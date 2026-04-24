@@ -1,0 +1,37 @@
+site_name: GateKeeper Docs
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.tabs.link
+    - search.highlight
+    - search.suggest
+
+  palette:
+    - scheme: default
+      primary: blue
+      accent: cyan
+    - scheme: slate
+      primary: black
+      accent: lime
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed
+  - pymdownx.highlight
+  - pymdownx.arithmatex
+
+# extra_javascript:
+#   - https://unpkg.com/aos@2.3.1/dist/aos.js
+
+# extra_css:
+#   - https://unpkg.com/aos@2.3.1/dist/aos.css
+#   - stylesheets/extra.css
