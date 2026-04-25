@@ -1,0 +1,30 @@
+/*DEFINIZIONE DELLA PALETTE DI COLORI PERSONALIZZATA*/
+
+:root {
+  --md-primary-fg-color: #0D1117;
+  --md-accent-fg-color: #00767A;
+  --md-default-bg-color: #0D1117;
+  --md-default-fg-color: #F0E2E7;
+}
+
+/* Header */
+.md-header {
+  background-color: #0D1117;
+}
+
+/* Sidebar */
+.md-sidebar {
+  background-color: #41474E;
+}
+
+/* Links */
+a {
+  color: #FFA400;
+}
+
+/* Buttons */
+.md-button {
+  background-color: #00767A;
+  color: #F0E2E7;
+  border-radius: 8px;
+}
