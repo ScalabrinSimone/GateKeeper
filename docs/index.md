@@ -2,56 +2,111 @@
 
 ## Smart tag, safe exit
 
-Benvenuto nella documentazione ufficiale del progetto GateKeeper.
+> Sistema IoT domestico intelligente che traccia oggetti e utenti
+> alla porta di casa — automaticamente, senza tracking continuo.
+
+[Scopri il progetto](panoramica/idea.md){ .md-button }
+[Architettura](panoramica/architettura.md){ .md-button }
 
 ---
 
-## 🚀 Obiettivo
+## Come funziona
 
-GateKeeper è un sistema IoT che permette di:
+```mermaid
+graph LR
+    A[🚪 Evento alla porta] --> B[📡 RFID rileva oggetti]
+    A --> C[📶 BLE rileva utente]
+    B & C --> D[🧠 Raspberry Pi associa]
+    D --> E[📱 Notifica contestuale]
+```
 
-- monitorare oggetti tramite RFID
-- identificare utenti tramite BLE
-- notificare eventi in tempo reale
+**In tre passi:**
 
----
-
-## 🧠 Architettura
-
-Il sistema è composto da:
-
-- Raspberry Pi (backend)
-- App (frontend)
-- Sensori RFID e BLE
+1. **Rileva** — RFID e BLE captano il transito alla porta
+2. **Associa** — il sistema collega utente e oggetti all'evento
+3. **Notifica** — l'app invia un alert solo se necessario
 
 ---
 
-## 📡 Stato progetto
+## I tre pilastri
 
-> 🚧 In sviluppo
+<div class="grid cards" markdown>
+
+-   📡 __RFID UHF__
+
+    ---
+
+    Ogni oggetto è dotato di un tag passivo.
+    Il lettore alla porta rileva automaticamente
+    cosa entra e cosa esce.
+
+-   📶 __Bluetooth Low Energy__
+
+    ---
+
+    Il sistema riconosce chi è presente
+    nei pressi della porta tramite
+    il telefono dell'utente.
+
+-   🔒 __Accesso sicuro__
+
+    ---
+
+    Cloudflare Tunnel garantisce accesso
+    remoto cifrato senza esporre
+    il Raspberry Pi su Internet.
+
+</div>
 
 ---
 
-## ✨ Feature
 
-- Tracking oggetti
-- Notifiche smart
-- Sistema multi-utente
+## Stack tecnologico
 
----
-
-## 🔗 Link utili
-
-- Repository GitHub
-- Board progetto
-- Documentazione tecnica
+| Componente | Tecnologia |
+|---|---|
+| 🧠 Hub centrale | Raspberry Pi 4 |
+| ⚙️ Backend | FastAPI + Python 3.11+ |
+| 🗄️ Database | SQLite → PostgreSQL |
+| 📱 App | Flet |
+| 🌐 Accesso remoto | Cloudflare Tunnel |
 
 ---
 
-<div data-aos="fade-up">
+## Esplora la documentazione
 
-### 🎯 Vision
+<div class="grid cards" markdown>
 
-Costruire un sistema domestico intelligente e sicuro.
+-   🗺️ __Panoramica__
+
+    ---
+
+    Idea, architettura generale e componenti del sistema.
+
+    [Vai →](panoramica/idea.md)
+
+-   📖 __Guida utente__
+
+    ---
+
+    Installazione, primo avvio e gestione delle notifiche.
+
+    [Vai →](guida-utente/installazione.md)
+
+-   🔧 __Parte tecnica__
+
+    ---
+
+    Backend, database, hardware e sicurezza.
+
+    [Vai →](parte-tecnica/backend.md)
+
+-   🚀 __Sviluppo__
+
+    ---
+
+    Roadmap e come contribuire al progetto.
+
+    [Vai →](sviluppo/roadmap.md)
 
 </div>

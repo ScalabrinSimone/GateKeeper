@@ -12,10 +12,10 @@
   background-color: #0D1117;
 }
 
-/* Sidebar */
+/* Sidebar (non funziona)
 .md-sidebar {
   background-color: #41474E;
-}
+}*/
 
 /* Links */
 a {
@@ -23,8 +23,14 @@ a {
 }
 
 /* Buttons */
-.md-button {
+.md-typeset .md-button {
   background-color: #00767A;
-  color: #F0E2E7;
+  color: #c7bbbf !important;
   border-radius: 8px;
+  padding: 0.4em 0.8em;
+}
+
+.mermaid .node {
+  rx: 8px !important; /* Raggio orizzontale */
+  ry: 8px !important; /* Raggio verticale */
 }
