@@ -1,4 +1,3 @@
-# Requirements per raspberry
-
 fastapi
-uvicorn
+uvicorn[standard]
+werkzeug
