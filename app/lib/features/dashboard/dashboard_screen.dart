@@ -11,18 +11,13 @@ import 'widgets/person_status_card.dart';
 import 'widgets/presence_avatar.dart';
 import 'widgets/recent_activity_card.dart';
 
-/// Dashboard iniziale.
+/// Dashboard principale (Gateway Monitor).
 ///
-/// Questa schermata replica la struttura principale del mockup:
-/// - header con azioni utente
-/// - cards overview
-/// - activity feed
-/// - persone in casa / fuori
+/// Layout:
+/// - Desktop: sidebar + contenuto a due colonne (activity | presenza)
+/// - Mobile:  scroll verticale con cards e feed
 ///
-/// TODO:
-/// - collegare dati reali dal backend
-/// - aggiungere popup notifiche/account
-/// - animare cards e numeri
+/// TODO: sostituire i dati statici con stream dal backend FastAPI.
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
@@ -30,29 +25,18 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < AppBreakpoints.mobile;
+        final isMobile =
+            constraints.maxWidth < AppBreakpoints.mobile;
 
         return SafeArea(
           child: SingleChildScrollView(
-            padding: EdgeInsets.zero,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    isMobile ? 16 : 24,
-                    12,
-                    isMobile ? 16 : 24,
-                    0,
-                  ),
-                  child: Row(
-                    children: [
-                      if (isMobile) const Expanded(child: SizedBox()),
-                      const TopActionBar(),
-                    ],
-                  ),
-                ),
+                // Header con titolo + azioni a destra
                 PageHeader(
                   title: isMobile ? 'Dashboard' : 'Gateway Monitor',
+                  trailing: const TopActionBar(),
                 ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(
@@ -62,8 +46,8 @@ class DashboardScreen extends StatelessWidget {
                     24,
                   ),
                   child: isMobile
-                      ? _MobileDashboardContent()
-                      : _DesktopDashboardContent(),
+                      ? const _MobileDashboardContent()
+                      : const _DesktopDashboardContent(),
                 ),
               ],
             ),
@@ -74,56 +58,67 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Desktop layout
+// ---------------------------------------------------------------------------
 class _DesktopDashboardContent extends StatelessWidget {
+  const _DesktopDashboardContent();
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const SizedBox(height: 4),
-        GridView.count(
-          crossAxisCount: 4,
-          shrinkWrap: true,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.55,
-          physics: const NeverScrollableScrollPhysics(),
-          children: const [
-            DashboardStatCard(
-              label: 'Gateway Status',
-              value: 'Active',
-              subtitle: 'All sensors online',
-              icon: Icons.shield_outlined,
-              highlightColor: AppColors.success,
-            ),
-            DashboardStatCard(
-              label: 'Users at Home',
-              value: '3',
-              subtitle: '2 away',
-              icon: Icons.home_outlined,
-            ),
-            DashboardStatCard(
-              label: 'Tracked Objects Outside',
-              value: '4',
-              subtitle: 'Out with users',
-              icon: Icons.inventory_2_outlined,
-            ),
-            DashboardStatCard(
-              label: 'Critical Alerts',
-              value: '1',
-              subtitle: 'Action Required',
-              icon: Icons.warning_amber_outlined,
-              highlightColor: AppColors.orange,
-            ),
-          ],
+        // Riga con 4 stat-card
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: const [
+              Expanded(
+                child: DashboardStatCard(
+                  label: 'Gateway Status',
+                  value: 'Active',
+                  subtitle: 'All sensors online',
+                  icon: Icons.shield_outlined,
+                  highlightColor: AppColors.success,
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: DashboardStatCard(
+                  label: 'Users at Home',
+                  value: '3',
+                  subtitle: '2 away',
+                  icon: Icons.home_outlined,
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: DashboardStatCard(
+                  label: 'Tracked Objects Outside',
+                  value: '4',
+                  subtitle: 'Out with users',
+                  icon: Icons.inventory_2_outlined,
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: DashboardStatCard(
+                  label: 'Critical Alerts',
+                  value: '1',
+                  subtitle: 'Action Required',
+                  icon: Icons.warning_amber_outlined,
+                  highlightColor: AppColors.orange,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
+        // Riga activity + presenza
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(
-              flex: 3,
-              child: _ActivityColumn(),
-            ),
+            const Expanded(flex: 3, child: _ActivityColumn()),
             const SizedBox(width: 20),
             Expanded(
               flex: 2,
@@ -131,12 +126,25 @@ class _DesktopDashboardContent extends StatelessWidget {
                 children: const [
                   PersonStatusCard(
                     title: 'Who is at Home',
-                    people: ['Alice - Admin', 'Bob - Manager', 'Dave - Child'],
+                    people: [
+                      _PersonEntry(
+                          name: 'Alice', role: 'Admin', isOnline: true),
+                      _PersonEntry(
+                          name: 'Bob', role: 'Manager', isOnline: true),
+                      _PersonEntry(
+                          name: 'Dave', role: 'Child', isOnline: true),
+                    ],
                   ),
                   SizedBox(height: 20),
                   PersonStatusCard(
                     title: 'Who is Away',
-                    people: ['Charlie - Left at 07:45 AM'],
+                    people: [
+                      _PersonEntry(
+                          name: 'Charlie',
+                          role: 'Child',
+                          subtitle: 'Left at 07:45 AM',
+                          isOnline: false),
+                    ],
                   ),
                 ],
               ),
@@ -148,7 +156,12 @@ class _DesktopDashboardContent extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Mobile layout
+// ---------------------------------------------------------------------------
 class _MobileDashboardContent extends StatelessWidget {
+  const _MobileDashboardContent();
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -160,13 +173,13 @@ class _MobileDashboardContent extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              PresenceAvatar(name: 'Alice'),
+              PresenceAvatar(name: 'Alice', isOnline: true),
               SizedBox(width: 20),
-              PresenceAvatar(name: 'Bob'),
+              PresenceAvatar(name: 'Bob', isOnline: true),
               SizedBox(width: 20),
-              PresenceAvatar(name: 'Dave'),
+              PresenceAvatar(name: 'Dave', isOnline: true),
               SizedBox(width: 20),
-              PresenceAvatar(name: 'Charlie'),
+              PresenceAvatar(name: 'Charlie', isOnline: false),
             ],
           ),
         ),
@@ -178,7 +191,7 @@ class _MobileDashboardContent extends StatelessWidget {
           shrinkWrap: true,
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          childAspectRatio: 1.08,
+          childAspectRatio: 1.1,
           physics: const NeverScrollableScrollPhysics(),
           children: const [
             DashboardStatCard(
@@ -191,7 +204,7 @@ class _MobileDashboardContent extends StatelessWidget {
             DashboardStatCard(
               label: 'Alerts',
               value: '1',
-              subtitle: 'Action Req',
+              subtitle: 'Action Req.',
               icon: Icons.warning_amber_outlined,
               highlightColor: AppColors.orange,
             ),
@@ -210,90 +223,180 @@ class _MobileDashboardContent extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 28),
-        Row(
-          children: [
-            const Text('RECENT ACTIVITY', style: AppTextStyles.label),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.stormyTeal.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'Live',
-                style: TextStyle(
-                  color: AppColors.live,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
         const _ActivityColumn(),
       ],
     );
   }
 }
 
+// ---------------------------------------------------------------------------
+// Activity column (condivisa desktop + mobile)
+// ---------------------------------------------------------------------------
 class _ActivityColumn extends StatelessWidget {
   const _ActivityColumn();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: const [
-        GlassCard(
-          padding: EdgeInsets.all(0),
-          child: Padding(
-            padding: EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header con titolo + badge LIVE
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+            child: Row(
               children: [
-                Text(
+                const Text(
                   'Gateway Activity',
                   style: AppTextStyles.sectionTitle,
                 ),
-                SizedBox(height: 18),
+                const Spacer(),
+                // Badge LIVE con puntino animato
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color:
+                        AppColors.stormyTeal.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _LiveDot(),
+                      SizedBox(width: 6),
+                      Text(
+                        'Live',
+                        style: TextStyle(
+                          color: AppColors.live,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+            child: Column(
+              children: const [
                 RecentActivityCard(
                   title: 'UNAUTHORIZED EXIT',
                   description:
                       'Object left the house without any authenticated user nearby.',
                   time: '10:45 AM',
                   objectName: 'MacBook Pro',
+                  objectIcon: Icons.laptop_mac_outlined,
                   tags: ['Electronics', 'Office'],
                   icon: Icons.power_settings_new,
                   borderColor: AppColors.orange,
                   actionLabel: 'Mark as False Alarm',
                 ),
-                SizedBox(height: 16),
+                SizedBox(height: 14),
                 RecentActivityCard(
                   title: 'Forgotten Item Alert',
                   description:
                       'Bob left the house but forgot an essential item.',
                   time: '09:15 AM',
                   objectName: 'Wallet',
+                  objectIcon: Icons.wallet_outlined,
                   tags: ['Usually in Bedroom'],
                   icon: Icons.info_outline,
                   borderColor: AppColors.stormyTealBright,
                 ),
-                SizedBox(height: 16),
+                SizedBox(height: 14),
                 RecentActivityCard(
                   title: 'Alice Arrived Home',
-                  description: 'Entered with authenticated BLE node.',
+                  description:
+                      'Entered with authenticated BLE node.',
                   time: '08:30 AM',
                   objectName: 'House Keys',
+                  objectIcon: Icons.vpn_key_outlined,
                   tags: ['Backpack'],
                   icon: Icons.arrow_forward,
-                  borderColor: AppColors.border,
+                  // Grigio più chiaro per eventi neutrali
+                  borderColor: Color(0xFF4A5568),
+                  cardBackground: Color(0xFF252D3D),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Dati di una persona nella card presenza.
+///
+/// Parametri:
+/// - [name]: nome visualizzato
+/// - [role]: ruolo (Admin, Manager, Child)
+/// - [subtitle]: testo secondario opzionale (es. 'Left at 07:45 AM')
+/// - [isOnline]: true = pallino verde, false = pallino grigio
+class _PersonEntry {
+  const _PersonEntry({
+    required this.name,
+    required this.role,
+    this.subtitle,
+    required this.isOnline,
+  });
+
+  final String name;
+  final String role;
+  final String? subtitle;
+  final bool isOnline;
+}
+
+/// Pallino verde pulsante per il badge LIVE.
+class _LiveDot extends StatefulWidget {
+  const _LiveDot();
+
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pulsa tra 0.3 e 1.0 ogni 1.2 secondi
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: AppColors.live,
+          shape: BoxShape.circle,
         ),
-      ],
+      ),
     );
   }
 }

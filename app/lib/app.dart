@@ -4,16 +4,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
-/// Root widget dell'app.
+/// Root widget dell'app GateKeeper.
 ///
-/// Qui configuriamo:
-/// - tema globale
-/// - router centrale
-/// - localizzazione IT/EN
-///
-/// Tenerlo separato da `main.dart` è comodo perché:
-/// - `main.dart` resta pulito;
-/// - nei test puoi montare direttamente `GateKeeperApp`.
+/// - [debugShowCheckedModeBanner] è false: rimuove il banner rosso "DEBUG" in alto a destra.
+/// - [MaterialApp.router] usa go_router per la navigazione dichiarativa.
+/// - La localizzazione IT/EN viene iniettata qui una sola volta.
 class GateKeeperApp extends StatelessWidget {
   const GateKeeperApp({super.key});
 
@@ -21,6 +16,7 @@ class GateKeeperApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'GateKeeper',
+      // Rimuove il banner DEBUG rosso in alto a destra
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       routerConfig: AppRouter.router,

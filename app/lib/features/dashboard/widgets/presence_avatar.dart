@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
 
+/// Avatar circolare con pallino di presenza (mobile).
+///
+/// Parametri:
+/// - [name]: nome da visualizzare sotto l'avatar
+/// - [isOnline]: true = pallino verde, false = pallino grigio
 class PresenceAvatar extends StatelessWidget {
   const PresenceAvatar({
     super.key,
     required this.name,
+    this.isOnline = true,
   });
 
   final String name;
+  final bool isOnline;
 
   @override
   Widget build(BuildContext context) {
@@ -17,32 +24,34 @@ class PresenceAvatar extends StatelessWidget {
         Stack(
           clipBehavior: Clip.none,
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 28,
               backgroundColor: AppColors.panelSoft,
-              child: Icon(Icons.person, color: AppColors.textPrimary),
+              child: const Icon(Icons.person,
+                  color: AppColors.textSecondary, size: 28),
             ),
             Positioned(
               right: -1,
               bottom: -1,
               child: Container(
-                width: 14,
-                height: 14,
+                width: 13,
+                height: 13,
                 decoration: BoxDecoration(
-                  color: AppColors.live,
+                  color: isOnline ? AppColors.success : AppColors.textMuted,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.inkBlack, width: 2),
+                  border:
+                      Border.all(color: AppColors.inkBlack, width: 2),
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Text(
           name,
           style: const TextStyle(
             color: AppColors.textSecondary,
-            fontSize: 13,
+            fontSize: 12,
           ),
         ),
       ],

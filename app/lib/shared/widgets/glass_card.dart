@@ -2,41 +2,38 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 
-/// Card riutilizzabile con look scuro/glass morbido.
+/// Card base dell'app GateKeeper.
 ///
-/// La uso già nel blocco 1 per evitare duplicazione di BoxDecoration.
+/// Parametri:
+/// - [child]: contenuto interno
+/// - [padding]: padding interno (default: EdgeInsets.all(16))
+/// - [borderColor]: colore bordo (default: [AppColors.border])
+/// - [color]: sfondo override opzionale (utile per card 'neutre' più chiare)
 class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(20),
+    this.padding,
     this.borderColor,
-    this.height,
+    this.color,
   });
 
   final Widget child;
-  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? padding;
   final Color? borderColor;
-  final double? height;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: height,
-      padding: padding,
+      width: double.infinity,
+      padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.panel.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(24),
+        color: color ?? AppColors.panel,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: borderColor ?? AppColors.border,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 30,
-            offset: Offset(0, 16),
-          ),
-        ],
       ),
       child: child,
     );
