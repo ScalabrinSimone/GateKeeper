@@ -7,6 +7,7 @@ import '../../shared/widgets/top_action_bar.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'widgets/dashboard_stat_card.dart';
+// PersonEntry è definita qui dentro person_status_card.dart — non ridichiarare!
 import 'widgets/person_status_card.dart';
 import 'widgets/presence_avatar.dart';
 import 'widgets/recent_activity_card.dart';
@@ -25,15 +26,14 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isMobile =
-            constraints.maxWidth < AppBreakpoints.mobile;
+        final isMobile = constraints.maxWidth < AppBreakpoints.mobile;
 
         return SafeArea(
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header con titolo + azioni a destra
+                // Header con titolo a sinistra + Alerts/profilo a destra
                 PageHeader(
                   title: isMobile ? 'Dashboard' : 'Gateway Monitor',
                   trailing: const TopActionBar(),
@@ -68,7 +68,7 @@ class _DesktopDashboardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Riga con 4 stat-card
+        // Riga 4 stat-cards con altezza uniforme
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -114,7 +114,7 @@ class _DesktopDashboardContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        // Riga activity + presenza
+        // Riga activity (sinistra) + presenza (destra)
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -124,14 +124,15 @@ class _DesktopDashboardContent extends StatelessWidget {
               flex: 2,
               child: Column(
                 children: const [
+                  // Usiamo PersonEntry (pubblica, da person_status_card.dart)
                   PersonStatusCard(
                     title: 'Who is at Home',
                     people: [
-                      _PersonEntry(
+                      PersonEntry(
                           name: 'Alice', role: 'Admin', isOnline: true),
-                      _PersonEntry(
+                      PersonEntry(
                           name: 'Bob', role: 'Manager', isOnline: true),
-                      _PersonEntry(
+                      PersonEntry(
                           name: 'Dave', role: 'Child', isOnline: true),
                     ],
                   ),
@@ -139,11 +140,12 @@ class _DesktopDashboardContent extends StatelessWidget {
                   PersonStatusCard(
                     title: 'Who is Away',
                     people: [
-                      _PersonEntry(
-                          name: 'Charlie',
-                          role: 'Child',
-                          subtitle: 'Left at 07:45 AM',
-                          isOnline: false),
+                      PersonEntry(
+                        name: 'Charlie',
+                        role: 'Child',
+                        subtitle: 'Left at 07:45 AM',
+                        isOnline: false,
+                      ),
                     ],
                   ),
                 ],
@@ -230,7 +232,7 @@ class _MobileDashboardContent extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Activity column (condivisa desktop + mobile)
+// Activity column — condivisa desktop + mobile
 // ---------------------------------------------------------------------------
 class _ActivityColumn extends StatelessWidget {
   const _ActivityColumn();
@@ -242,23 +244,18 @@ class _ActivityColumn extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header con titolo + badge LIVE
+          // Header: titolo a sinistra + badge LIVE a destra
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
             child: Row(
               children: [
-                const Text(
-                  'Gateway Activity',
-                  style: AppTextStyles.sectionTitle,
-                ),
+                const Text('Gateway Activity', style: AppTextStyles.sectionTitle),
                 const Spacer(),
-                // Badge LIVE con puntino animato
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color:
-                        AppColors.stormyTeal.withValues(alpha: 0.18),
+                    color: AppColors.stormyTeal.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Row(
@@ -312,14 +309,12 @@ class _ActivityColumn extends StatelessWidget {
                 SizedBox(height: 14),
                 RecentActivityCard(
                   title: 'Alice Arrived Home',
-                  description:
-                      'Entered with authenticated BLE node.',
+                  description: 'Entered with authenticated BLE node.',
                   time: '08:30 AM',
                   objectName: 'House Keys',
                   objectIcon: Icons.vpn_key_outlined,
                   tags: ['Backpack'],
                   icon: Icons.arrow_forward,
-                  // Grigio più chiaro per eventi neutrali
                   borderColor: Color(0xFF4A5568),
                   cardBackground: Color(0xFF252D3D),
                 ),
@@ -332,28 +327,14 @@ class _ActivityColumn extends StatelessWidget {
   }
 }
 
-/// Dati di una persona nella card presenza.
+// ---------------------------------------------------------------------------
+// Pallino LIVE pulsante
+// ---------------------------------------------------------------------------
+
+/// Pallino verde che pulsa per il badge LIVE nell'header di Gateway Activity.
 ///
-/// Parametri:
-/// - [name]: nome visualizzato
-/// - [role]: ruolo (Admin, Manager, Child)
-/// - [subtitle]: testo secondario opzionale (es. 'Left at 07:45 AM')
-/// - [isOnline]: true = pallino verde, false = pallino grigio
-class _PersonEntry {
-  const _PersonEntry({
-    required this.name,
-    required this.role,
-    this.subtitle,
-    required this.isOnline,
-  });
-
-  final String name;
-  final String role;
-  final String? subtitle;
-  final bool isOnline;
-}
-
-/// Pallino verde pulsante per il badge LIVE.
+/// Usa un [AnimationController] che ripete in loop (reverse: true),
+/// animando l'opacità tra 0.3 e 1.0 ogni 1.2 secondi.
 class _LiveDot extends StatefulWidget {
   const _LiveDot();
 
@@ -369,7 +350,6 @@ class _LiveDotState extends State<_LiveDot>
   @override
   void initState() {
     super.initState();
-    // Pulsa tra 0.3 e 1.0 ogni 1.2 secondi
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -381,6 +361,7 @@ class _LiveDotState extends State<_LiveDot>
 
   @override
   void dispose() {
+    // Fondamentale: smaltire il controller per non avere memory leak
     _ctrl.dispose();
     super.dispose();
   }
