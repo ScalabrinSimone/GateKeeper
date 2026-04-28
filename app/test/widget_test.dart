@@ -1,30 +1,22 @@
-// This is a basic Flutter widget test.
+// Test base dell'app GateKeeper.
+// Aggiornato per usare GateKeeperApp al posto del vecchio MyApp di default.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// TODO: man mano che aggiungi schermate, aggiungi qui test specifici.
+// Usa tester.pumpWidget + tester.pump(Duration) per testare animazioni.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:app/main.dart';
+import 'package:gatekeeper_app/app.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('GateKeeper app smoke test', (WidgetTester tester) async {
+    // Monta il widget radice dell'app.
+    // pumpWidget avvia il build tree completo: GateKeeperApp → router → shell → dashboard.
+    await tester.pumpWidget(const GateKeeperApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    // pump() esegue un frame in più per completare animazioni/routing iniziale.
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verifica che il titolo GateKeeper sia presente nell'albero dei widget.
+    expect(find.text('GateKeeper'), findsWidgets);
   });
 }
