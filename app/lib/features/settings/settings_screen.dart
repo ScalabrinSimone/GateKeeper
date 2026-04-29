@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/constants/app_breakpoints.dart';
+import '../../core/providers/locale_provider.dart';
+import '../../core/providers/theme_provider.dart';
 import '../../shared/widgets/glass_card.dart';
 import '../../shared/widgets/gk_badge.dart';
 import '../../shared/widgets/page_header.dart';
@@ -15,7 +18,7 @@ import 'widgets/settings_tile.dart';
 
 /// Sezioni disponibili nel pannello impostazioni.
 ///
-/// Usato sia per la sub-nav laterale (desktop) che per il menu a lista (mobile).
+/// Usato sia per la sub-nav laterale (desktop) che per il menu a chip (mobile).
 enum _SettingsSection {
   alertRules,
   gatewayDevice,
@@ -28,21 +31,21 @@ enum _SettingsSection {
 /// Metadati di ogni sezione: icona e label.
 extension _SettingsSectionMeta on _SettingsSection {
   IconData get icon => switch (this) {
-        _SettingsSection.alertRules    => Icons.notifications_active_outlined,
+        _SettingsSection.alertRules => Icons.notifications_active_outlined,
         _SettingsSection.gatewayDevice => Icons.router_outlined,
-        _SettingsSection.rfidBle       => Icons.sensors_outlined,
-        _SettingsSection.myAccount     => Icons.person_outline,
-        _SettingsSection.appearance    => Icons.palette_outlined,
-        _SettingsSection.dataPrivacy   => Icons.shield_outlined,
+        _SettingsSection.rfidBle => Icons.sensors_outlined,
+        _SettingsSection.myAccount => Icons.person_outline,
+        _SettingsSection.appearance => Icons.palette_outlined,
+        _SettingsSection.dataPrivacy => Icons.shield_outlined,
       };
 
   String get label => switch (this) {
-        _SettingsSection.alertRules    => 'Alert Rules',
+        _SettingsSection.alertRules => 'Alert Rules',
         _SettingsSection.gatewayDevice => 'Gateway Device',
-        _SettingsSection.rfidBle       => 'RFID & BLE',
-        _SettingsSection.myAccount     => 'My Account',
-        _SettingsSection.appearance    => 'Appearance',
-        _SettingsSection.dataPrivacy   => 'Data & Privacy',
+        _SettingsSection.rfidBle => 'RFID & BLE',
+        _SettingsSection.myAccount => 'My Account',
+        _SettingsSection.appearance => 'Appearance',
+        _SettingsSection.dataPrivacy => 'Data & Privacy',
       };
 }
 
@@ -50,22 +53,22 @@ extension _SettingsSectionMeta on _SettingsSection {
 // SettingsScreen
 // ---------------------------------------------------------------------------
 
-/// Schermata impostazioni con sub-navigation laterale (desktop) o a lista (mobile).
+/// Schermata impostazioni con sub-navigation laterale (desktop) o chip (mobile).
 ///
 /// Layout desktop:
-/// - Colonna sinistra (240px): menu sezioni con highlight animato
+/// - Colonna sinistra (220px): menu sezioni con highlight animato
 /// - Area destra: contenuto della sezione selezionata
 ///
 /// Layout mobile:
-/// - Lista compatta delle sezioni, tap apre la sezione inline.
+/// - Chip scorrevoli orizzontalmente, contenuto sotto
 ///
-/// Sezioni disponibili:
+/// Sezioni:
 /// 1. Alert Rules — regole di notifica e alert critico
 /// 2. Gateway Device — IP, tunnel, restart
 /// 3. RFID & BLE — calibrazione sensori
 /// 4. My Account — avatar, nome, password
-/// 5. Appearance — tema, lingua
-/// 6. Data & Privacy — export, reset dati
+/// 5. Appearance — tema dark/light (collegato a ThemeProvider), lingua (collegato a LocaleProvider)
+/// 6. Data & Privacy — notifiche push, export, reset dati
 ///
 /// TODO: collegare toggle e campi al backend /api/settings.
 /// TODO: implementare persistenza locale con SharedPreferences.
@@ -81,21 +84,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ── Stato toggle notifiche ─────────────────────────────────────────────────
   // TODO: caricare da SharedPreferences / GET /api/settings all'avvio
-  bool _notifEntry         = true;
-  bool _notifExit          = true;
-  bool _notifAlert         = true;
-  bool _notifForgotten     = true;
-  bool _notifUnauthorized  = true;
-  bool _notifQuietHours    = false;
-  bool _alertUnauthorized  = true;
+  bool _notifEntry = true;
+  bool _notifExit = true;
+  bool _notifAlert = true;
+  bool _notifForgotten = true;
+  bool _notifUnauthorized = true;
+  bool _notifQuietHours = false;
+  bool _alertUnauthorized = true;
   bool _alertForgottenEssentials = true;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isDesktop =
-            constraints.maxWidth >= AppBreakpoints.desktop;
+        final isDesktop = constraints.maxWidth >= AppBreakpoints.desktop;
 
         return SafeArea(
           child: isDesktop
@@ -119,7 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Costruisce il widget del contenuto per la sezione attiva.
   Widget _buildSectionContent(BuildContext context) {
     return switch (_activeSection) {
-      _SettingsSection.alertRules    => _AlertRulesContent(
+      _SettingsSection.alertRules => _AlertRulesContent(
           alertUnauthorized: _alertUnauthorized,
           onAlertUnauthorized: (v) =>
               setState(() => _alertUnauthorized = v),
@@ -127,22 +129,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onAlertForgotten: (v) =>
               setState(() => _alertForgottenEssentials = v),
           quietHours: _notifQuietHours,
-          onQuietHours: (v) =>
-              setState(() => _notifQuietHours = v),
+          onQuietHours: (v) => setState(() => _notifQuietHours = v),
         ),
       _SettingsSection.gatewayDevice => _GatewayDeviceContent(
           onAction: (msg) => _todoSnack(context, msg),
         ),
-      _SettingsSection.rfidBle       => _RfidBleContent(
+      _SettingsSection.rfidBle => _RfidBleContent(
           onAction: (msg) => _todoSnack(context, msg),
         ),
-      _SettingsSection.myAccount     => _MyAccountContent(
+      _SettingsSection.myAccount => _MyAccountContent(
           onAction: (msg) => _todoSnack(context, msg),
         ),
-      _SettingsSection.appearance    => _AppearanceContent(
-          onAction: (msg) => _todoSnack(context, msg),
+      // Appearance: passa i provider direttamente al widget
+      // In questo modo _AppearanceContent può leggere e modificare
+      // tema e lingua senza dipendere dal BuildContext genitore.
+      _SettingsSection.appearance => _AppearanceContent(
+          themeProvider: context.read<ThemeProvider>(),
+          localeProvider: context.read<LocaleProvider>(),
         ),
-      _SettingsSection.dataPrivacy   => _DataPrivacyContent(
+      _SettingsSection.dataPrivacy => _DataPrivacyContent(
           onAction: (msg) => _todoSnack(context, msg),
           notifEntry: _notifEntry,
           onNotifEntry: (v) => setState(() => _notifEntry = v),
@@ -222,7 +227,6 @@ class _DesktopLayout extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Titolo sezione corrente
                 Text(
                   activeSection.label,
                   style: const TextStyle(
@@ -231,7 +235,6 @@ class _DesktopLayout extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 4),
                 const SizedBox(height: 20),
                 content,
               ],
@@ -244,7 +247,7 @@ class _DesktopLayout extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Layout mobile: header + contenuto scroll
+// Layout mobile: chip navigazione + contenuto
 // ---------------------------------------------------------------------------
 
 class _MobileLayout extends StatelessWidget {
@@ -266,7 +269,6 @@ class _MobileLayout extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const PageHeader(title: 'Settings'),
-          // Chip sezioni a scorrimento orizzontale
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -328,7 +330,7 @@ class _MobileLayout extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Sub-nav item (usato nel desktop layout)
+// Sub-nav item (desktop)
 // ---------------------------------------------------------------------------
 
 /// Voce della sub-navigazione sinistra nelle Settings (solo desktop).
@@ -355,9 +357,9 @@ class _SubNavItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          // L'item attivo ha un background teal semi-trasparente
           color: isActive
               ? AppColors.stormyTeal.withValues(alpha: 0.15)
               : Colors.transparent,
@@ -400,8 +402,6 @@ class _SubNavItem extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 /// Sezione Alert Rules: regole di notifica + gateway config.
-///
-/// Parametri bool con relativi callback per gestire lo stato nel parent.
 class _AlertRulesContent extends StatelessWidget {
   const _AlertRulesContent({
     required this.alertUnauthorized,
@@ -424,19 +424,15 @@ class _AlertRulesContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Descrizione sezione
         const Text(
           'Configure when GateKeeper should send notifications or trigger critical alerts.',
-          style: TextStyle(
-              color: AppColors.textSecondary, fontSize: 13),
+          style:
+              TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 20),
-
-        // Card regole alert
         GlassCard(
           child: Column(
             children: [
-              // Toggle: unauthorized exit alert
               _AlertRuleRow(
                 title: 'Unauthorized Exit Alerts',
                 subtitle:
@@ -445,7 +441,6 @@ class _AlertRulesContent extends StatelessWidget {
                 onChanged: onAlertUnauthorized,
               ),
               const Divider(color: AppColors.border),
-              // Toggle: forgotten essential items
               _AlertRuleRow(
                 title: 'Forgotten Essential Items',
                 subtitle:
@@ -454,7 +449,6 @@ class _AlertRulesContent extends StatelessWidget {
                 onChanged: onAlertForgotten,
               ),
               const Divider(color: AppColors.border),
-              // Toggle: quiet hours
               _AlertRuleRow(
                 title: 'Quiet Hours',
                 subtitle:
@@ -462,14 +456,12 @@ class _AlertRulesContent extends StatelessWidget {
                 value: quietHours,
                 onChanged: onQuietHours,
               ),
-              // Selettori orari quiet (visibili solo se quiet hours è attivo)
               if (quietHours)
                 Padding(
-                  padding:
-                      const EdgeInsets.fromLTRB(0, 8, 0, 4),
+                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
                   child: Row(
                     children: [
-                      // TODO: implementare TimePickerDialog
+                      // TODO: implementare TimePickerDialog per selezionare l'ora
                       _TimeChip(label: '10:00 PM'),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 8),
@@ -490,7 +482,6 @@ class _AlertRulesContent extends StatelessWidget {
   }
 }
 
-/// Riga con toggle per una regola di alert.
 class _AlertRuleRow extends StatelessWidget {
   const _AlertRuleRow({
     required this.title,
@@ -514,22 +505,15 @@ class _AlertRuleRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text(title,
+                    style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
+                Text(subtitle,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12)),
               ],
             ),
           ),
@@ -544,7 +528,6 @@ class _AlertRuleRow extends StatelessWidget {
   }
 }
 
-/// Chip selettore orario (stub — TODO: aprire TimePickerDialog).
 class _TimeChip extends StatelessWidget {
   const _TimeChip({required this.label});
   final String label;
@@ -561,11 +544,9 @@ class _TimeChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-                color: AppColors.textPrimary, fontSize: 13),
-          ),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.textPrimary, fontSize: 13)),
           const SizedBox(width: 4),
           const Icon(Icons.keyboard_arrow_down,
               size: 14, color: AppColors.textSecondary),
@@ -579,7 +560,7 @@ class _TimeChip extends StatelessWidget {
 // 2. Gateway Device
 // ---------------------------------------------------------------------------
 
-/// Sezione Gateway Device: stato dispositivo, IP, Cloudflare, restart.
+/// Sezione Gateway Device: stato Raspberry Pi, IP, Cloudflare Tunnel, restart.
 class _GatewayDeviceContent extends StatelessWidget {
   const _GatewayDeviceContent({required this.onAction});
   final ValueChanged<String> onAction;
@@ -591,8 +572,8 @@ class _GatewayDeviceContent extends StatelessWidget {
       children: [
         const Text(
           'Manage your Raspberry Pi gateway and network settings.',
-          style: TextStyle(
-              color: AppColors.textSecondary, fontSize: 13),
+          style:
+              TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 20),
         GlassCard(
@@ -601,7 +582,7 @@ class _GatewayDeviceContent extends StatelessWidget {
             children: [
               SettingsTile(
                 label: 'Gateway IP / Hostname',
-                subtitle: '192.168.1.100',
+                subtitle: '192.168.1.150',
                 icon: Icons.dns_outlined,
                 onTap: () => onAction('Edit Gateway IP'),
               ),
@@ -622,7 +603,6 @@ class _GatewayDeviceContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        // Card gateway online con azioni
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,24 +620,19 @@ class _GatewayDeviceContent extends StatelessWidget {
                         color: AppColors.stormyTealBright, size: 18),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Main Entry Gateway',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          'IP: 192.168.1.100 · Uptime: 45 days',
-                          style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12),
-                        ),
+                      children: [
+                        Text('Main Entry Gateway',
+                            style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
+                        Text('IP: 192.168.1.150 · Uptime: 45 days',
+                            style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12)),
                       ],
                     ),
                   ),
@@ -713,7 +688,7 @@ class _GatewayDeviceContent extends StatelessWidget {
 // 3. RFID & BLE
 // ---------------------------------------------------------------------------
 
-/// Sezione RFID & BLE: stato reader, calibrazione range scanner.
+/// Sezione RFID & BLE: stato reader, calibrazione range BLE, intervallo RFID.
 class _RfidBleContent extends StatelessWidget {
   const _RfidBleContent({required this.onAction});
   final ValueChanged<String> onAction;
@@ -725,8 +700,8 @@ class _RfidBleContent extends StatelessWidget {
       children: [
         const Text(
           'Adjust sensor ranges and read intervals to prevent false positives.',
-          style: TextStyle(
-              color: AppColors.textSecondary, fontSize: 13),
+          style:
+              TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 20),
         GlassCard(
@@ -777,7 +752,7 @@ class _RfidBleContent extends StatelessWidget {
 // 4. My Account
 // ---------------------------------------------------------------------------
 
-/// Sezione My Account: avatar, nome, email, cambio password.
+/// Sezione My Account: avatar, nome, email, cambio password, sessioni, 2FA.
 class _MyAccountContent extends StatelessWidget {
   const _MyAccountContent({required this.onAction});
   final ValueChanged<String> onAction;
@@ -787,42 +762,33 @@ class _MyAccountContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Card profilo con avatar
         GlassCard(
           child: Row(
             children: [
-              // Avatar utente
               CircleAvatar(
                 radius: 28,
                 backgroundColor:
                     AppColors.orange.withValues(alpha: 0.2),
-                child: const Text(
-                  'A',
-                  style: TextStyle(
-                    color: AppColors.orange,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: const Text('A',
+                    style: TextStyle(
+                        color: AppColors.orange,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700)),
               ),
               const SizedBox(width: 16),
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Alice Rossi',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      'alice@home.local · Admin',
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 13),
-                    ),
+                  children: [
+                    Text('Alice Rossi',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600)),
+                    Text('alice@home.local · Admin',
+                        style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13)),
                   ],
                 ),
               ),
@@ -830,8 +796,8 @@ class _MyAccountContent extends StatelessWidget {
                 onPressed: () => onAction('Edit Profile'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.stormyTealBright,
-                  side: const BorderSide(
-                      color: AppColors.stormyTeal),
+                  side:
+                      const BorderSide(color: AppColors.stormyTeal),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -872,50 +838,341 @@ class _MyAccountContent extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Appearance
+// 5. Appearance — CONNESSA AI PROVIDER REALI
 // ---------------------------------------------------------------------------
 
-/// Sezione Appearance: tema, lingua.
+/// Sezione Appearance: toggle dark/light theme e selezione lingua.
+///
+/// Questa sezione è l'unica che modifica direttamente i provider globali
+/// dell'app. Le altre sezioni usano stato locale + snackBar stub.
+///
+/// Come funziona il tema:
+/// - [ThemeProvider.toggle()] alterna dark ↔ light
+/// - [MaterialApp.router] in app.dart ascolta [ThemeProvider.isDark]
+///   e passa il ThemeMode corretto a Flutter — l'intera app si ridisegna
+///
+/// Come funziona la lingua:
+/// - [LocaleProvider.setLocale()] cambia la locale dell'app
+/// - [MaterialApp.router] in app.dart ascolta [LocaleProvider.locale]
+///   e aggiorna il [Localizations] — i widget localizzati si adattano
+///
+/// NOTA: i colori del brand (teal, orange) NON cambiano tra i temi;
+/// cambia solo lo sfondo e il testo (dark surfaces ↔ light surfaces).
+/// Vedi [AppColors] vs [AppColorsLight] in app_colors.dart.
+///
+/// TODO: persistere la scelta tema/lingua con SharedPreferences.
+///
+/// Parametri:
+/// - [themeProvider]: il provider del tema, iniettato dal parent
+/// - [localeProvider]: il provider della lingua, iniettato dal parent
 class _AppearanceContent extends StatelessWidget {
-  const _AppearanceContent({required this.onAction});
-  final ValueChanged<String> onAction;
+  const _AppearanceContent({
+    required this.themeProvider,
+    required this.localeProvider,
+  });
+
+  final ThemeProvider themeProvider;
+  final LocaleProvider localeProvider;
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          SettingsTile(
-            label: 'Theme',
-            subtitle: 'Dark (default)',
-            icon: Icons.dark_mode_outlined,
-            // TODO: aggiungere light theme e toggle
-            onTap: () => onAction('Theme selector'),
+    // Ascoltiamo i provider qui per ricostruire quando cambiano.
+    // context.watch fa sì che il widget si ridisegni quando il provider notifica.
+    final theme = context.watch<ThemeProvider>();
+    final locale = context.watch<LocaleProvider>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Customize the look and language of GateKeeper.',
+          style:
+              TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 20),
+
+        // ── Card tema ─────────────────────────────────────────────────────
+        const Text('THEME', style: AppTextStyles.label),
+        const SizedBox(height: 10),
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Toggle dark / light — connesso a ThemeProvider
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.stormyTeal.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      // Icona dinamica: luna = dark, sole = light
+                      theme.isDark
+                          ? Icons.dark_mode_outlined
+                          : Icons.light_mode_outlined,
+                      color: AppColors.stormyTealBright,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Theme',
+                            style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
+                        Text(
+                          // Label dinamica: mostra il tema attuale
+                          theme.isDark ? 'Dark mode' : 'Light mode',
+                          style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Switch collegato a ThemeProvider.toggle()
+                  Switch.adaptive(
+                    value: theme.isDark,
+                    onChanged: (_) => theme.toggle(),
+                    activeColor: AppColors.stormyTealBright,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              // Anteprima visiva dei due temi (solo informativa)
+              Row(
+                children: [
+                  _ThemePreviewChip(
+                    label: 'Dark',
+                    bgColor: const Color(0xFF0D1117),
+                    textColor: const Color(0xFFF4F7FB),
+                    isSelected: theme.isDark,
+                    // Seleziona dark se non è già dark
+                    onTap: () {
+                      if (!theme.isDark) theme.toggle();
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  _ThemePreviewChip(
+                    label: 'Light',
+                    bgColor: const Color(0xFFF0E2E7),
+                    textColor: const Color(0xFF0D1117),
+                    isSelected: !theme.isDark,
+                    // Seleziona light se non è già light
+                    onTap: () {
+                      if (theme.isDark) theme.toggle();
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
-          SettingsTile(
-            label: 'Language',
-            subtitle: 'English',
-            icon: Icons.language_outlined,
-            // TODO: flutter_localizations
-            onTap: () => onAction('Language selector'),
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── Card lingua ────────────────────────────────────────────────────
+        const Text('LANGUAGE', style: AppTextStyles.label),
+        const SizedBox(height: 10),
+        GlassCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              // Italiano
+              _LanguageOptionTile(
+                flag: '🇮🇹',
+                language: 'Italiano',
+                subtitle: 'Italian',
+                isSelected: locale.isItalian,
+                onTap: () =>
+                    locale.setLocale(const Locale('it')),
+              ),
+              const Divider(
+                  color: AppColors.border, height: 1, indent: 56),
+              // Inglese
+              _LanguageOptionTile(
+                flag: '🇬🇧',
+                language: 'English',
+                subtitle: 'English',
+                isSelected: !locale.isItalian,
+                onTap: () =>
+                    locale.setLocale(const Locale('en')),
+              ),
+            ],
           ),
-          SettingsTile(
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── Info app ───────────────────────────────────────────────────────
+        GlassCard(
+          padding: EdgeInsets.zero,
+          child: SettingsTile(
             label: 'About GateKeeper',
             subtitle: 'v0.1.0-alpha — Smart tag, safe exit',
             icon: Icons.info_outline,
           ),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Chip anteprima tema (Dark / Light) con bordo di selezione teal.
+///
+/// Parametri:
+/// - [label]: etichetta ('Dark' / 'Light')
+/// - [bgColor]: colore di sfondo dell'anteprima
+/// - [textColor]: colore del testo nell'anteprima
+/// - [isSelected]: se è il tema attualmente attivo
+/// - [onTap]: callback al tap
+class _ThemePreviewChip extends StatelessWidget {
+  const _ThemePreviewChip({
+    required this.label,
+    required this.bgColor,
+    required this.textColor,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color bgColor;
+  final Color textColor;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 110,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            // Bordo teal se selezionato, altrimenti bordo standard
+            color:
+                isSelected ? AppColors.stormyTealBright : AppColors.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.phone_iphone,
+                color: textColor.withValues(alpha: 0.6), size: 20),
+            const SizedBox(height: 4),
+            Text(label,
+                style: TextStyle(
+                    color: textColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500)),
+            if (isSelected) ...
+              [
+                const SizedBox(height: 4),
+                Icon(Icons.check_circle,
+                    color: AppColors.stormyTealBright, size: 14),
+              ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tile per la selezione della lingua con flag emoji e check di selezione.
+///
+/// Parametri:
+/// - [flag]: emoji della bandiera
+/// - [language]: nome della lingua nella lingua stessa
+/// - [subtitle]: nome in inglese (per chiarezza)
+/// - [isSelected]: se è la lingua attualmente attiva
+/// - [onTap]: callback al tap → deve chiamare [LocaleProvider.setLocale]
+class _LanguageOptionTile extends StatelessWidget {
+  const _LanguageOptionTile({
+    required this.flag,
+    required this.language,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String flag;
+  final String language;
+  final String subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            // Flag emoji in un cerchio
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.panelSoft,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Center(
+                child: Text(flag,
+                    style: const TextStyle(fontSize: 18)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(language,
+                      style: TextStyle(
+                          color: isSelected
+                              ? AppColors.stormyTealBright
+                              : AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400)),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12)),
+                ],
+              ),
+            ),
+            // Check se selezionata
+            if (isSelected)
+              const Icon(Icons.check_circle,
+                  color: AppColors.stormyTealBright, size: 18),
+          ],
+        ),
       ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// 6. Data & Privacy (contiene anche i toggle notifiche)
+// 6. Data & Privacy
 // ---------------------------------------------------------------------------
 
-/// Sezione Data & Privacy + Notification preferences.
+/// Sezione Data & Privacy + preferenze notifiche push.
 class _DataPrivacyContent extends StatelessWidget {
   const _DataPrivacyContent({
     required this.onAction,
@@ -948,7 +1205,6 @@ class _DataPrivacyContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Preferenze notifiche push
         const Text('PUSH NOTIFICATIONS', style: AppTextStyles.label),
         const SizedBox(height: 10),
         GlassCard(
@@ -1005,7 +1261,6 @@ class _DataPrivacyContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        // Azioni dati
         const Text('DATA', style: AppTextStyles.label),
         const SizedBox(height: 10),
         GlassCard(
@@ -1023,7 +1278,8 @@ class _DataPrivacyContent extends StatelessWidget {
                 subtitle: 'Cancella tutti gli eventi e gli oggetti',
                 icon: Icons.delete_outline,
                 labelColor: AppColors.error,
-                onTap: () => onAction('Reset All Data — requires confirm'),
+                onTap: () =>
+                    onAction('Reset All Data — requires confirm'),
               ),
             ],
           ),

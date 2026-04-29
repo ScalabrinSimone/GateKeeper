@@ -73,40 +73,62 @@ class GkEvent {
 /// TODO: rimpiazzare con GET /api/events?before={timestamp}&limit=20
 final _stubEvents = [
   GkEvent(
-    id: 'e1', type: EventType.exit, direction: EventDirection.out,
-    timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
-    userName: 'Alice', objectNames: ['House Keys', 'Laptop Bag'],
+    id: 'e1',
+    type: EventType.alert,
+    direction: EventDirection.out,
+    timestamp: DateTime.now().subtract(const Duration(hours: 0, minutes: 15)),
+    userName: null,
+    alertMessage: 'Object passed gateway without authenticated BLE device',
+    objectNames: ['MacBook Pro'],
   ),
   GkEvent(
-    id: 'e2', type: EventType.alert, direction: EventDirection.out,
-    timestamp: DateTime.now().subtract(const Duration(minutes: 35)),
+    id: 'e2',
+    type: EventType.scan,
+    direction: EventDirection.out,
+    timestamp: DateTime.now().subtract(const Duration(hours: 0, minutes: 45)),
+    userName: 'Bob',
+    alertMessage: 'User exited but usually carries tagged item',
+    objectNames: ['Wallet'],
+  ),
+  GkEvent(
+    id: 'e3',
+    type: EventType.entry,
+    direction: EventDirection.in_,
+    timestamp: DateTime.now().subtract(const Duration(hours: 1, minutes: 30)),
+    userName: 'Alice',
+    objectNames: ['House Keys', 'Backpack'],
+  ),
+  GkEvent(
+    id: 'e4',
+    type: EventType.exit,
+    direction: EventDirection.out,
+    timestamp: DateTime.now().subtract(const Duration(hours: 2, minutes: 15)),
     userName: 'Charlie',
-    alertMessage: 'Child exited without phone detected nearby.',
+    objectNames: ['Car Keys'],
   ),
   GkEvent(
-    id: 'e3', type: EventType.entry, direction: EventDirection.in_,
-    timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-    userName: 'Bob', objectNames: ['Umbrella'],
+    id: 'e5',
+    type: EventType.scan,
+    direction: EventDirection.in_,
+    timestamp: DateTime.now().subtract(const Duration(hours: 4)),
+    objectNames: [],
+    alertMessage: 'Daily automated gateway health check completed',
   ),
   GkEvent(
-    id: 'e4', type: EventType.exit, direction: EventDirection.out,
-    timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-    userName: 'Alice', objectNames: ['House Keys'],
-  ),
-  GkEvent(
-    id: 'e5', type: EventType.scan, direction: EventDirection.in_,
-    timestamp: DateTime.now().subtract(const Duration(hours: 8)),
-    objectNames: ['Unknown Tag #A4F2'],
-  ),
-  GkEvent(
-    id: 'e6', type: EventType.entry, direction: EventDirection.in_,
+    id: 'e6',
+    type: EventType.entry,
+    direction: EventDirection.in_,
     timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 2)),
-    userName: 'Charlie', objectNames: ['Car Keys'],
+    userName: 'Charlie',
+    objectNames: ['Car Keys'],
   ),
   GkEvent(
-    id: 'e7', type: EventType.exit, direction: EventDirection.out,
+    id: 'e7',
+    type: EventType.exit,
+    direction: EventDirection.out,
     timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
-    userName: 'Bob', objectNames: ['Wallet'],
+    userName: 'Bob',
+    objectNames: ['Wallet'],
   ),
 ];
 
@@ -125,10 +147,13 @@ final _stubUsers = _stubEvents
 /// Schermata storico eventi gateway.
 ///
 /// Filtri disponibili:
-/// - **Tipo**: All / Exits / Entries / Alerts / Scans (chip su mobile, dropdown su desktop)
-/// - **Data**: Today / Last 7 Days / Last 30 Days / All Time (dropdown desktop)
-/// - **Utente**: tutti gli utenti o uno specifico (dropdown desktop)
+/// - **Tipo**: All / Exits / Entries / Alerts / Scans
+/// - **Data**: Today / Last 7 Days / Last 30 Days / All Time
+/// - **Utente**: tutti gli utenti o uno specifico
 /// - **Testo**: ricerca libera su userName, objectNames, alertMessage
+///
+/// Layout desktop: barra filtri su RIGA SINGOLA (search + 3 dropdown affiancati).
+/// Layout mobile: search + chip tipo su righe compatte.
 ///
 /// TODO: paginazione infinita con cursore timestamp.
 /// TODO: Export CSV → GET /api/events/export.csv
@@ -141,17 +166,17 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   EventType? _typeFilter;
-  String?    _userFilter;    // null = tutti gli utenti
+  String? _userFilter; // null = tutti gli utenti
   _DateRange _dateRange = _DateRange.last7Days;
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
 
   static const _typeFilters = <(EventType?, String)>[
-    (null,             'All'),
-    (EventType.exit,   'Exits'),
-    (EventType.entry,  'Entries'),
-    (EventType.alert,  'Alerts'),
-    (EventType.scan,   'Scans'),
+    (null, 'All Event Types'),
+    (EventType.exit, 'Exits'),
+    (EventType.entry, 'Entries'),
+    (EventType.alert, 'Alerts'),
+    (EventType.scan, 'Scans'),
   ];
 
   @override
@@ -164,32 +189,25 @@ class _EventsScreenState extends State<EventsScreen> {
   List<GkEvent> get _filteredEvents {
     var events = _stubEvents.toList();
 
-    // Filtro tipo
     if (_typeFilter != null) {
       events = events.where((e) => e.type == _typeFilter).toList();
     }
-
-    // Filtro utente
     if (_userFilter != null) {
       events = events.where((e) => e.userName == _userFilter).toList();
     }
-
-    // Filtro data
     final cutoff = _dateRange.cutoff;
     if (cutoff != null) {
       events = events.where((e) => e.timestamp.isAfter(cutoff)).toList();
     }
-
-    // Filtro testo libero
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
-      events = events.where((e) =>
-        (e.userName?.toLowerCase().contains(q) ?? false) ||
-        e.objectNames.any((o) => o.toLowerCase().contains(q)) ||
-        (e.alertMessage?.toLowerCase().contains(q) ?? false)
-      ).toList();
+      events = events
+          .where((e) =>
+              (e.userName?.toLowerCase().contains(q) ?? false) ||
+              e.objectNames.any((o) => o.toLowerCase().contains(q)) ||
+              (e.alertMessage?.toLowerCase().contains(q) ?? false))
+          .toList();
     }
-
     return events;
   }
 
@@ -203,7 +221,7 @@ class _EventsScreenState extends State<EventsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
+              // ── Header ────────────────────────────────────────────────────
               PageHeader(
                 title: isDesktop ? 'System Event Logs' : 'Event Logs',
                 trailing: isDesktop
@@ -222,26 +240,65 @@ class _EventsScreenState extends State<EventsScreen> {
                     : null,
               ),
 
-              // ── Desktop: barra filtri completa ───────────────────────────
-              if (isDesktop) _DesktopFilterBar(
-                searchCtrl:    _searchCtrl,
-                onSearchChanged: (v) => setState(() => _searchQuery = v),
-                typeFilter:    _typeFilter,
-                onTypeChanged: (f) => setState(() => _typeFilter = f),
-                userFilter:    _userFilter,
-                onUserChanged: (u) => setState(() => _userFilter = u),
-                dateRange:     _dateRange,
-                onDateChanged: (d) => setState(() => _dateRange = d),
-                availableUsers: _stubUsers,
-                typeFilters:   _typeFilters,
-              ),
+              // ── Desktop: filtri tutti su riga singola ─────────────────────
+              // Search + dropdown Data + dropdown Tipo + dropdown Utente
+              // sono tutti in Row affiancati dentro un container.
+              if (isDesktop)
+                _DesktopFilterBar(
+                  searchCtrl: _searchCtrl,
+                  onSearchChanged: (v) => setState(() => _searchQuery = v),
+                  typeFilter: _typeFilter,
+                  onTypeChanged: (f) => setState(() => _typeFilter = f),
+                  userFilter: _userFilter,
+                  onUserChanged: (u) => setState(() => _userFilter = u),
+                  dateRange: _dateRange,
+                  onDateChanged: (d) => setState(() => _dateRange = d),
+                  availableUsers: _stubUsers,
+                  typeFilters: _typeFilters,
+                ),
 
-              // ── Mobile: chip tipo + search ────────────────────────────────
+              // ── Mobile: search + chip tipo ────────────────────────────────
               if (!isDesktop) ...
                 [
-                  // Chip filtro tipo
+                  // Search bar
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                      style: const TextStyle(
+                          color: AppColors.textPrimary, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Search logs (users, objects, events)...',
+                        hintStyle:
+                            const TextStyle(color: AppColors.textMuted),
+                        prefixIcon: const Icon(Icons.search,
+                            color: AppColors.textMuted, size: 18),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        filled: true,
+                        fillColor: AppColors.panelSoft,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: AppColors.stormyTeal),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Chip filtro tipo a scorrimento orizzontale
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
@@ -288,45 +345,9 @@ class _EventsScreenState extends State<EventsScreen> {
                       ),
                     ),
                   ),
-                  // Search bar mobile
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (v) => setState(() => _searchQuery = v),
-                      style: const TextStyle(
-                          color: AppColors.textPrimary, fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: 'Search...',
-                        hintStyle:
-                            const TextStyle(color: AppColors.textMuted),
-                        prefixIcon: const Icon(Icons.search,
-                            color: AppColors.textMuted, size: 18),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                        filled: true,
-                        fillColor: AppColors.panelSoft,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                              color: AppColors.stormyTeal),
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
 
-              // Lista / tabella eventi
+              // ── Lista / tabella eventi ────────────────────────────────────
               Expanded(
                 child: _filteredEvents.isEmpty
                     ? const _EmptyEvents()
@@ -369,34 +390,36 @@ enum _DateRange {
   last30Days,
   allTime;
 
-  /// Label mostrata nel dropdown.
   String get label => switch (this) {
-        _DateRange.today      => 'Today',
-        _DateRange.last7Days  => 'Last 7 Days',
+        _DateRange.today => 'Today',
+        _DateRange.last7Days => 'Last 7 Days',
         _DateRange.last30Days => 'Last 30 Days',
-        _DateRange.allTime    => 'All Time',
+        _DateRange.allTime => 'All Time',
       };
 
-  /// Data di taglio per il filtro (null = nessun filtro).
   DateTime? get cutoff {
     final now = DateTime.now();
     return switch (this) {
-      _DateRange.today      => DateTime(now.year, now.month, now.day),
-      _DateRange.last7Days  => now.subtract(const Duration(days: 7)),
+      _DateRange.today =>
+        DateTime(now.year, now.month, now.day),
+      _DateRange.last7Days => now.subtract(const Duration(days: 7)),
       _DateRange.last30Days => now.subtract(const Duration(days: 30)),
-      _DateRange.allTime    => null,
+      _DateRange.allTime => null,
     };
   }
 }
 
 // ---------------------------------------------------------------------------
-// Desktop: barra filtri
+// Desktop: barra filtri su RIGA SINGOLA
 // ---------------------------------------------------------------------------
 
-/// Barra filtri desktop con search + 3 dropdown (data, tipo, utente).
+/// Barra filtri desktop.
 ///
-/// Tutti i dropdown usano [PopupMenuButton] nativo per apertura/chiusura
-/// corretta — sostituisce il ciclo grezzo del vecchio _FilterDropdown.
+/// Tutti i controlli sono su una singola riga:
+/// [search (Expanded)] [dropdown Data] [dropdown Tipo] [dropdown Utente]
+///
+/// La search occupa lo spazio restante con [Expanded]; i dropdown hanno
+/// dimensione minima intrinseca. Questo replica esattamente il mockup Figma.
 ///
 /// Parametri:
 /// - [searchCtrl]: controller TextField ricerca
@@ -438,85 +461,89 @@ class _DesktopFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.panelSoft,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
-      child: Column(
+      // ── Riga singola: search + 3 dropdown ──────────────────────────────
+      // NOTA: in precedenza search e dropdown erano in Column separata;
+      // ora sono tutti in Row così il layout replica il mockup.
+      child: Row(
         children: [
-          // Search bar
-          TextField(
-            controller: searchCtrl,
-            onChanged: onSearchChanged,
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'Search logs (users, objects, events)...',
-              hintStyle:
-                  const TextStyle(color: AppColors.textMuted, fontSize: 14),
-              prefixIcon:
-                  const Icon(Icons.search, color: AppColors.textMuted, size: 18),
-              filled: true,
-              fillColor: AppColors.panel,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.stormyTeal),
+          // Search bar — si espande per riempire lo spazio disponibile
+          Expanded(
+            child: TextField(
+              controller: searchCtrl,
+              onChanged: onSearchChanged,
+              style: const TextStyle(
+                  color: AppColors.textPrimary, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Search logs (users, objects, events)...',
+                hintStyle: const TextStyle(
+                    color: AppColors.textMuted, fontSize: 13),
+                prefixIcon: const Icon(Icons.search,
+                    color: AppColors.textMuted, size: 16),
+                filled: true,
+                fillColor: AppColors.panel,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: AppColors.stormyTeal),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          // Riga dropdown filtri
-          Row(
-            children: [
-              // ── Filtro data ──────────────────────────────────────────────
-              _DropdownFilter<_DateRange>(
-                icon: Icons.calendar_today_outlined,
-                label: dateRange.label,
-                items: _DateRange.values,
-                labelFor: (d) => d.label,
-                selected: dateRange,
-                onSelected: onDateChanged,
-              ),
-              const SizedBox(width: 10),
-              // ── Filtro tipo ──────────────────────────────────────────────
-              _DropdownFilter<EventType?>(
-                icon: Icons.filter_list_outlined,
-                label: typeFilter == null
-                    ? 'All Types'
-                    : typeFilters
-                        .firstWhere((f) => f.$1 == typeFilter,
-                            orElse: () => (null, 'All Types'))
-                        .$2,
-                items: typeFilters.map((f) => f.$1).toList(),
-                labelFor: (t) => typeFilters
-                    .firstWhere((f) => f.$1 == t,
-                        orElse: () => (null, 'All Types'))
+          const SizedBox(width: 10),
+          // ── Filtro data ────────────────────────────────────────────────
+          _DropdownFilter<_DateRange>(
+            icon: Icons.calendar_today_outlined,
+            label: dateRange.label,
+            items: _DateRange.values,
+            labelFor: (d) => d.label,
+            selected: dateRange,
+            onSelected: onDateChanged,
+          ),
+          const SizedBox(width: 8),
+          // ── Filtro tipo ────────────────────────────────────────────────
+          _DropdownFilter<EventType?>(
+            icon: Icons.filter_list_outlined,
+            label: typeFilter == null
+                ? 'All Event Types'
+                : typeFilters
+                    .firstWhere((f) => f.$1 == typeFilter,
+                        orElse: () => (null, 'All Event Types'))
                     .$2,
-                selected: typeFilter,
-                onSelected: onTypeChanged,
-              ),
-              const SizedBox(width: 10),
-              // ── Filtro utente ────────────────────────────────────────────
-              _DropdownFilter<String?>(
-                icon: Icons.person_outline,
-                label: userFilter ?? 'All Users',
-                items: [null, ...availableUsers],
-                labelFor: (u) => u ?? 'All Users',
-                selected: userFilter,
-                onSelected: onUserChanged,
-              ),
-            ],
+            items: typeFilters.map((f) => f.$1).toList(),
+            labelFor: (t) => typeFilters
+                .firstWhere((f) => f.$1 == t,
+                    orElse: () => (null, 'All Event Types'))
+                .$2,
+            selected: typeFilter,
+            onSelected: onTypeChanged,
+          ),
+          const SizedBox(width: 8),
+          // ── Filtro utente ──────────────────────────────────────────────
+          _DropdownFilter<String?>(
+            icon: Icons.person_outline,
+            label: userFilter ?? 'All Users',
+            items: [null, ...availableUsers],
+            labelFor: (u) => u ?? 'All Users',
+            selected: userFilter,
+            onSelected: onUserChanged,
           ),
         ],
       ),
@@ -526,8 +553,8 @@ class _DesktopFilterBar extends StatelessWidget {
 
 /// Dropdown filtro generico con [PopupMenuButton].
 ///
-/// Sostituisce il vecchio [_FilterDropdown] che ciclava i valori al tap
-/// senza mostrare un menu reale. Ora apre un menu con tutte le opzioni.
+/// Apre un menu nativo con tutte le opzioni — il valore corrente
+/// è evidenziato con un check mark e colore teal.
 ///
 /// Parametri:
 /// - [icon]: icona a sinistra del label
@@ -556,7 +583,6 @@ class _DropdownFilter<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<T>(
-      // Evita che si apra sull'angolo del widget — lo offset lo centra sotto
       offset: const Offset(0, 40),
       color: AppColors.panel,
       shape: RoundedRectangleBorder(
@@ -571,7 +597,6 @@ class _DropdownFilter<T> extends StatelessWidget {
           value: item,
           child: Row(
             children: [
-              // Check mark per il valore corrente
               SizedBox(
                 width: 18,
                 child: isSelected
@@ -595,9 +620,9 @@ class _DropdownFilter<T> extends StatelessWidget {
           ),
         );
       }).toList(),
-      // Chip trigger del dropdown
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: AppColors.panel,
           borderRadius: BorderRadius.circular(10),
@@ -664,40 +689,55 @@ class _DesktopEventsTable extends StatelessWidget {
           children: [
             // Header colonne
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.border)),
+                border:
+                    Border(bottom: BorderSide(color: AppColors.border)),
               ),
               child: const Row(
                 children: [
-                  SizedBox(width: 120,
-                      child: Text('TIMESTAMP', style: AppTextStyles.label)),
-                  SizedBox(width: 50,
+                  SizedBox(
+                      width: 120,
+                      child:
+                          Text('TIMESTAMP', style: AppTextStyles.label)),
+                  SizedBox(
+                      width: 60,
                       child: Text('TYPE', style: AppTextStyles.label)),
-                  Expanded(flex: 3,
-                      child: Text('EVENT DESCRIPTION', style: AppTextStyles.label)),
-                  Expanded(flex: 2,
+                  Expanded(
+                      flex: 3,
+                      child: Text('EVENT DESCRIPTION',
+                          style: AppTextStyles.label)),
+                  Expanded(
+                      flex: 2,
                       child: Text('USER', style: AppTextStyles.label)),
-                  Expanded(flex: 2,
-                      child: Text('ASSOCIATED OBJECTS', style: AppTextStyles.label)),
+                  Expanded(
+                      flex: 2,
+                      child: Text('ASSOCIATED OBJECTS',
+                          style: AppTextStyles.label)),
                 ],
               ),
             ),
-            // Righe raggruppate
+            // Righe raggruppate per giorno
             Expanded(
               child: ListView(
                 children: [
-                  for (final entry in _grouped.entries) ...[  
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-                      child: Text(entry.key, style: AppTextStyles.label),
-                    ),
-                    const Divider(color: AppColors.border, height: 1),
-                    ...entry.value.map((event) => _DesktopEventRow(
-                      event: event,
-                      onTap: () => EventDetailSheet.show(context, event: event),
-                    )),
-                  ],
+                  for (final entry in _grouped.entries) ...
+                    [
+                      Padding(
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                        child: Text(entry.key,
+                            style: AppTextStyles.label),
+                      ),
+                      const Divider(color: AppColors.border, height: 1),
+                      ...entry.value.map((event) => _DesktopEventRow(
+                            event: event,
+                            onTap: () => EventDetailSheet.show(
+                                context,
+                                event: event),
+                          )),
+                    ],
                 ],
               ),
             ),
@@ -717,21 +757,29 @@ class _DesktopEventRow extends StatelessWidget {
   Color get _typeColor => switch (event.type) {
         EventType.alert => AppColors.warning,
         EventType.entry => AppColors.success,
-        EventType.exit  => AppColors.stormyTealBright,
-        EventType.scan  => AppColors.textMuted,
+        EventType.exit => AppColors.stormyTealBright,
+        EventType.scan => AppColors.textMuted,
+      };
+
+  IconData get _typeIcon => switch (event.type) {
+        EventType.alert => Icons.warning_amber_outlined,
+        EventType.entry => Icons.login_outlined,
+        EventType.exit => Icons.logout_outlined,
+        EventType.scan => Icons.sensors_outlined,
       };
 
   String get _typeLabel => switch (event.type) {
         EventType.alert => 'Alert',
         EventType.entry => 'Entry',
-        EventType.exit  => 'Exit',
-        EventType.scan  => 'Scan',
+        EventType.exit => 'Exit',
+        EventType.scan => 'Scan',
       };
 
   String get _description {
     if (event.alertMessage != null) return event.alertMessage!;
     final user = event.userName ?? 'Unknown';
-    final dir  = event.direction == EventDirection.out ? 'exited' : 'entered';
+    final dir =
+        event.direction == EventDirection.out ? 'exited' : 'entered';
     final objs = event.objectNames.isEmpty
         ? 'no objects'
         : event.objectNames.join(', ');
@@ -740,9 +788,9 @@ class _DesktopEventRow extends StatelessWidget {
 
   String get _timeStr {
     final dt = event.timestamp;
-    final h  = dt.hour.toString().padLeft(2, '0');
-    final m  = dt.minute.toString().padLeft(2, '0');
-    final s  = dt.second.toString().padLeft(2, '0');
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    final s = dt.second.toString().padLeft(2, '0');
     final ap = dt.hour < 12 ? 'AM' : 'PM';
     return '$h:$m:$s $ap';
   }
@@ -753,9 +801,12 @@ class _DesktopEventRow extends StatelessWidget {
       onTap: onTap,
       hoverColor: AppColors.panel.withValues(alpha: 0.5),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+          border: Border(
+              bottom: BorderSide(
+                  color: AppColors.border, width: 0.5)),
         ),
         child: Row(
           children: [
@@ -766,23 +817,25 @@ class _DesktopEventRow extends StatelessWidget {
                   style: const TextStyle(
                       color: AppColors.textSecondary, fontSize: 12)),
             ),
-            // Badge tipo
+            // Badge tipo con icona
             SizedBox(
-              width: 50,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _typeColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  _typeLabel,
-                  style: TextStyle(
-                    color: _typeColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+              width: 60,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(_typeIcon, size: 14, color: _typeColor),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      _typeLabel,
+                      style: TextStyle(
+                        color: _typeColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
             // Descrizione
@@ -802,23 +855,42 @@ class _DesktopEventRow extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Text(
-                event.userName ?? '—',
+                event.userName ?? 'System / Unknown',
                 style: const TextStyle(
                     color: AppColors.textSecondary, fontSize: 13),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            // Oggetti
+            // Oggetti associati come chip
             Expanded(
               flex: 2,
-              child: Text(
-                event.objectNames.isEmpty
-                    ? '—'
-                    : event.objectNames.join(', '),
-                style: const TextStyle(
-                    color: AppColors.textSecondary, fontSize: 13),
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: event.objectNames.isEmpty
+                  ? const Text('—',
+                      style: TextStyle(
+                          color: AppColors.textMuted, fontSize: 13))
+                  : Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: event.objectNames
+                          .map((obj) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.panel,
+                                  borderRadius:
+                                      BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: AppColors.border),
+                                ),
+                                child: Text(
+                                  obj,
+                                  style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11),
+                                ),
+                              ))
+                          .toList(),
+                    ),
             ),
           ],
         ),
@@ -831,8 +903,6 @@ class _DesktopEventRow extends StatelessWidget {
 // Tile mobile
 // ---------------------------------------------------------------------------
 
-/// Tile evento per la lista mobile (riutilizza [EventListTile] se importato).
-/// Duplicato inline per evitare import circolare con events_screen.
 class _EventTile extends StatelessWidget {
   const _EventTile({required this.event, required this.onTap});
   final GkEvent event;
@@ -841,28 +911,30 @@ class _EventTile extends StatelessWidget {
   Color get _color => switch (event.type) {
         EventType.alert => AppColors.warning,
         EventType.entry => AppColors.success,
-        EventType.exit  => AppColors.stormyTealBright,
-        EventType.scan  => AppColors.textMuted,
+        EventType.exit => AppColors.stormyTealBright,
+        EventType.scan => AppColors.textMuted,
       };
 
   IconData get _icon => switch (event.type) {
         EventType.alert => Icons.warning_amber_outlined,
         EventType.entry => Icons.login_outlined,
-        EventType.exit  => Icons.logout_outlined,
-        EventType.scan  => Icons.wifi_tethering_outlined,
+        EventType.exit => Icons.logout_outlined,
+        EventType.scan => Icons.wifi_tethering_outlined,
       };
 
   String get _title => switch (event.type) {
         EventType.alert => 'Alert',
         EventType.entry => 'Entry',
-        EventType.exit  => 'Exit',
-        EventType.scan  => 'Scan',
+        EventType.exit => 'Exit',
+        EventType.scan => 'Scan',
       };
 
   String get _desc {
     if (event.alertMessage != null) return event.alertMessage!;
     final u = event.userName ?? 'Unknown';
-    final o = event.objectNames.isEmpty ? 'no objects' : event.objectNames.join(', ');
+    final o = event.objectNames.isEmpty
+        ? 'no objects'
+        : event.objectNames.join(', ');
     return '$u — $o';
   }
 
@@ -889,6 +961,7 @@ class _EventTile extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Striscia colorata laterale: indica il tipo visivamente
                 Container(width: 4, color: _color),
                 Expanded(
                   child: Padding(
@@ -916,7 +989,8 @@ class _EventTile extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(_desc,
                             style: const TextStyle(
-                                color: AppColors.textSecondary, fontSize: 12),
+                                color: AppColors.textSecondary,
+                                fontSize: 12),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis),
                       ],
@@ -952,8 +1026,10 @@ class _EmptyEvents extends StatelessWidget {
         children: [
           Icon(Icons.inbox_outlined, color: AppColors.textMuted, size: 40),
           SizedBox(height: 12),
-          Text('No events match the current filters.',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
+          Text(
+            'No events match the current filters.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+          ),
         ],
       ),
     );
