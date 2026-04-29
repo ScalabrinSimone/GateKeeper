@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/models/models.dart'; // UserRole — definita in gk_user.dart
 import '../../../theme/app_colors.dart';
-import '../users_screen.dart';
+
+// NOTA: prima importava '../users_screen.dart' per UserRole.
+// UserRole è ora nel core model → import aggiornato.
 
 /// Badge colorato con il ruolo dell'utente.
 ///
-/// Rimasto per compatibilità futura (es. in altre schermate dove
-/// si mostra un singolo utente con badge inline).
+/// Usato nelle card utente e in altri contesti dove si vuole
+/// mostrare il ruolo in formato compatto (pill colorata).
 ///
 /// Parametri:
-/// - [role]: valore enum [UserRole]
+/// - [role]: valore enum [UserRole] (admin / adult / child)
+///
+/// Esempio:
+/// ```dart
+/// UserRoleBadge(role: user.role)
+/// ```
 class UserRoleBadge extends StatelessWidget {
   const UserRoleBadge({super.key, required this.role});
 
@@ -17,6 +25,7 @@ class UserRoleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Associa ogni ruolo a una etichetta e un colore differente
     final (label, color) = switch (role) {
       UserRole.admin => ('Admin', AppColors.orange),
       UserRole.adult => ('Adult', AppColors.stormyTealBright),

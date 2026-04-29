@@ -1,29 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/models/models.dart'; // ObjectCategory — definita in rfid_object.dart
 import '../../../core/services/haptic_service.dart';
 import '../../../shared/widgets/gk_dialog.dart';
 import '../../../shared/widgets/gk_text_field.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 
-/// Categorie disponibili per un oggetto RFID.
-///
-/// Usate nel chip-selector del form.
-enum ObjectCategory {
-  keys,
-  bag,
-  umbrella,
-  wallet,
-  device,
-  other,
-}
+// NOTA: ObjectCategory è definita in core/models/rfid_object.dart ed esportata
+// via core/models/models.dart. NON ridefinirla qui — causerebbe ambiguous_import
+// in qualsiasi file che importa sia questo dialog che core/models.
 
 /// Dialog per aggiungere un nuovo oggetto RFID al sistema.
 ///
 /// L'utente inserisce:
 /// - nome oggetto (es. "Chiavi auto");
-/// - categoria (chip selector);
-/// - UID tag RFID (letto dal lettore o inserito manualmente);
+/// - categoria (chip selector, valori da [ObjectCategory]);
+/// - UID tag RFID (inserito manualmente — in futuro via lettore RFID);
 /// - note opzionali.
 ///
 /// TODO: collegare a POST /api/objects con body:
@@ -67,17 +60,21 @@ class _AddObjectFormState extends State<_AddObjectForm> {
   final _uidCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
+  // Categoria di default
   ObjectCategory _selectedCategory = ObjectCategory.other;
   bool _loading = false;
 
-  // Mappa categoria → icona + etichetta
-  static const _categories = {
-    ObjectCategory.keys: (Icons.vpn_key_outlined, 'Keys'),
-    ObjectCategory.bag: (Icons.backpack_outlined, 'Bag'),
-    ObjectCategory.umbrella: (Icons.umbrella_outlined, 'Umbrella'),
-    ObjectCategory.wallet: (Icons.account_balance_wallet_outlined, 'Wallet'),
-    ObjectCategory.device: (Icons.devices_outlined, 'Device'),
-    ObjectCategory.other: (Icons.category_outlined, 'Other'),
+  // Mappa categoria → (icona, etichetta) per il chip selector.
+  // Usa i valori di ObjectCategory dal core model:
+  //   keys, umbrella, bag, electronics, documents, clothing, other
+  static const _categories = <ObjectCategory, (IconData, String)>{
+    ObjectCategory.keys:        (Icons.vpn_key_outlined,                'Keys'),
+    ObjectCategory.bag:         (Icons.backpack_outlined,               'Bag'),
+    ObjectCategory.umbrella:    (Icons.umbrella_outlined,               'Umbrella'),
+    ObjectCategory.electronics: (Icons.devices_outlined,                'Electronics'),
+    ObjectCategory.documents:   (Icons.description_outlined,            'Documents'),
+    ObjectCategory.clothing:    (Icons.checkroom_outlined,              'Clothing'),
+    ObjectCategory.other:       (Icons.category_outlined,               'Other'),
   };
 
   @override
@@ -135,7 +132,7 @@ class _AddObjectFormState extends State<_AddObjectForm> {
           ),
           const SizedBox(height: 16),
 
-          // Selezione categoria con chip+icona
+          // Chip selector per la categoria
           Text('CATEGORY', style: AppTextStyles.label),
           const SizedBox(height: 8),
           Wrap(
@@ -186,18 +183,13 @@ class _AddObjectFormState extends State<_AddObjectForm> {
           ),
           const SizedBox(height: 8),
 
-          // Hint: in futuro questo bottone aprirà il lettore via WebSocket
           Row(
             children: [
-              Icon(Icons.info_outline,
-                  size: 13, color: AppColors.textMuted),
+              Icon(Icons.info_outline, size: 13, color: AppColors.textMuted),
               const SizedBox(width: 6),
               const Text(
-                'TODO: "Scan Tag" button → RFID reader WebSocket',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 12,
-                ),
+                'Scan Tag (futuro): lettore RFID via WebSocket',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
               ),
             ],
           ),

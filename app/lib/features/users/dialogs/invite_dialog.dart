@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/models/models.dart'; // UserRole — definita in gk_user.dart
 import '../../../core/services/haptic_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
-import '../users_screen.dart';
+
+// NOTA: UserRole era definita in users_screen.dart ma è stata spostata
+// nel core model (gk_user.dart) per essere condivisa tra tutti i widget.
+// L'import qui punta ora a core/models/models.dart.
 
 // ---------------------------------------------------------------------------
 // InviteDialog — fedele al mockup Figma
@@ -37,7 +41,7 @@ import '../users_screen.dart';
 /// Dialog per invitare un nuovo membro nella casa.
 ///
 /// Segue esattamente il design Figma:
-/// 1. Dropdown per selezionare il ruolo
+/// 1. Dropdown per selezionare il ruolo ([UserRole])
 /// 2. Preview dei permessi associati al ruolo scelto
 /// 3. Link di invito generabile e copiabile
 ///
@@ -82,33 +86,38 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
   // true quando il link è stato copiato (mostra feedback temporaneo)
   bool _copied = false;
 
-  // ── Mappa ruolo → label mostrata nel dropdown ──
-  static const _roleLabels = {
+  // Mappa ruolo → label mostrata nel dropdown
+  static const _roleLabels = <UserRole, String>{
     UserRole.admin: 'Administrator',
     UserRole.adult: 'Manager',
     UserRole.child: 'Child / Guest',
   };
 
-  // ── Mappa ruolo → permessi mostrati nella preview ──
-  // Ogni permesso ha: testo + granted (true = check verde, false = x rosso)
-  static const _rolePermissions = <UserRole, List<({String label, bool granted})>>{
+  // Mappa ruolo → lista permessi mostrata nella preview.
+  // Ogni entry è un record: (label: String, granted: bool)
+  //   granted=true  → icona check verde
+  //   granted=false → icona x grigia
+  //
+  // In futuro questi permessi verranno dal backend (GET /api/roles/{role}/permissions).
+  static const _rolePermissions =
+      <UserRole, List<({String label, bool granted})>>{
     UserRole.admin: [
-      (label: 'Full Control', granted: true),
-      (label: 'Manage Users', granted: true),
-      (label: 'Alert Configuration', granted: true),
-      (label: 'Cannot Manage Users', granted: false), // non applicabile
+      (label: 'Full Control',       granted: true),
+      (label: 'Manage Users',       granted: true),
+      (label: 'Alert Configuration',granted: true),
+      (label: 'Cannot Manage Users',granted: false),
     ],
     UserRole.adult: [
-      (label: 'View History', granted: true),
-      (label: 'Edit Object Tags', granted: true),
-      (label: 'Dismiss Alerts', granted: true),
-      (label: 'Cannot Manage Users', granted: false),
+      (label: 'View History',          granted: true),
+      (label: 'Edit Object Tags',       granted: true),
+      (label: 'Dismiss Alerts',         granted: true),
+      (label: 'Cannot Manage Users',    granted: false),
     ],
     UserRole.child: [
-      (label: 'BLE Tracking Only', granted: true),
-      (label: 'View Own History', granted: true),
-      (label: 'Cannot Change Settings', granted: false),
-      (label: 'Cannot View Sensitive Alerts', granted: false),
+      (label: 'BLE Tracking Only',             granted: true),
+      (label: 'View Own History',              granted: true),
+      (label: 'Cannot Change Settings',        granted: false),
+      (label: 'Cannot View Sensitive Alerts',  granted: false),
     ],
   };
 
@@ -123,10 +132,9 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
     setState(() => _generating = true);
     await HapticService.light();
 
-    // Stub: simula latenza di rete
+    // Stub: simula latenza di rete (~700ms)
     await Future<void>.delayed(const Duration(milliseconds: 700));
 
-    // Genera un "token" fake per il mockup
     final roleSlug = _selectedRole.name;
     setState(() {
       _generatedLink =
@@ -137,7 +145,7 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
     await HapticService.success();
   }
 
-  /// Copia il link negli appunti e mostra feedback temporaneo.
+  /// Copia il link negli appunti e mostra feedback temporaneo ("Copied!").
   Future<void> _copyLink() async {
     if (_generatedLink == null) return;
     await Clipboard.setData(ClipboardData(text: _generatedLink!));
@@ -154,7 +162,6 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
     final permissions = _rolePermissions[_selectedRole]!;
 
     return Dialog(
-      // Larghezza massima come nel mockup (~420px)
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
@@ -178,7 +185,6 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
                       style: AppTextStyles.sectionTitle,
                     ),
                   ),
-                  // Bottone chiudi
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(
@@ -206,7 +212,6 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
               // ── Select Role ───────────────────────────────────────────
               Text('Select Role', style: AppTextStyles.label),
               const SizedBox(height: 8),
-              // DropdownButtonFormField: più fedele al mockup rispetto ai chips
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.panelSoft,
@@ -227,13 +232,13 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
                       Icons.keyboard_arrow_down_rounded,
                       color: AppColors.textSecondary,
                     ),
-                    // Al cambio ruolo: resetta il link generato (non è più valido)
+                    // Al cambio ruolo: il link precedente non è più valido
                     onChanged: (role) async {
                       if (role == null) return;
                       await HapticService.light();
                       setState(() {
                         _selectedRole = role;
-                        _generatedLink = null; // link invalidato
+                        _generatedLink = null;
                         _copied = false;
                       });
                     },
@@ -251,11 +256,10 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
               // ── Permissions Preview ───────────────────────────────────
               Text('Permissions Preview', style: AppTextStyles.label),
               const SizedBox(height: 10),
-              // Lista animata: si aggiorna quando cambia il ruolo
+              // AnimatedSwitcher: fade quando cambia il ruolo
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: Column(
-                  // La key cambia con il ruolo → AnimatedSwitcher fa fade
                   key: ValueKey(_selectedRole),
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: permissions.map((p) {
@@ -291,65 +295,63 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
               // ── Invite Link ───────────────────────────────────────────
               Text('Invite Link', style: AppTextStyles.label),
               const SizedBox(height: 8),
-              // Campo link: visibile solo se il link è stato generato
-              if (_generatedLink != null) ...
-                [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.panelSoft,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
-                            ),
-                            child: Text(
-                              _generatedLink!,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12,
-                                fontFamily: 'monospace',
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        // Bottone Copy con feedback visivo
-                        GestureDetector(
-                          onTap: _copyLink,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.all(6),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _copied
-                                  ? AppColors.success
-                                  : AppColors.stormyTeal,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              _copied ? 'Copied!' : 'Copy',
-                              style: const TextStyle(
-                                color: AppColors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+              if (_generatedLink != null) ...[
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.panelSoft,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
                   ),
-                  const SizedBox(height: 16),
-                ],
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          child: Text(
+                            _generatedLink!,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      // Bottone Copy con feedback animato
+                      GestureDetector(
+                        onTap: _copyLink,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _copied
+                                ? AppColors.success
+                                : AppColors.stormyTeal,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _copied ? 'Copied!' : 'Copy',
+                            style: const TextStyle(
+                              color: AppColors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // ── Bottone Generate Link ─────────────────────────────────
               Align(
@@ -377,11 +379,8 @@ class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
                             color: AppColors.white,
                           ),
                         )
-                      // Testo cambia dopo la prima generazione
                       : Text(
-                          _generatedLink == null
-                              ? 'Generate Link'
-                              : 'Regenerate',
+                          _generatedLink == null ? 'Generate Link' : 'Regenerate',
                         ),
                 ),
               ),
