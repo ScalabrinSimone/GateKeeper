@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/models/models.dart'; // GkUser — modello core
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
-import '../users_screen.dart';
 import 'user_card.dart';
 
 /// Colonna per un gruppo di utenti con lo stesso ruolo.
@@ -20,7 +20,7 @@ import 'user_card.dart';
 /// Parametri:
 /// - [roleTitle]: es. 'Administrators'
 /// - [roleDescription]: testo esplicativo sotto il titolo
-/// - [users]: lista utenti del ruolo
+/// - [users]: lista [GkUser] del ruolo (filtrata in UsersScreen)
 class UserRoleColumn extends StatelessWidget {
   const UserRoleColumn({
     super.key,
@@ -31,14 +31,18 @@ class UserRoleColumn extends StatelessWidget {
 
   final String roleTitle;
   final String roleDescription;
-  final List<HouseUser> users;
+
+  // Usa GkUser (core model) — non più HouseUser (era definita localmente
+  // in users_screen.dart e causava type mismatch con UserCard che si
+  // aspetta GkUser).
+  final List<GkUser> users;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header colonna: titolo + badge count
+        // Header colonna: titolo + badge count utenti
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -48,7 +52,7 @@ class UserRoleColumn extends StatelessWidget {
                 style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
               ),
             ),
-            // Badge numerico con count utenti
+            // Badge numerico con count utenti del ruolo
             Container(
               width: 26,
               height: 26,
@@ -71,14 +75,14 @@ class UserRoleColumn extends StatelessWidget {
         ),
         const SizedBox(height: 8),
 
-        // Descrizione ruolo
+        // Descrizione del ruolo
         Text(
           roleDescription,
           style: AppTextStyles.body,
         ),
         const SizedBox(height: 16),
 
-        // Lista card utenti
+        // Lista card utenti — o stato vuoto se nessuno
         if (users.isEmpty)
           Container(
             padding: const EdgeInsets.all(20),
@@ -98,10 +102,15 @@ class UserRoleColumn extends StatelessWidget {
             ),
           )
         else
-          ...users.map(
-            (u) => Padding(
+          // Passa il GkUser direttamente a UserCard (stesso tipo)
+          ...users.asMap().entries.map(
+            (entry) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: UserCard(user: u),
+              // animationIndex per stagger di entrata nella lista
+              child: UserCard(
+                user: entry.value,
+                animationIndex: entry.key,
+              ),
             ),
           ),
       ],

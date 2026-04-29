@@ -1,120 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_breakpoints.dart';
+import '../../core/models/models.dart'; // GkUser, UserRole, kFakeUsersJson
 import '../../shared/widgets/page_header.dart';
 import '../../theme/app_colors.dart';
 import 'dialogs/invite_dialog.dart';
 import 'widgets/user_role_column.dart';
 
 // ---------------------------------------------------------------------------
-// Modello dati
+// Dati stub — derivati dal modello core GkUser
 // ---------------------------------------------------------------------------
 
-/// Ruoli disponibili nel sistema GateKeeper.
-///
-/// - [admin]: accesso totale a impostazioni, alert e oggetti
-/// - [adult]: può vedere tracking, gestire tag e dismissare alert
-/// - [child]: tracciato via BLE, nessun accesso a settings o alert sensibili
-enum UserRole { admin, adult, child }
-
-/// Singolo permesso mostrato nella card utente.
-///
-/// Parametri:
-/// - [label]: testo del permesso (es. 'Full Control')
-class UserPermission {
-  const UserPermission(this.label);
-  final String label;
-}
-
-/// Membro della casa registrato nel sistema.
-///
-/// Parametri:
-/// - [id]: identificatore univoco
-/// - [name]: nome visualizzato (es. 'Alice')
-/// - [email]: email/username (es. 'alice@home.local')
-/// - [role]: ruolo [UserRole]
-/// - [isOnline]: true se il dispositivo BLE è rilevato in casa
-/// - [isCurrentUser]: true per l'utente loggato (mostra '(You)')
-/// - [hasAccount]: false per bambini/ospiti senza login
-/// - [permissions]: lista permessi mostrati nella card
-class HouseUser {
-  const HouseUser({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.role,
-    this.isOnline = false,
-    this.isCurrentUser = false,
-    this.hasAccount = true,
-    this.permissions = const [],
-  });
-
-  final String id;
-  final String name;
-  final String email;
-  final UserRole role;
-  final bool isOnline;
-  final bool isCurrentUser;
-  final bool hasAccount;
-  final List<UserPermission> permissions;
-}
-
-// ---------------------------------------------------------------------------
-// Dati stub
-// ---------------------------------------------------------------------------
-
-/// TODO: rimpiazzare con GET /api/users dal backend FastAPI.
-const _stubUsers = [
-  HouseUser(
-    id: '1',
-    name: 'Alice',
-    email: 'alice@home.local',
-    role: UserRole.admin,
-    isOnline: true,
-    isCurrentUser: true,
-    permissions: [
-      UserPermission('Full Control'),
-      UserPermission('Manage Users'),
-      UserPermission('Alert Configuration'),
-    ],
-  ),
-  HouseUser(
-    id: '2',
-    name: 'Bob',
-    email: 'bob@home.local',
-    role: UserRole.adult,
-    isOnline: true,
-    permissions: [
-      UserPermission('View History'),
-      UserPermission('Edit Tags'),
-      UserPermission('Dismiss Alerts'),
-    ],
-  ),
-  HouseUser(
-    id: '3',
-    name: 'Charlie',
-    email: '',
-    role: UserRole.child,
-    isOnline: false,
-    hasAccount: false,
-    permissions: [
-      UserPermission('BLE Tracking Only'),
-      UserPermission('View Own History'),
-    ],
-  ),
-  HouseUser(
-    id: '4',
-    name: 'Dave',
-    email: '',
-    role: UserRole.child,
-    isOnline: true,
-    hasAccount: false,
-    permissions: [
-      UserPermission('BLE Tracking Only'),
-      UserPermission('View Own History'),
-    ],
-  ),
-];
+// Usiamo kFakeUsersJson (definita in gk_user.dart) per costruire la lista
+// di utenti fake da mostrare durante lo sviluppo UI.
+//
+// TODO: rimpiazzare con GET /api/users dal backend FastAPI.
+final _stubUsers = kFakeUsersJson.map(GkUser.fromJson).toList();
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -122,15 +23,18 @@ const _stubUsers = [
 
 /// Schermata gestione utenti e ruoli.
 ///
-/// Desktop: 3 colonne affiancate (Administrators | Managers | Children & Guests).
+/// Desktop: 3 colonne affiancate (Administrators | Managers | Children).
 /// Mobile: colonne in scroll verticale.
 ///
-/// TODO: ⋮ menu → dialog modifica ruolo / rimuovi utente.
-/// TODO: sostituire _stubUsers con stream dal backend.
+/// TODO: sostituire _stubUsers con dati reali dal backend.
+/// TODO: ⋮ menu utente → dialog modifica ruolo / rimuovi utente.
 class UsersScreen extends StatelessWidget {
   const UsersScreen({super.key});
 
-  List<HouseUser> _byRole(UserRole role) =>
+  /// Filtra gli utenti stub per ruolo.
+  ///
+  /// - [role]: il [UserRole] da filtrare (admin / adult / child)
+  List<GkUser> _byRole(UserRole role) =>
       _stubUsers.where((u) => u.role == role).toList();
 
   @override
@@ -218,7 +122,7 @@ class UsersScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Bottone Invite Member — ora collegato al dialog reale
+// Bottone Invite Member
 // ---------------------------------------------------------------------------
 
 class _InviteButton extends StatelessWidget {
@@ -229,7 +133,6 @@ class _InviteButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
-      // Collega il dialog InviteDialog (già implementato in invite_dialog.dart)
       onPressed: () => InviteDialog.show(context),
       icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
       label: isMobile ? const SizedBox.shrink() : const Text('Invite Member'),
