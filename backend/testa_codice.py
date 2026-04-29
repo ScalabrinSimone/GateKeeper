@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Script console per interagire con il DB `test.db`.
+"""Script console per interagire con il DB `test.db`.
 Menu minimale per aggiungere e leggere: utenti, dispositivi, associazioni e log.
 """
 from typing import Any, Dict, List

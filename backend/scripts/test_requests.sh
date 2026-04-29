@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+#!/usr/bin/env bash
+# Script di test che esegue richieste HTTP contro il server locale
 set -e
 BASE=http://127.0.0.1:8000
 

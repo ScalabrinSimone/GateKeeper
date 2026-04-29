@@ -1,3 +1,4 @@
+## Script PowerShell di test per eseguire chiamate HTTP al server locale
 $base = 'http://127.0.0.1:8000'
 
 Write-Output '1) Create user'
