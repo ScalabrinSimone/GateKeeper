@@ -370,8 +370,9 @@ class _LogoutButton extends StatelessWidget {
         icon: const Icon(Icons.logout, size: 18),
         label: const Text('Sign Out'),
         style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.redAccent,
-          side: const BorderSide(color: Colors.redAccent),
+          // FIX: era Colors.redAccent — usa AppColors.danger dalla palette
+          foregroundColor: AppColors.danger,
+          side: const BorderSide(color: AppColors.danger),
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -401,12 +402,13 @@ class _LogoutButton extends StatelessWidget {
             // TODO: ApiService.logout() → invalida JWT sul backend
             if (context.mounted) {
               Navigator.of(context).pop(); // chiude dialog
-              context.go('/login');        // torna al login
+              context.go('/login');         // torna al login
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.redAccent,
-            foregroundColor: Colors.white,
+            // FIX: era Colors.redAccent — usa AppColors.danger dalla palette
+            backgroundColor: AppColors.danger,
+            foregroundColor: AppColors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),

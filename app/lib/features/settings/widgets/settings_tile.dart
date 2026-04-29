@@ -11,7 +11,9 @@ import '../../../theme/app_text_styles.dart';
 /// - [icon]: icona a sinistra
 /// - [trailing]: widget a destra opzionale (es. Switch, Badge)
 /// - [onTap]: callback tap; se null la riga non è cliccabile
-/// - [labelColor]: colore override del testo (es. rosso per Sign Out)
+/// - [labelColor]: colore override del testo E dell'icona.
+///   Usato ad esempio per la voce "Sign Out" dove entrambi
+///   devono essere arancione/rosso per comunicare pericolo.
 class SettingsTile extends StatelessWidget {
   const SettingsTile({
     super.key,
@@ -28,21 +30,27 @@ class SettingsTile extends StatelessWidget {
   final IconData icon;
   final Widget? trailing;
   final VoidCallback? onTap;
+
+  /// Se fornito, questo colore viene applicato sia al testo [label]
+  /// sia all'[icon], per coerenza visiva su voci "pericolose".
   final Color? labelColor;
 
   @override
   Widget build(BuildContext context) {
+    // Colore effettivo dell'icona: usa labelColor se definito,
+    // altrimenti il grigio secondario di default.
+    final iconColor = labelColor ?? AppColors.textSecondary;
+
     return InkWell(
       onTap: onTap,
       // Bordi arrotondati per il feedback ripple
       borderRadius: BorderRadius.circular(20),
       child: Padding(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            // Icona a sinistra
-            Icon(icon, color: AppColors.textSecondary, size: 20),
+            // FIX: icona ora usa iconColor (rispetta labelColor)
+            Icon(icon, color: iconColor, size: 20),
             const SizedBox(width: 14),
 
             // Testo

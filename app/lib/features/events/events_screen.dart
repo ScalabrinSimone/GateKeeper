@@ -318,25 +318,28 @@ class _EventTile extends StatelessWidget {
     );
   }
 
+  /// Restituisce il colore associato al tipo di evento.
+  /// Usa sempre le costanti di [AppColors] — mai valori Material hardcoded.
   Color _typeColor(EventType type) => switch (type) {
-        EventType.exit => AppColors.warning,
+        EventType.exit  => AppColors.warning,
         EventType.entry => AppColors.success,
-        EventType.alert => Colors.redAccent,
-        EventType.scan => AppColors.stormyTealBright,
+        // FIX: era Colors.redAccent — ora usa AppColors.error dalla palette
+        EventType.alert => AppColors.error,
+        EventType.scan  => AppColors.stormyTealBright,
       };
 
   IconData _typeIcon(EventType type) => switch (type) {
-        EventType.exit => Icons.logout,
+        EventType.exit  => Icons.logout,
         EventType.entry => Icons.login,
         EventType.alert => Icons.warning_amber_outlined,
-        EventType.scan => Icons.nfc_outlined,
+        EventType.scan  => Icons.nfc_outlined,
       };
 
   /// Calcola il tempo relativo (es. "5m ago", "2h ago").
   String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inHours < 24)   return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
   }
 }
