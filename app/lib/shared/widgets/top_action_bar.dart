@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/providers/locale_provider.dart';
+import '../../core/providers/theme_provider.dart';
 import '../../core/services/haptic_service.dart';
 import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 
 // ---------------------------------------------------------------------------
-// Dati stub degli alert attivi
+// Dati stub degli alert
 // ---------------------------------------------------------------------------
 
 /// Singolo alert nel pannello notifiche.
@@ -15,9 +18,9 @@ import '../../theme/app_text_styles.dart';
 /// Parametri:
 /// - [icon]: icona del tipo di alert
 /// - [title]: titolo breve
-/// - [description]: dettaglio dell'alert
-/// - [time]: ora dell'evento (stringa formattata)
-/// - [color]: colore dell'indicatore (warning, error, teal, ecc.)
+/// - [description]: dettaglio
+/// - [time]: ora formattata
+/// - [color]: colore indicatore
 class _AlertItem {
   const _AlertItem({
     required this.icon,
@@ -55,16 +58,16 @@ const _stubAlerts = [
 // TopActionBar
 // ---------------------------------------------------------------------------
 
-/// Barra azioni in alto a destra: badge alerts cliccabile + menu profilo utente.
+/// Barra azioni in alto a destra della shell.
 ///
-/// Il badge [Alerts (N)] apre un overlay panel animato con la lista alert.
-/// Il bottone utente apre un [PopupMenuButton] con:
-/// - My Account → /account
-/// - Notification Settings → /settings (stub)
-/// - Sign Out → dialog conferma → /login
+/// Contiene nell'ordine:
+/// 1. [_ThemeToggleButton] — toggle rapido dark/light
+/// 2. [_LanguageToggleButton] — toggle rapido IT/EN
+/// 3. [_AlertsBadge] — badge con contatore alert + overlay panel
+/// 4. [_UserMenuButton] — menu utente con account/settings/logout
 ///
-/// TODO: collegare al provider utente reale per mostrare nome dinamico.
-/// TODO: badge alerts da stream backend (conteggio in tempo reale).
+/// I toggle di tema e lingua agiscono direttamente sui rispettivi provider;
+/// le stesse impostazioni sono disponibili anche nella pagina Settings.
 class TopActionBar extends StatelessWidget {
   const TopActionBar({super.key});
 
@@ -72,26 +75,137 @@ class TopActionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: [
-        // Badge alerts cliccabile — apre l'overlay panel
-        const _AlertsBadge(),
-        const SizedBox(width: 10),
-        // Menu dropdown utente
-        const _UserMenuButton(),
+      children: const [
+        _ThemeToggleButton(),
+        SizedBox(width: 6),
+        _LanguageToggleButton(),
+        SizedBox(width: 10),
+        _AlertsBadge(),
+        SizedBox(width: 10),
+        _UserMenuButton(),
       ],
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Badge alerts cliccabile con overlay panel
+// Toggle tema
 // ---------------------------------------------------------------------------
 
-/// Badge "Alerts (N)" che al tap apre un overlay panel animato con la lista.
+/// Bottone icona che alterna dark ↔ light mode.
 ///
-/// Usa un [OverlayEntry] inserito nel più vicino [Overlay] (solitamente
-/// quello del MaterialApp) per mostrare il pannello senza bloccare la UI.
+/// Mostra una luna in dark mode (indica che si può passare al chiaro)
+/// e un sole in light mode (indica che si può passare allo scuro).
+/// Questo è il pattern standard usato da GitHub, Figma, Linear.
+class _ThemeToggleButton extends StatelessWidget {
+  const _ThemeToggleButton();
+
+  @override
+  Widget build(BuildContext context) {
+    // context.watch ricostruisce il widget quando ThemeProvider notifica.
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = themeProvider.isDark;
+
+    return Tooltip(
+      message: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+      child: GestureDetector(
+        onTap: () async {
+          await HapticService.light();
+          // context.read non ascolta — usato solo per chiamare metodi.
+          context.read<ThemeProvider>().toggle();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: AppColors.panelSoft,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            // key diversa per forzare l'animazione al cambio
+            child: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+              key: ValueKey(isDark),
+              size: 17,
+              color: isDark ? AppColors.orange : AppColors.stormyTealBright,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Toggle lingua
+// ---------------------------------------------------------------------------
+
+/// Bottone che alterna la lingua dell'app tra Italiano e Inglese.
+///
+/// Mostra il codice della lingua corrente ("IT" o "EN").
+/// Al tap chiama [LocaleProvider.toggle()] che notifica il [MaterialApp]
+/// e aggiorna tutte le stringhe localizzate nell'app.
+class _LanguageToggleButton extends StatelessWidget {
+  const _LanguageToggleButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final localeProvider = context.watch<LocaleProvider>();
+    final isItalian = localeProvider.isItalian;
+    final currentLabel = isItalian ? 'IT' : 'EN';
+    final nextLabel = isItalian ? 'EN' : 'IT';
+
+    return Tooltip(
+      message: 'Switch to $nextLabel',
+      child: GestureDetector(
+        onTap: () async {
+          await HapticService.light();
+          context.read<LocaleProvider>().toggle();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: AppColors.panelSoft,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: child,
+            ),
+            child: Text(
+              currentLabel,
+              key: ValueKey(currentLabel),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Badge alerts con overlay panel
+// ---------------------------------------------------------------------------
+
+/// Badge "Alerts (N)" che al tap apre un overlay panel animato.
+///
+/// Usa [OverlayEntry] per mostrare il pannello senza bloccare la UI.
 /// Il pannello si chiude toccando fuori oppure il pulsante X.
+/// "View all" naviga alla pagina Event Logs.
 class _AlertsBadge extends StatefulWidget {
   const _AlertsBadge();
 
@@ -109,13 +223,11 @@ class _AlertsBadgeState extends State<_AlertsBadge>
   @override
   void initState() {
     super.initState();
-    // Durata animazione apertura/chiusura del pannello
     _animCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
     );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    // Il pannello scende dall'alto di 8px
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, -0.04),
       end: Offset.zero,
@@ -129,20 +241,19 @@ class _AlertsBadgeState extends State<_AlertsBadge>
     super.dispose();
   }
 
-  /// Apre il pannello inserendo un OverlayEntry posizionato
-  /// sotto il badge (coordinate calcolate con RenderBox).
   void _openPanel() {
-    if (_overlayEntry != null) return; // già aperto
-
-    // Recupera la posizione globale del badge per allineare il pannello
+    if (_overlayEntry != null) return;
     final renderBox = context.findRenderObject() as RenderBox;
     final offset = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
+    // Salviamo il router context PRIMA di entrare nell'overlay,
+    // così "View all" può navigare anche dall'OverlayEntry.
+    final router = GoRouter.of(context);
+
     _overlayEntry = OverlayEntry(
       builder: (ctx) => Stack(
         children: [
-          // Sfondo trasparente cliccabile per chiudere il pannello
           Positioned.fill(
             child: GestureDetector(
               onTap: _closePanel,
@@ -150,7 +261,6 @@ class _AlertsBadgeState extends State<_AlertsBadge>
               child: const SizedBox.expand(),
             ),
           ),
-          // Pannello posizionato sotto il badge
           Positioned(
             top: offset.dy + size.height + 8,
             right: 16,
@@ -159,7 +269,17 @@ class _AlertsBadgeState extends State<_AlertsBadge>
               opacity: _fadeAnim,
               child: SlideTransition(
                 position: _slideAnim,
-                child: _AlertsPanel(onClose: _closePanel),
+                child: _AlertsPanel(
+                  onClose: _closePanel,
+                  // Passiamo il router per navigare dall'overlay
+                  onViewAll: () {
+                    _closePanel();
+                    // Naviga agli event logs — il filtro alert può essere
+                    // aggiunto come query param quando il backend è pronto.
+                    // TODO: aggiungere ?filter=alert quando API è pronta
+                    router.go('/events');
+                  },
+                ),
               ),
             ),
           ),
@@ -171,7 +291,6 @@ class _AlertsBadgeState extends State<_AlertsBadge>
     _animCtrl.forward();
   }
 
-  /// Chiude il pannello con animazione reverse e rimuove l'OverlayEntry.
   Future<void> _closePanel() async {
     if (_overlayEntry == null) return;
     await _animCtrl.reverse();
@@ -200,7 +319,6 @@ class _AlertsBadgeState extends State<_AlertsBadge>
             Icon(
               Icons.notifications_none,
               size: 18,
-              // Il badge diventa arancione se ci sono alert attivi
               color: _stubAlerts.isNotEmpty
                   ? AppColors.orange
                   : AppColors.textPrimary,
@@ -224,17 +342,22 @@ class _AlertsBadgeState extends State<_AlertsBadge>
 }
 
 // ---------------------------------------------------------------------------
-// Pannello lista alert (usato nell'OverlayEntry)
+// Pannello lista alert
 // ---------------------------------------------------------------------------
 
-/// Pannello a card con la lista degli alert attivi.
+/// Pannello overlay con la lista degli alert attivi.
 ///
 /// Parametri:
-/// - [onClose]: callback per chiudere il pannello
+/// - [onClose]: chiude il pannello
+/// - [onViewAll]: naviga alla pagina Event Logs e chiude il pannello
 class _AlertsPanel extends StatelessWidget {
-  const _AlertsPanel({required this.onClose});
+  const _AlertsPanel({
+    required this.onClose,
+    required this.onViewAll,
+  });
 
   final VoidCallback onClose;
+  final VoidCallback onViewAll; // FIX: navigazione "View all" funzionante
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +380,7 @@ class _AlertsPanel extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header pannello
+            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 12, 0),
               child: Row(
@@ -271,10 +394,8 @@ class _AlertsPanel extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  // Contatore alert
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppColors.orange.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
@@ -289,14 +410,9 @@ class _AlertsPanel extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  // Tasto chiudi
                   GestureDetector(
                     onTap: onClose,
-                    child: const Icon(
-                      Icons.close,
-                      size: 18,
-                      color: AppColors.textMuted,
-                    ),
+                    child: const Icon(Icons.close, size: 18, color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -313,12 +429,10 @@ class _AlertsPanel extends StatelessWidget {
               itemBuilder: (context, i) {
                 final alert = _stubAlerts[i];
                 return Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Icona colorata
                       Container(
                         width: 32,
                         height: 32,
@@ -326,11 +440,9 @@ class _AlertsPanel extends StatelessWidget {
                           color: alert.color.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(alert.icon,
-                            color: alert.color, size: 16),
+                        child: Icon(alert.icon, color: alert.color, size: 16),
                       ),
                       const SizedBox(width: 12),
-                      // Testo
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,26 +466,18 @@ class _AlertsPanel extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // Ora
-                      Text(
-                        alert.time,
-                        style: AppTextStyles.label,
-                      ),
+                      Text(alert.time, style: AppTextStyles.label),
                     ],
                   ),
                 );
               },
             ),
-            // Footer: link a tutti gli eventi
+            // Footer "View all" — ora naviga davvero
             const Divider(color: AppColors.border, height: 1),
             Padding(
               padding: const EdgeInsets.all(12),
               child: GestureDetector(
-                onTap: () {
-                  onClose();
-                  // Naviga agli event logs filtrati per alerts
-                  // TODO: passare parametro filtro ?type=alert
-                },
+                onTap: onViewAll, // FIX: usa onViewAll invece di stub vuoto
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -406,18 +510,18 @@ class _AlertsPanel extends StatelessWidget {
 // Dropdown menu utente
 // ---------------------------------------------------------------------------
 
-/// Bottone avatar+nome che apre un menu a tendina con le azioni rapide.
+/// Bottone avatar+nome con menu a tendina.
 ///
-/// Voci del menu:
-/// - My Account: naviga a /account
-/// - Notification Settings: stub
-/// - Sign Out: dialog di conferma, poi go('/login')
+/// Voci:
+/// - My Account → push('/account')
+/// - Notification Settings → push('/settings')
+/// - Sign Out → dialog conferma → go('/login')
 class _UserMenuButton extends StatelessWidget {
   const _UserMenuButton();
 
-  static const _itemAccount = 'account';
+  static const _itemAccount       = 'account';
   static const _itemNotifications = 'notifications';
-  static const _itemSignOut = 'signout';
+  static const _itemSignOut       = 'signout';
 
   Future<void> _handleSignOut(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -430,8 +534,7 @@ class _UserMenuButton extends StatelessWidget {
         ),
         title: const Text(
           'Sign Out',
-          style: TextStyle(
-              color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
         ),
         content: const Text(
           'Are you sure you want to sign out?',
@@ -449,8 +552,7 @@ class _UserMenuButton extends StatelessWidget {
               backgroundColor: AppColors.error,
               foregroundColor: AppColors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Sign Out'),
           ),
@@ -460,7 +562,6 @@ class _UserMenuButton extends StatelessWidget {
 
     if (confirmed == true && context.mounted) {
       await HapticService.heavy();
-      // Resetta lo stato di login prima di navigare
       AuthState.instance.setLoggedIn(false);
       context.go('/login');
     }
@@ -470,12 +571,6 @@ class _UserMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
       offset: const Offset(0, 42),
-      color: AppColors.panel,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      elevation: 8,
       onSelected: (value) async {
         switch (value) {
           case _itemAccount:
@@ -489,8 +584,7 @@ class _UserMenuButton extends StatelessWidget {
         }
       },
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           color: AppColors.panelSoft,
@@ -502,8 +596,7 @@ class _UserMenuButton extends StatelessWidget {
             CircleAvatar(
               radius: 13,
               backgroundColor: AppColors.orange,
-              child:
-                  Icon(Icons.person, size: 14, color: AppColors.inkBlack),
+              child: Icon(Icons.person, size: 14, color: AppColors.inkBlack),
             ),
             SizedBox(width: 6),
             Text(
@@ -515,50 +608,35 @@ class _UserMenuButton extends StatelessWidget {
               ),
             ),
             SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down,
-                size: 16, color: AppColors.textSecondary),
+            Icon(Icons.keyboard_arrow_down, size: 16, color: AppColors.textSecondary),
           ],
         ),
       ),
       itemBuilder: (context) => [
         const PopupMenuItem<String>(
           value: _itemAccount,
-          child: Row(
-            children: [
-              Icon(Icons.person_outline,
-                  size: 17, color: AppColors.textSecondary),
-              SizedBox(width: 10),
-              Text('My Account',
-                  style: TextStyle(
-                      color: AppColors.textPrimary, fontSize: 14)),
-            ],
-          ),
+          child: Row(children: [
+            Icon(Icons.person_outline, size: 17, color: AppColors.textSecondary),
+            SizedBox(width: 10),
+            Text('My Account', style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+          ]),
         ),
         const PopupMenuItem<String>(
           value: _itemNotifications,
-          child: Row(
-            children: [
-              Icon(Icons.notifications_none,
-                  size: 17, color: AppColors.textSecondary),
-              SizedBox(width: 10),
-              Text('Notification Settings',
-                  style: TextStyle(
-                      color: AppColors.textPrimary, fontSize: 14)),
-            ],
-          ),
+          child: Row(children: [
+            Icon(Icons.notifications_none, size: 17, color: AppColors.textSecondary),
+            SizedBox(width: 10),
+            Text('Notification Settings', style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+          ]),
         ),
         const PopupMenuDivider(),
         const PopupMenuItem<String>(
           value: _itemSignOut,
-          child: Row(
-            children: [
-              Icon(Icons.logout, size: 17, color: AppColors.error),
-              SizedBox(width: 10),
-              Text('Sign Out',
-                  style:
-                      TextStyle(color: AppColors.error, fontSize: 14)),
-            ],
-          ),
+          child: Row(children: [
+            Icon(Icons.logout, size: 17, color: AppColors.error),
+            SizedBox(width: 10),
+            Text('Sign Out', style: TextStyle(color: AppColors.error, fontSize: 14)),
+          ]),
         ),
       ],
     );

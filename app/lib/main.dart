@@ -9,18 +9,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ── Titlebar desktop ────────────────────────────────────────────────────
-  // Su Windows/Linux/macOS Flutter mostra una titlebar nativa con il titolo
-  // impostato in MaterialApp. Per nasconderla completamente si usa il package
-  // window_manager (non ancora in pubspec.yaml).
+  // Su Windows/Linux/macOS Flutter mostra una titlebar nativa.
+  // Per nasconderla si usa window_manager (non ancora in pubspec.yaml).
   //
-  // TODO: aggiungi window_manager al pubspec.yaml e sostituisci questo blocco:
-  //
+  // TODO: aggiungi window_manager al pubspec.yaml e sostituisci con:
   //   import 'package:window_manager/window_manager.dart';
   //   await windowManager.ensureInitialized();
   //   await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
-  //
-  // Per ora usiamo SystemChrome per rimuovere gli overlay di sistema su mobile
-  // e impostiamo il titolo vuoto (vedi app.dart) per minimizzare la barra.
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -31,8 +26,9 @@ void main() async {
   // TODO: inizializzare qui i servizi globali quando pronti:
   // - lettura config ambiente (dev/prod)
   // - flutter_secure_storage per il JWT
-  // - dependency injection (get_it o riverpod)
   // - bootstrap ApiClient con baseUrl da config
 
+  // GateKeeperApp crea i provider (ThemeProvider, LocaleProvider)
+  // e li inietta nell'albero dei widget tramite MultiProvider.
   runApp(const GateKeeperApp());
 }

@@ -9,21 +9,21 @@ import 'dialogs/add_object_dialog.dart';
 import 'widgets/object_card.dart';
 
 // ---------------------------------------------------------------------------
-// Modello dati locale
+// Modello
 // ---------------------------------------------------------------------------
 
-/// Stato attuale di un oggetto tracciato via RFID.
+/// Stato corrente di un oggetto RFID.
 enum ObjectStatus { home, away, unknown }
 
 /// Oggetto fisico con tag RFID registrato nel sistema.
 ///
 /// Parametri:
-/// - [id]: ID RFID dell'etichetta (es. 'RFID-001')
+/// - [id]: ID tag RFID (es. 'RFID-001')
 /// - [name]: nome leggibile (es. 'House Keys')
-/// - [category]: categoria (es. 'Keys', 'Electronics')
+/// - [category]: categoria (es. 'Keys', 'Electronics', 'Accessories')
 /// - [status]: posizione corrente [ObjectStatus]
-/// - [lastSeen]: ultima rilevazione formattata (es. 'Today, 08:30 AM')
-/// - [icon]: icona [IconData] rappresentativa
+/// - [lastSeen]: ultima rilevazione formattata
+/// - [icon]: icona rappresentativa
 class RfidObject {
   const RfidObject({
     required this.id,
@@ -46,50 +46,42 @@ class RfidObject {
 // Dati stub
 // ---------------------------------------------------------------------------
 
-/// TODO: rimpiazzare con chiamata GET /api/objects dal backend.
-/// La risposta sarà una lista di JSON da deserializzare in [RfidObject].
+/// TODO: rimpiazzare con GET /api/objects dal backend.
 const _stubObjects = [
   RfidObject(
-    id: 'RFID-001',
-    name: 'House Keys',
-    category: 'Keys',
-    status: ObjectStatus.home,
-    lastSeen: 'Today, 08:30 AM',
-    icon: Icons.vpn_key_outlined,
+    id: 'RFID-001', name: 'House Keys',
+    category: 'Keys',        status: ObjectStatus.home,
+    lastSeen: 'Today, 08:30 AM', icon: Icons.vpn_key_outlined,
   ),
   RfidObject(
-    id: 'RFID-002',
-    name: 'MacBook Pro',
-    category: 'Electronics',
-    status: ObjectStatus.away,
-    lastSeen: 'Today, 10:45 AM',
-    icon: Icons.laptop_mac_outlined,
+    id: 'RFID-002', name: 'MacBook Pro',
+    category: 'Electronics', status: ObjectStatus.away,
+    lastSeen: 'Today, 10:45 AM', icon: Icons.laptop_mac_outlined,
   ),
   RfidObject(
-    id: 'RFID-003',
-    name: 'Wallet',
-    category: 'Accessories',
-    status: ObjectStatus.away,
-    lastSeen: 'Today, 09:15 AM',
-    icon: Icons.wallet_outlined,
+    id: 'RFID-003', name: 'Wallet',
+    category: 'Accessories', status: ObjectStatus.away,
+    lastSeen: 'Today, 09:15 AM', icon: Icons.wallet_outlined,
   ),
   RfidObject(
-    id: 'RFID-004',
-    name: 'Umbrella',
-    category: 'Accessories',
-    status: ObjectStatus.home,
-    lastSeen: 'Yesterday, 06:00 PM',
-    icon: Icons.umbrella_outlined,
+    id: 'RFID-004', name: 'Umbrella',
+    category: 'Accessories', status: ObjectStatus.home,
+    lastSeen: 'Yesterday, 06:00 PM', icon: Icons.umbrella_outlined,
   ),
   RfidObject(
-    id: 'RFID-005',
-    name: 'Car Keys',
-    category: 'Keys',
-    status: ObjectStatus.home,
-    lastSeen: 'Today, 07:00 AM',
-    icon: Icons.directions_car_outlined,
+    id: 'RFID-005', name: 'Car Keys',
+    category: 'Keys',        status: ObjectStatus.home,
+    lastSeen: 'Today, 07:00 AM', icon: Icons.directions_car_outlined,
   ),
 ];
+
+// Categorie distinte per il filtro — derivate dagli stub.
+// In produzione questo verrà dal backend.
+final _allCategories = _stubObjects
+    .map((o) => o.category)
+    .toSet()
+    .toList()
+  ..sort();
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -97,15 +89,16 @@ const _stubObjects = [
 
 /// Schermata gestione oggetti RFID.
 ///
-/// Responsabilità:
-/// - visualizza tutti gli oggetti registrati con stato e ultima rilevazione;
-/// - filtro per ricerca testuale e stato su una **riga unica** (come da mockup Figma);
-/// - l'admin può aggiungere nuovi oggetti tramite [AddObjectDialog].
+/// Filtri:
+/// - **Ricerca testuale**: nome, categoria, ID RFID
+/// - **Stato**: All / At Home / Away
+/// - **Categoria**: All / Keys / Electronics / Accessories (ecc.)
 ///
-/// Layout filtri (desktop): [SearchBar] espansa + [_StatusFilterRow] a destra
-/// sulla stessa riga orizzontale.
+/// Layout:
+/// - Desktop: SearchBar + filtri stato + filtro categoria in riga
+/// - Mobile: SearchBar → filtri stato → filtro categoria (impilati)
 ///
-/// TODO: chiamata GET /api/objects per popolare la lista in modo reale.
+/// TODO: GET /api/objects per dati reali.
 class ObjectsScreen extends StatefulWidget {
   const ObjectsScreen({super.key});
 
@@ -116,8 +109,9 @@ class ObjectsScreen extends StatefulWidget {
 class _ObjectsScreenState extends State<ObjectsScreen> {
   String _query = '';
   ObjectStatus? _statusFilter;
+  String? _categoryFilter; // null = tutte le categorie
 
-  /// Filtra gli oggetti in base alla query testuale e al filtro di stato.
+  /// Applica tutti i filtri attivi.
   List<RfidObject> get _filtered {
     return _stubObjects.where((o) {
       final matchesQuery =
@@ -126,124 +120,121 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
           o.id.toLowerCase().contains(_query.toLowerCase());
       final matchesStatus =
           _statusFilter == null || o.status == _statusFilter;
-      return matchesQuery && matchesStatus;
+      final matchesCategory =
+          _categoryFilter == null || o.category == _categoryFilter;
+      return matchesQuery && matchesStatus && matchesCategory;
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Soglia per layout mobile: sotto 500px si impila verticalmente.
-        // Usiamo una soglia più bassa di AppBreakpoints.mobile (600px) perché
-        // la schermata oggetti è incassata nella shell (sidebar 230px già tolta).
-        // Così su desktop la barra ricerca+filtri è sempre in riga.
-        final isMobile = constraints.maxWidth < AppBreakpoints.objectsMobile;
+    final isMobile =
+        MediaQuery.of(context).size.width < AppBreakpoints.objectsMobile;
 
-        return SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              PageHeader(
-                title: 'RFID Objects',
-                trailing: _AddObjectButton(isMobile: isMobile),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    isMobile ? 16 : 24,
-                    0,
-                    isMobile ? 16 : 24,
-                    24,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Barra ricerca + filtri ────────────────────────────
-                      // Desktop: SearchBar + chips sulla stessa riga (Row).
-                      // Mobile: SearchBar sopra, chips sotto.
-                      if (isMobile) ...
-                        [
-                          GkSearchBar(
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PageHeader(
+            title: 'RFID Objects',
+            trailing: _AddObjectButton(isMobile: isMobile),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 16 : 24, 0, isMobile ? 16 : 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Filtri ────────────────────────────────────────────────
+                  if (isMobile) ...
+                    [
+                      GkSearchBar(
+                        hint: 'Search by name, category or RFID ID…',
+                        onChanged: (v) => setState(() => _query = v),
+                      ),
+                      const SizedBox(height: 10),
+                      // Filtro stato
+                      _StatusFilterRow(
+                        current: _statusFilter,
+                        onChanged: (s) => setState(() => _statusFilter = s),
+                      ),
+                      const SizedBox(height: 8),
+                      // Filtro categoria
+                      _CategoryFilterRow(
+                        current: _categoryFilter,
+                        categories: _allCategories,
+                        onChanged: (c) => setState(() => _categoryFilter = c),
+                      ),
+                    ]
+                  else
+                    // Desktop: tutto in riga
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GkSearchBar(
                             hint: 'Search by name, category or RFID ID…',
                             onChanged: (v) => setState(() => _query = v),
                           ),
-                          const SizedBox(height: 10),
-                          _StatusFilterRow(
-                            current: _statusFilter,
-                            onChanged: (s) =>
-                                setState(() => _statusFilter = s),
-                          ),
-                        ]
-                      else
-                        // Desktop: SearchBar espansa + chips a destra nella stessa Row
-                        Row(
-                          children: [
-                            Expanded(
-                              child: GkSearchBar(
-                                hint:
-                                    'Search by name, category or RFID ID…',
-                                onChanged: (v) =>
-                                    setState(() => _query = v),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            _StatusFilterRow(
-                              current: _statusFilter,
-                              onChanged: (s) =>
-                                  setState(() => _statusFilter = s),
-                            ),
-                          ],
                         ),
-
-                      const SizedBox(height: 20),
-
-                      // ── Griglia oggetti ───────────────────────────────────
-                      if (_filtered.isEmpty)
-                        const GkEmptyState(
-                          icon: Icons.sell_outlined,
-                          title: 'No objects found',
-                          subtitle:
-                              'Add a new RFID object or try a different search.',
-                        )
-                      else if (isMobile)
-                        // Mobile: lista verticale
-                        Column(
-                          children: [
-                            for (final obj in _filtered) ...
-                              [
-                                ObjectCard(object: obj),
-                                const SizedBox(height: 12),
-                              ],
-                          ],
-                        )
-                      else
-                        // Desktop: griglia con altezza fissa.
-                        // mainAxisExtent = altezza fissa per ogni card;
-                        // evita il childAspectRatio che causava overflow
-                        // su contenuto di lunghezza variabile.
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 300,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                            mainAxisExtent: 190,
-                          ),
-                          itemCount: _filtered.length,
-                          itemBuilder: (_, i) =>
-                              ObjectCard(object: _filtered[i]),
+                        const SizedBox(width: 12),
+                        _StatusFilterRow(
+                          current: _statusFilter,
+                          onChanged: (s) => setState(() => _statusFilter = s),
                         ),
-                    ],
-                  ),
-                ),
+                        const SizedBox(width: 8),
+                        // Separatore visivo
+                        Container(
+                          width: 1,
+                          height: 28,
+                          color: AppColors.border,
+                        ),
+                        const SizedBox(width: 8),
+                        _CategoryFilterRow(
+                          current: _categoryFilter,
+                          categories: _allCategories,
+                          onChanged: (c) => setState(() => _categoryFilter = c),
+                        ),
+                      ],
+                    ),
+
+                  const SizedBox(height: 20),
+
+                  // ── Griglia / lista oggetti ──────────────────────────────
+                  if (_filtered.isEmpty)
+                    const GkEmptyState(
+                      icon: Icons.sell_outlined,
+                      title: 'No objects found',
+                      subtitle:
+                          'Add a new RFID object or try a different search.',
+                    )
+                  else if (isMobile)
+                    Column(
+                      children: [
+                        for (final obj in _filtered) ...
+                          [ObjectCard(object: obj), const SizedBox(height: 12)],
+                      ],
+                    )
+                  else
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 300,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        mainAxisExtent: 190,
+                      ),
+                      itemCount: _filtered.length,
+                      itemBuilder: (_, i) => ObjectCard(object: _filtered[i]),
+                    ),
+                ],
               ),
-            ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -254,7 +245,6 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
 
 class _AddObjectButton extends StatelessWidget {
   const _AddObjectButton({required this.isMobile});
-
   final bool isMobile;
 
   @override
@@ -267,24 +257,21 @@ class _AddObjectButton extends StatelessWidget {
         backgroundColor: AppColors.stormyTeal,
         foregroundColor: AppColors.white,
         padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 12 : 18,
-          vertical: 10,
-        ),
+          horizontal: isMobile ? 12 : 18, vertical: 10),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         elevation: 0,
       ),
     );
   }
 }
 
-/// Riga di filtri per stato oggetto: All / At Home / Away.
+/// Riga chip filtro stato: All / At Home / Away.
 ///
-/// Non fa scroll su desktop perché i 3 chip entrano sempre accanto alla search.
-/// Su mobile usa SingleChildScrollView orizzontale per sicurezza.
+/// Parametri:
+/// - [current]: stato attivo (null = All)
+/// - [onChanged]: callback al cambio
 class _StatusFilterRow extends StatelessWidget {
   const _StatusFilterRow({
     required this.current,
@@ -300,11 +287,8 @@ class _StatusFilterRow extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _FilterChip(
-            label: 'All',
-            isSelected: current == null,
-            onTap: () => onChanged(null),
-          ),
+          _FilterChip(label: 'All',
+              isSelected: current == null, onTap: () => onChanged(null)),
           const SizedBox(width: 8),
           _FilterChip(
             label: 'At Home',
@@ -325,11 +309,59 @@ class _StatusFilterRow extends StatelessWidget {
   }
 }
 
-/// Chip filtro animato per lo stato degli oggetti.
+/// Riga chip filtro categoria.
+///
+/// Mostra "All" + un chip per ogni categoria disponibile.
+/// Il chip selezionato ha bordo e sfondo accentati.
 ///
 /// Parametri:
-/// - [label]: testo mostrato nel chip
-/// - [isSelected]: se true applica sfondo + bordo colorato
+/// - [current]: categoria attiva (null = All)
+/// - [categories]: lista categorie disponibili (derivata dagli oggetti)
+/// - [onChanged]: callback al cambio
+class _CategoryFilterRow extends StatelessWidget {
+  const _CategoryFilterRow({
+    required this.current,
+    required this.categories,
+    required this.onChanged,
+  });
+
+  final String? current;
+  final List<String> categories;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _FilterChip(
+            label: 'All Categories',
+            isSelected: current == null,
+            onTap: () => onChanged(null),
+          ),
+          for (final cat in categories) ...
+            [
+              const SizedBox(width: 8),
+              _FilterChip(
+                label: cat,
+                isSelected: current == cat,
+                onTap: () => onChanged(cat),
+                // Colore diverso per categoria — visivamente distinguibile
+                color: AppColors.stormyTealBright,
+              ),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Chip filtro animato generico.
+///
+/// Parametri:
+/// - [label]: testo del chip
+/// - [isSelected]: true = stile attivo
 /// - [onTap]: callback al tap
 /// - [color]: colore accent (default teal)
 class _FilterChip extends StatelessWidget {
@@ -352,7 +384,8 @@ class _FilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? c.withValues(alpha: 0.18)
@@ -368,7 +401,8 @@ class _FilterChip extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            fontWeight:
+                isSelected ? FontWeight.w600 : FontWeight.w400,
             color: isSelected ? c : AppColors.textSecondary,
           ),
         ),
