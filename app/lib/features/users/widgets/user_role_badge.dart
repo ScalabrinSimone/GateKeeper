@@ -5,10 +5,8 @@ import '../users_screen.dart';
 
 /// Badge colorato con il ruolo dell'utente.
 ///
-/// I colori seguono la gerarchia:
-/// - Admin → arancione (valore più alto)
-/// - Adult → teal
-/// - Child → grigio
+/// Rimasto per compatibilità futura (es. in altre schermate dove
+/// si mostra un singolo utente con badge inline).
 ///
 /// Parametri:
 /// - [role]: valore enum [UserRole]

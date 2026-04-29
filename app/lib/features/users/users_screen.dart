@@ -1,31 +1,42 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_breakpoints.dart';
-import '../../shared/widgets/gk_badge.dart';
-import '../../shared/widgets/gk_empty_state.dart';
-import '../../shared/widgets/gk_search_bar.dart';
-import '../../shared/widgets/glass_card.dart';
 import '../../shared/widgets/page_header.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
-import 'widgets/user_role_badge.dart';
-import 'widgets/user_tile.dart';
+import 'widgets/user_role_column.dart';
 
 // ---------------------------------------------------------------------------
-// Modello dati locale (stub finché non c'è backend)
+// Modello dati
 // ---------------------------------------------------------------------------
 
-/// Ruoli disponibili nell'app GateKeeper.
+/// Ruoli disponibili nel sistema GateKeeper.
+///
+/// - [admin]: accesso totale a impostazioni, alert e oggetti
+/// - [adult]: può vedere tracking, gestire tag e dismissare alert
+/// - [child]: tracciato via BLE, nessun accesso a settings o alert sensibili
 enum UserRole { admin, adult, child }
 
-/// Rappresenta un membro della casa.
+/// Singolo permesso mostrato nella card utente.
+///
+/// Parametri:
+/// - [label]: testo del permesso (es. 'Full Control')
+class UserPermission {
+  const UserPermission(this.label);
+  final String label;
+}
+
+/// Membro della casa registrato nel sistema.
 ///
 /// Parametri:
 /// - [id]: identificatore univoco
-/// - [name]: nome visualizzato
-/// - [email]: email/username
-/// - [role]: ruolo (admin / adult / child)
-/// - [isOnline]: true se BLE lo rileva in casa
+/// - [name]: nome visualizzato (es. 'Alice')
+/// - [email]: email/username (es. 'alice@home.local')
+/// - [role]: ruolo [UserRole]
+/// - [isOnline]: true se il dispositivo BLE è rilevato in casa
+/// - [isCurrentUser]: true per l'utente loggato (mostra '(You)')
+/// - [hasAccount]: false per bambini/ospiti senza login
+/// - [permissions]: lista permessi mostrati nella card
 class HouseUser {
   const HouseUser({
     required this.id,
@@ -33,6 +44,9 @@ class HouseUser {
     required this.email,
     required this.role,
     this.isOnline = false,
+    this.isCurrentUser = false,
+    this.hasAccount = true,
+    this.permissions = const [],
   });
 
   final String id;
@@ -40,13 +54,16 @@ class HouseUser {
   final String email;
   final UserRole role;
   final bool isOnline;
+  final bool isCurrentUser;
+  final bool hasAccount;
+  final List<UserPermission> permissions;
 }
 
 // ---------------------------------------------------------------------------
 // Dati stub
 // ---------------------------------------------------------------------------
 
-/// TODO: rimpiazzare con chiamata GET /api/users dal backend.
+/// TODO: rimpiazzare con GET /api/users dal backend FastAPI.
 const _stubUsers = [
   HouseUser(
     id: '1',
@@ -54,6 +71,12 @@ const _stubUsers = [
     email: 'alice@home.local',
     role: UserRole.admin,
     isOnline: true,
+    isCurrentUser: true,
+    permissions: [
+      UserPermission('Full Control'),
+      UserPermission('Manage Users'),
+      UserPermission('Alert Configuration'),
+    ],
   ),
   HouseUser(
     id: '2',
@@ -61,20 +84,35 @@ const _stubUsers = [
     email: 'bob@home.local',
     role: UserRole.adult,
     isOnline: true,
+    permissions: [
+      UserPermission('View History'),
+      UserPermission('Edit Tags'),
+      UserPermission('Dismiss Alerts'),
+    ],
   ),
   HouseUser(
     id: '3',
     name: 'Charlie',
-    email: 'charlie@home.local',
+    email: '',
     role: UserRole.child,
     isOnline: false,
+    hasAccount: false,
+    permissions: [
+      UserPermission('BLE Tracking Only'),
+      UserPermission('View Own History'),
+    ],
   ),
   HouseUser(
     id: '4',
     name: 'Dave',
-    email: 'dave@home.local',
+    email: '',
     role: UserRole.child,
     isOnline: true,
+    hasAccount: false,
+    permissions: [
+      UserPermission('BLE Tracking Only'),
+      UserPermission('View Own History'),
+    ],
   ),
 ];
 
@@ -84,33 +122,22 @@ const _stubUsers = [
 
 /// Schermata gestione utenti e ruoli.
 ///
-/// Responsabilità:
-/// - visualizza lista membri della casa con ruolo e presenza BLE;
-/// - permette ricerca per nome;
-/// - l'admin può invitare nuovi utenti (dialog nel Blocco 2B).
+/// Desktop: 3 colonne affiancate (Administrators | Managers | Children & Guests).
+/// Mobile: colonne in scroll verticale.
 ///
-/// TODO (Blocco 2B): collegare bottone "Invite" al dialog.
-/// TODO: chiamata GET /api/users per popolare _users.
-class UsersScreen extends StatefulWidget {
+/// Ogni colonna mostra:
+/// - titolo ruolo + badge count + descrizione;
+/// - card per ogni utente con avatar, nome/email, menu ⋮ e lista permessi.
+///
+/// TODO (Blocco 2B): ⋮ menu → dialog modifica ruolo / rimuovi utente.
+/// TODO (Blocco 2B): bottone Invite Member → dialog invito.
+/// TODO: sostituire _stubUsers con stream dal backend.
+class UsersScreen extends StatelessWidget {
   const UsersScreen({super.key});
 
-  @override
-  State<UsersScreen> createState() => _UsersScreenState();
-}
-
-class _UsersScreenState extends State<UsersScreen> {
-  // Lista filtrata in base alla ricerca
-  List<HouseUser> _filtered = _stubUsers;
-
-  void _onSearch(String query) {
-    setState(() {
-      _filtered = _stubUsers
-          .where((u) =>
-              u.name.toLowerCase().contains(query.toLowerCase()) ||
-              u.email.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    });
-  }
+  // Filtra gli utenti per ruolo
+  List<HouseUser> _byRole(UserRole role) =>
+      _stubUsers.where((u) => u.role == role).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -123,61 +150,72 @@ class _UsersScreenState extends State<UsersScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               PageHeader(
-                title: 'Users & Roles',
+                title: 'User Management',
                 trailing: _InviteButton(isMobile: isMobile),
               ),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    isMobile ? 16 : 24,
-                    0,
-                    isMobile ? 16 : 24,
-                    24,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Barra di ricerca
-                      GkSearchBar(
-                        hint: 'Search members…',
-                        onChanged: _onSearch,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Contatori ruolo in alto (solo desktop)
-                      if (!isMobile) _RoleSummaryRow(users: _stubUsers),
-                      if (!isMobile) const SizedBox(height: 20),
-
-                      // Lista utenti
-                      if (_filtered.isEmpty)
-                        const GkEmptyState(
-                          icon: Icons.group_off_outlined,
-                          title: 'No members found',
-                          subtitle:
-                              'Try a different search or invite a new member.',
-                        )
-                      else
-                        GlassCard(
-                          padding: EdgeInsets.zero,
-                          child: Column(
-                            children: [
-                              for (int i = 0; i < _filtered.length; i++) ...
-                                [
-                                  UserTile(user: _filtered[i]),
-                                  // Divider tra voci ma non dopo l'ultima
-                                  if (i < _filtered.length - 1)
-                                    const Divider(
-                                      height: 1,
-                                      color: AppColors.border,
-                                      indent: 60,
-                                    ),
-                                ],
-                            ],
+                child: isMobile
+                    // Mobile: colonne in scroll verticale
+                    ? ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        children: [
+                          UserRoleColumn(
+                            roleTitle: 'Administrators',
+                            roleDescription:
+                                'Full access to all system settings, alerts, and object tracking.',
+                            users: _byRole(UserRole.admin),
                           ),
+                          const SizedBox(height: 20),
+                          UserRoleColumn(
+                            roleTitle: 'Managers',
+                            roleDescription:
+                                'Can view tracking, dismiss alerts, and edit object tags.',
+                            users: _byRole(UserRole.adult),
+                          ),
+                          const SizedBox(height: 20),
+                          UserRoleColumn(
+                            roleTitle: 'Children & Guests',
+                            roleDescription:
+                                'Tracked via BLE. Cannot change settings or view sensitive alerts.',
+                            users: _byRole(UserRole.child),
+                          ),
+                        ],
+                      )
+                    // Desktop: 3 colonne affiancate con IntrinsicHeight
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: UserRoleColumn(
+                                roleTitle: 'Administrators',
+                                roleDescription:
+                                    'Full access to all system settings, alerts, and object tracking.',
+                                users: _byRole(UserRole.admin),
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: UserRoleColumn(
+                                roleTitle: 'Managers',
+                                roleDescription:
+                                    'Can view tracking, dismiss alerts, and edit object tags.',
+                                users: _byRole(UserRole.adult),
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: UserRoleColumn(
+                                roleTitle: 'Children & Guests',
+                                roleDescription:
+                                    'Tracked via BLE. Cannot change settings or view sensitive alerts.',
+                                users: _byRole(UserRole.child),
+                              ),
+                            ),
+                          ],
                         ),
-                    ],
-                  ),
-                ),
+                      ),
               ),
             ],
           ),
@@ -188,10 +226,9 @@ class _UsersScreenState extends State<UsersScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Widget locali
+// Bottone Invite Member
 // ---------------------------------------------------------------------------
 
-/// Bottone "Invite Member" — nel Blocco 2B aprirà il dialog.
 class _InviteButton extends StatelessWidget {
   const _InviteButton({required this.isMobile});
 
@@ -203,11 +240,15 @@ class _InviteButton extends StatelessWidget {
       onPressed: () {
         // TODO (Blocco 2B): showInviteDialog(context)
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invite dialog — coming in Block 2B')),
+          const SnackBar(
+            content: Text('Invite dialog — coming in Block 2B'),
+          ),
         );
       },
       icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
-      label: isMobile ? const SizedBox.shrink() : const Text('Invite Member'),
+      label: isMobile
+          ? const SizedBox.shrink()
+          : const Text('Invite Member'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.stormyTeal,
         foregroundColor: AppColors.white,
@@ -221,78 +262,6 @@ class _InviteButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
         ),
         elevation: 0,
-      ),
-    );
-  }
-}
-
-/// Riga di riepilogo con numero di Admin / Adult / Child.
-class _RoleSummaryRow extends StatelessWidget {
-  const _RoleSummaryRow({required this.users});
-
-  final List<HouseUser> users;
-
-  int _count(UserRole r) => users.where((u) => u.role == r).length;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _RoleChip(
-          label: 'Admin',
-          count: _count(UserRole.admin),
-          color: AppColors.orange,
-        ),
-        const SizedBox(width: 10),
-        _RoleChip(
-          label: 'Adult',
-          count: _count(UserRole.adult),
-          color: AppColors.stormyTealBright,
-        ),
-        const SizedBox(width: 10),
-        _RoleChip(
-          label: 'Child',
-          count: _count(UserRole.child),
-          color: AppColors.textSecondary,
-        ),
-      ],
-    );
-  }
-}
-
-class _RoleChip extends StatelessWidget {
-  const _RoleChip({
-    required this.label,
-    required this.count,
-    required this.color,
-  });
-
-  final String label;
-  final int count;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.30)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            '$count',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(label, style: AppTextStyles.label),
-        ],
       ),
     );
   }
