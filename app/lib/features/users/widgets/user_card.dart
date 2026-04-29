@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/haptic_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../users_screen.dart';
@@ -8,14 +9,14 @@ import '../users_screen.dart';
 ///
 /// Layout:
 /// ```
-/// ┌─────────────────────────────────────────┐
-/// │  [avatar]  Nome (You?)     ⋮            │
-/// │            email                        │
-/// │  ──────────────────────────────────     │
-/// │  PERMISSIONS                            │
-/// │  ✓ Full Control                         │
-/// │  ✓ Manage Users                         │
-/// └─────────────────────────────────────────┘
+/// ┌────────────────────────────────────────┐
+/// │  [avatar]  Nome (You?)     ⋮           │
+/// │            email / No Account          │
+/// │  ──────────────────────────────────    │
+/// │  PERMISSIONS                           │
+/// │  ✓ Full Control                        │
+/// │  ✓ Manage Users                        │
+/// └────────────────────────────────────────┘
 /// ```
 ///
 /// Parametri:
@@ -70,7 +71,6 @@ class UserCard extends StatelessWidget {
                               ? AppColors.success
                               : AppColors.textMuted,
                           shape: BoxShape.circle,
-                          // Bordo per staccare il pallino dallo sfondo
                           border: Border.all(
                             color: AppColors.panelSoft,
                             width: 1.5,
@@ -87,25 +87,16 @@ class UserCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Nome con badge '(You)' se è l'utente corrente
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              user.isCurrentUser
-                                  ? '${user.name} (You)'
-                                  : user.name,
-                              style: AppTextStyles.cardTitle,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        user.isCurrentUser
+                            ? '${user.name} (You)'
+                            : user.name,
+                        style: AppTextStyles.cardTitle,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        user.hasAccount
-                            ? user.email
-                            : 'No Account',
+                        user.hasAccount ? user.email : 'No Account',
                         style: AppTextStyles.body.copyWith(fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -113,18 +104,17 @@ class UserCard extends StatelessWidget {
                   ),
                 ),
 
-                // Menu ⋮ (tre puntini)
+                // Menu ⋮
                 IconButton(
-                  onPressed: () {
-                    // TODO (Blocco 2B): PopupMenu con Modifica ruolo / Rimuovi
-                    _showUserMenu(context);
+                  onPressed: () async {
+                    await HapticService.light();
+                    if (context.mounted) _showUserMenu(context);
                   },
                   icon: const Icon(
                     Icons.more_vert,
                     color: AppColors.textSecondary,
                     size: 20,
                   ),
-                  // Riduce il padding attorno all'icona
                   padding: const EdgeInsets.all(4),
                   constraints: const BoxConstraints(),
                   visualDensity: VisualDensity.compact,
@@ -133,7 +123,6 @@ class UserCard extends StatelessWidget {
             ),
           ),
 
-          // Divider tra header e permessi
           const Divider(height: 1, color: AppColors.border),
 
           // Sezione permessi
@@ -142,11 +131,8 @@ class UserCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Label 'PERMISSIONS'
                 const Text('PERMISSIONS', style: AppTextStyles.label),
                 const SizedBox(height: 8),
-
-                // Lista permessi con checkmark
                 ...user.permissions.map(
                   (p) => Padding(
                     padding: const EdgeInsets.only(bottom: 4),
@@ -177,14 +163,12 @@ class UserCard extends StatelessWidget {
     );
   }
 
-  /// Mostra un PopupMenuButton posizionato vicino al bottone ⋮.
-  /// TODO (Blocco 2B): sostituire con dialog modale con blur.
+  /// PopupMenu con opzioni di gestione utente.
+  /// TODO (futuro): showModalBottomSheet con preview ruolo e conferma.
   void _showUserMenu(BuildContext context) {
-    final RenderBox button =
-        context.findRenderObject() as RenderBox;
+    final RenderBox button = context.findRenderObject() as RenderBox;
     final RenderBox overlay =
-        Navigator.of(context).overlay!.context.findRenderObject()
-            as RenderBox;
+        Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
     final RelativeRect position = RelativeRect.fromRect(
       Rect.fromPoints(
         button.localToGlobal(Offset.zero, ancestor: overlay),
@@ -204,10 +188,40 @@ class UserCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: AppColors.border),
       ),
-      items: const [
-        PopupMenuItem(value: 'edit', child: Text('Change Role')),
-        PopupMenuItem(value: 'remove', child: Text('Remove Member')),
+      items: [
+        const PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(Icons.edit_outlined,
+                  size: 16, color: AppColors.textSecondary),
+              SizedBox(width: 10),
+              Text('Change Role',
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'remove',
+          child: Row(
+            children: [
+              Icon(Icons.person_remove_outlined,
+                  size: 16, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text('Remove Member',
+                  style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+            ],
+          ),
+        ),
       ],
-    );
+    ).then((value) async {
+      if (value == 'remove') {
+        // Vibrazione pesante per azione distruttiva
+        await HapticService.heavy();
+        // TODO: showConfirmDialog → DELETE /api/users/{id}
+      } else if (value == 'edit') {
+        // TODO: showChangeRoleDialog → PATCH /api/users/{id}/role
+      }
+    });
   }
 }

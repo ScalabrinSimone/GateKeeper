@@ -1,108 +1,102 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_breakpoints.dart';
-import '../../shared/widgets/gk_badge.dart';
-import '../../shared/widgets/gk_empty_state.dart';
-import '../../shared/widgets/gk_search_bar.dart';
-import '../../shared/widgets/glass_card.dart';
+import '../../core/services/haptic_service.dart';
 import '../../shared/widgets/page_header.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
-import 'widgets/event_list_tile.dart';
+import 'widgets/event_detail_sheet.dart';
 
 // ---------------------------------------------------------------------------
-// Modello dati
+// Modelli
 // ---------------------------------------------------------------------------
+
+/// Direzione dell'evento: uscita o entrata dalla porta.
+enum EventDirection { out, in_ }
 
 /// Tipo di evento generato dal sistema GateKeeper.
-enum EventType { entry, exit, alert, forgotten, unauthorized }
+///
+/// - [exit]: oggetto/utente rilevati in uscita
+/// - [entry]: oggetto/utente rilevati in entrata
+/// - [alert]: evento anomalo (bambino senza telefono, oggetto sensibile fuori, ecc.)
+/// - [scan]: scansione RFID generica senza movimento porta
+enum EventType { exit, entry, alert, scan }
 
-/// Singolo evento del log.
+/// Singolo evento registrato dal gateway.
 ///
 /// Parametri:
 /// - [id]: identificatore univoco
-/// - [type]: categoria dell'evento
-/// - [title]: titolo breve
-/// - [description]: dettaglio esteso
-/// - [user]: nome utente associato (può essere null per eventi senza utente)
-/// - [object]: nome oggetto associato (null se non pertinente)
-/// - [timestamp]: orario evento
+/// - [type]: [EventType]
+/// - [direction]: [EventDirection]
+/// - [timestamp]: data/ora dell'evento
+/// - [userName]: nome dell'utente associato (null se non identificato)
+/// - [objectNames]: oggetti RFID rilevati durante l'evento
+/// - [alertMessage]: testo notifica se l'evento ha generato un alert
 class GkEvent {
   const GkEvent({
     required this.id,
     required this.type,
-    required this.title,
-    required this.description,
-    this.user,
-    this.object,
+    required this.direction,
     required this.timestamp,
+    this.userName,
+    this.objectNames = const [],
+    this.alertMessage,
   });
 
   final String id;
   final EventType type;
-  final String title;
-  final String description;
-  final String? user;
-  final String? object;
-  final String timestamp;
+  final EventDirection direction;
+  final DateTime timestamp;
+  final String? userName;
+  final List<String> objectNames;
+  final String? alertMessage;
 }
 
 // ---------------------------------------------------------------------------
 // Dati stub
 // ---------------------------------------------------------------------------
 
-/// TODO: rimpiazzare con GET /api/events?limit=50 dal backend.
+/// TODO: rimpiazzare con GET /api/events (paginato) dal backend.
 final _stubEvents = [
-  const GkEvent(
-    id: 'EVT-001',
-    type: EventType.unauthorized,
-    title: 'Unauthorized Exit',
-    description:
-        'Object left the house without any authenticated user nearby.',
-    object: 'MacBook Pro',
-    timestamp: 'Today, 10:45 AM',
-  ),
-  const GkEvent(
-    id: 'EVT-002',
-    type: EventType.forgotten,
-    title: 'Forgotten Item',
-    description: 'Bob left the house but forgot an essential item.',
-    user: 'Bob',
-    object: 'Wallet',
-    timestamp: 'Today, 09:15 AM',
-  ),
-  const GkEvent(
-    id: 'EVT-003',
-    type: EventType.entry,
-    title: 'Alice Arrived Home',
-    description: 'Entered with authenticated BLE node.',
-    user: 'Alice',
-    object: 'House Keys',
-    timestamp: 'Today, 08:30 AM',
-  ),
-  const GkEvent(
-    id: 'EVT-004',
+  GkEvent(
+    id: 'e1',
     type: EventType.exit,
-    title: 'Bob Left Home',
-    description: 'Exit detected. MacBook Pro and Wallet tracked.',
-    user: 'Bob',
-    timestamp: 'Today, 09:10 AM',
+    direction: EventDirection.out,
+    timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
+    userName: 'Alice',
+    objectNames: ['House Keys', 'Laptop Bag'],
   ),
-  const GkEvent(
-    id: 'EVT-005',
+  GkEvent(
+    id: 'e2',
     type: EventType.alert,
-    title: 'Child Unaccompanied',
-    description: 'Charlie exited without an adult present.',
-    user: 'Charlie',
-    timestamp: 'Yesterday, 03:30 PM',
+    direction: EventDirection.out,
+    timestamp: DateTime.now().subtract(const Duration(minutes: 35)),
+    userName: 'Charlie',
+    objectNames: [],
+    alertMessage: 'Child exited without phone detected nearby.',
   ),
-  const GkEvent(
-    id: 'EVT-006',
+  GkEvent(
+    id: 'e3',
     type: EventType.entry,
-    title: 'Dave Arrived Home',
-    description: 'Entry confirmed via BLE.',
-    user: 'Dave',
-    timestamp: 'Yesterday, 04:00 PM',
+    direction: EventDirection.in_,
+    timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+    userName: 'Bob',
+    objectNames: ['Umbrella'],
+  ),
+  GkEvent(
+    id: 'e4',
+    type: EventType.exit,
+    direction: EventDirection.out,
+    timestamp: DateTime.now().subtract(const Duration(hours: 5)),
+    userName: 'Alice',
+    objectNames: ['House Keys'],
+  ),
+  GkEvent(
+    id: 'e5',
+    type: EventType.scan,
+    direction: EventDirection.in_,
+    timestamp: DateTime.now().subtract(const Duration(hours: 8)),
+    userName: null,
+    objectNames: ['Unknown Tag #A4F2'],
   ),
 ];
 
@@ -110,16 +104,16 @@ final _stubEvents = [
 // Screen
 // ---------------------------------------------------------------------------
 
-/// Schermata log eventi.
+/// Schermata storico eventi gateway.
 ///
-/// Mostra tutti gli eventi in ordine cronologico inverso.
-/// Supporta:
-/// - ricerca testuale;
-/// - filtro per tipo evento;
-/// - dettaglio evento (TODO Blocco 2B: bottom sheet).
+/// Mostra una lista cronologica degli eventi RFID/BLE.
+/// Ogni tile è tappabile: apre [EventDetailSheet] con i dettagli.
 ///
-/// TODO (Blocco 2B): tap su evento → bottom sheet con dettaglio completo.
-/// TODO: WebSocket / polling per ricevere nuovi eventi in realtime.
+/// I filtri (All / Exits / Entries / Alerts) usano [AnimatedContainer]
+/// per l'animazione del chip selezionato.
+///
+/// TODO: paginazione infinita con scroll listener.
+/// TODO: filtro per data con DateRangePicker.
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
 
@@ -128,191 +122,245 @@ class EventsScreen extends StatefulWidget {
 }
 
 class _EventsScreenState extends State<EventsScreen> {
-  String _query = '';
-  EventType? _typeFilter;
+  // null = tutti i tipi
+  EventType? _activeFilter;
 
-  List<GkEvent> get _filtered {
-    return _stubEvents.where((e) {
-      final matchesQuery =
-          e.title.toLowerCase().contains(_query.toLowerCase()) ||
-              e.description.toLowerCase().contains(_query.toLowerCase()) ||
-              (e.user?.toLowerCase().contains(_query.toLowerCase()) ?? false) ||
-              (e.object?.toLowerCase().contains(_query.toLowerCase()) ??
-                  false);
-      final matchesType =
-          _typeFilter == null || e.type == _typeFilter;
-      return matchesQuery && matchesType;
-    }).toList();
-  }
+  // Filtri disponibili: null = "All"
+  static const _filters = <(EventType?, String)>[
+    (null, 'All'),
+    (EventType.exit, 'Exits'),
+    (EventType.entry, 'Entries'),
+    (EventType.alert, 'Alerts'),
+    (EventType.scan, 'Scans'),
+  ];
+
+  List<GkEvent> get _filteredEvents => _activeFilter == null
+      ? _stubEvents
+      : _stubEvents.where((e) => e.type == _activeFilter).toList();
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < AppBreakpoints.mobile;
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PageHeader(title: 'Event Logs'),
 
-        return SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const PageHeader(title: 'Event Logs'),
-              // Barra ricerca + filtri — sticky sopra la lista
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isMobile ? 16 : 24,
-                  0,
-                  isMobile ? 16 : 24,
-                  12,
-                ),
-                child: Column(
-                  children: [
-                    GkSearchBar(
-                      hint: 'Search events, users or objects…',
-                      onChanged: (v) => setState(() => _query = v),
-                    ),
-                    const SizedBox(height: 10),
-                    _TypeFilterRow(
-                      current: _typeFilter,
-                      onChanged: (t) => setState(() => _typeFilter = t),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Lista eventi
-              Expanded(
-                child: _filtered.isEmpty
-                    ? const GkEmptyState(
-                        icon: Icons.history_toggle_off_outlined,
-                        title: 'No events found',
-                        subtitle:
-                            'Try a different search or filter.',
-                      )
-                    : ListView.separated(
-                        padding: EdgeInsets.fromLTRB(
-                          isMobile ? 16 : 24,
-                          0,
-                          isMobile ? 16 : 24,
-                          24,
+          // Filtri chip animati
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _filters.map((f) {
+                  final (type, label) = f;
+                  final active = _activeFilter == type;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () async {
+                        await HapticService.light();
+                        setState(() => _activeFilter = type);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
                         ),
-                        itemCount: _filtered.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (context, i) => EventListTile(
-                          event: _filtered[i],
-                          onTap: () {
-                            // TODO (Blocco 2B): aprire bottom sheet dettaglio evento
-                          },
+                        decoration: BoxDecoration(
+                          // Il chip attivo diventa teal, gli altri restano scuri
+                          color: active
+                              ? AppColors.stormyTeal
+                              : AppColors.panelSoft,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: active
+                                ? AppColors.stormyTeal
+                                : AppColors.border,
+                          ),
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            color: active
+                                ? AppColors.white
+                                : AppColors.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Filtro per tipo evento
-// ---------------------------------------------------------------------------
-
-class _TypeFilterRow extends StatelessWidget {
-  const _TypeFilterRow({
-    required this.current,
-    required this.onChanged,
-  });
-
-  final EventType? current;
-  final ValueChanged<EventType?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _TypeChip(
-            label: 'All',
-            isSelected: current == null,
-            onTap: () => onChanged(null),
-          ),
-          ...[EventType.alert, EventType.unauthorized, EventType.forgotten,
-           EventType.entry, EventType.exit]
-              .map((t) => Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: _TypeChip(
-                      label: _typeLabel(t),
-                      color: _typeColor(t),
-                      isSelected: current == t,
-                      onTap: () => onChanged(t),
                     ),
-                  )),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+
+          // Lista eventi
+          Expanded(
+            child: _filteredEvents.isEmpty
+                ? const _EmptyEvents()
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    itemCount: _filteredEvents.length,
+                    itemBuilder: (context, i) {
+                      return _EventTile(
+                        event: _filteredEvents[i],
+                        onTap: () => EventDetailSheet.show(
+                          context,
+                          event: _filteredEvents[i],
+                        ),
+                      );
+                    },
+                  ),
+          ),
         ],
       ),
     );
   }
-
-  String _typeLabel(EventType t) => switch (t) {
-        EventType.entry => 'Entry',
-        EventType.exit => 'Exit',
-        EventType.alert => 'Alert',
-        EventType.forgotten => 'Forgotten',
-        EventType.unauthorized => 'Unauthorized',
-      };
-
-  Color _typeColor(EventType t) => switch (t) {
-        EventType.entry => AppColors.success,
-        EventType.exit => AppColors.stormyTealBright,
-        EventType.alert => AppColors.warning,
-        EventType.forgotten => AppColors.orange,
-        EventType.unauthorized => const Color(0xFFFF4D4D),
-      };
 }
 
-class _TypeChip extends StatelessWidget {
-  const _TypeChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-    this.color,
-  });
+// ---------------------------------------------------------------------------
+// Tile evento
+// ---------------------------------------------------------------------------
 
-  final String label;
-  final bool isSelected;
+class _EventTile extends StatelessWidget {
+  const _EventTile({required this.event, required this.onTap});
+
+  final GkEvent event;
   final VoidCallback onTap;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? AppColors.stormyTealBright;
+    final typeColor = _typeColor(event.type);
+
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: isSelected
-              ? c.withValues(alpha: 0.18)
-              : AppColors.panelSoft,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? c.withValues(alpha: 0.55)
-                : AppColors.border,
-          ),
+          color: AppColors.panelSoft,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight:
-                isSelected ? FontWeight.w600 : FontWeight.w400,
-            color: isSelected ? c : AppColors.textSecondary,
-          ),
+        child: Row(
+          children: [
+            // Barra colorata sinistra che indica il tipo di evento
+            Container(
+              width: 4,
+              height: 64,
+              decoration: BoxDecoration(
+                color: typeColor,
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(14),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+
+            // Icona tipo
+            Icon(_typeIcon(event.type), color: typeColor, size: 20),
+            const SizedBox(width: 12),
+
+            // Nome utente + oggetti
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.userName ?? 'Unknown user',
+                    style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+                  ),
+                  if (event.objectNames.isNotEmpty)
+                    Text(
+                      event.objectNames.join(', '),
+                      style: AppTextStyles.body.copyWith(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  else if (event.alertMessage != null)
+                    Text(
+                      event.alertMessage!,
+                      style: AppTextStyles.body.copyWith(
+                        fontSize: 12,
+                        color: AppColors.warning,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+
+            // Timestamp + freccia info
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _timeAgo(event.timestamp),
+                    style: AppTextStyles.label,
+                  ),
+                  const SizedBox(height: 4),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textMuted,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Color _typeColor(EventType type) => switch (type) {
+        EventType.exit => AppColors.warning,
+        EventType.entry => AppColors.success,
+        EventType.alert => Colors.redAccent,
+        EventType.scan => AppColors.stormyTealBright,
+      };
+
+  IconData _typeIcon(EventType type) => switch (type) {
+        EventType.exit => Icons.logout,
+        EventType.entry => Icons.login,
+        EventType.alert => Icons.warning_amber_outlined,
+        EventType.scan => Icons.nfc_outlined,
+      };
+
+  /// Calcola il tempo relativo (es. "5m ago", "2h ago").
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Empty state
+// ---------------------------------------------------------------------------
+
+class _EmptyEvents extends StatelessWidget {
+  const _EmptyEvents();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.history_outlined, color: AppColors.textMuted, size: 48),
+          SizedBox(height: 12),
+          Text(
+            'No events for this filter',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+          ),
+        ],
       ),
     );
   }
