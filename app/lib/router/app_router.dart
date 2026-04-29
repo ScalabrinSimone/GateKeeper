@@ -23,9 +23,18 @@ class _AuthState {
   static final _AuthState instance = _AuthState._();
   _AuthState._();
 
-  // Stub: utente sempre loggato per ora.
-  // TODO: impostare a false e gestire il redirect a /login
-  bool isLoggedIn = true;
+  // Stub: false = l'app parte dal login (corretto per lo sviluppo UI).
+  // TODO: leggere da flutter_secure_storage per ricordare la sessione.
+  bool isLoggedIn = false;
+
+  /// Imposta il flag di login e il token JWT.
+  ///
+  /// Chiamare dopo un login riuscito:
+  /// ```dart
+  /// _AuthState.instance.setLoggedIn(true);
+  /// context.go('/dashboard');
+  /// ```
+  void setLoggedIn(bool value) => isLoggedIn = value;
 }
 
 /// Router centralizzato dell'app GateKeeper.
@@ -46,46 +55,31 @@ class _AuthState {
 /// - se non loggato → /login
 /// - se loggato ma va a /login o /setup → /dashboard
 ///
-/// TODO: quando il backend è pronto, sostituire _AuthState.isLoggedIn
-/// con un controllo reale del JWT (validità, scadenza).
+/// TODO: sostituire _AuthState.isLoggedIn con verifica JWT reale.
 abstract final class AppRouter {
   static final GoRouter router = GoRouter(
     // Punto di partenza; il redirect qui sotto decide dove andare davvero
     initialLocation: '/dashboard',
 
     // ── Redirect globale di autenticazione ──────────────────────────────
-    // Viene chiamato ad ogni navigazione. Se l'utente non è loggato,
-    // viene mandato a /login (tranne se è già lì o su /setup).
     redirect: (context, state) {
       final isLoggedIn = _AuthState.instance.isLoggedIn;
       final path = state.uri.path;
 
-      // Pagine accessibili senza login
       final publicPaths = ['/login', '/setup'];
       final isPublic = publicPaths.contains(path);
 
-      if (!isLoggedIn && !isPublic) {
-        // Non loggato → vai al login
-        return '/login';
-      }
-
-      if (isLoggedIn && isPublic) {
-        // Già loggato → non ha senso stare su /login o /setup
-        return '/dashboard';
-      }
-
-      // Nessun redirect necessario
+      if (!isLoggedIn && !isPublic) return '/login';
+      if (isLoggedIn && isPublic) return '/dashboard';
       return null;
     },
 
     routes: [
       // ── Route FUORI dallo ShellRoute ──────────────────────────────────
-      // Queste route non hanno sidebar né bottom nav.
 
       GoRoute(
         path: '/login',
         name: 'login',
-        // FadeTransition personalizzata (più morbida di NoTransition)
         pageBuilder: (context, state) => CustomTransitionPage(
           child: const LoginScreen(),
           transitionsBuilder: (context, animation, _, child) =>
@@ -105,13 +99,11 @@ abstract final class AppRouter {
         ),
       ),
 
-      // AccountScreen: fuori da Shell perché ha il proprio AppBar con back.
       GoRoute(
         path: '/account',
         name: 'account',
         pageBuilder: (context, state) => CustomTransitionPage(
           child: const AccountScreen(),
-          // Slide dal basso (feeling "modale")
           transitionsBuilder: (context, animation, _, child) {
             final tween = Tween(
               begin: const Offset(0, 0.08),

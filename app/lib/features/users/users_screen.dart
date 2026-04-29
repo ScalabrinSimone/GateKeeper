@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_breakpoints.dart';
 import '../../shared/widgets/page_header.dart';
 import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
+import 'dialogs/invite_dialog.dart';
 import 'widgets/user_role_column.dart';
 
 // ---------------------------------------------------------------------------
@@ -125,17 +125,11 @@ const _stubUsers = [
 /// Desktop: 3 colonne affiancate (Administrators | Managers | Children & Guests).
 /// Mobile: colonne in scroll verticale.
 ///
-/// Ogni colonna mostra:
-/// - titolo ruolo + badge count + descrizione;
-/// - card per ogni utente con avatar, nome/email, menu ⋮ e lista permessi.
-///
-/// TODO (Blocco 2B): ⋮ menu → dialog modifica ruolo / rimuovi utente.
-/// TODO (Blocco 2B): bottone Invite Member → dialog invito.
+/// TODO: ⋮ menu → dialog modifica ruolo / rimuovi utente.
 /// TODO: sostituire _stubUsers con stream dal backend.
 class UsersScreen extends StatelessWidget {
   const UsersScreen({super.key});
 
-  // Filtra gli utenti per ruolo
   List<HouseUser> _byRole(UserRole role) =>
       _stubUsers.where((u) => u.role == role).toList();
 
@@ -155,7 +149,6 @@ class UsersScreen extends StatelessWidget {
               ),
               Expanded(
                 child: isMobile
-                    // Mobile: colonne in scroll verticale
                     ? ListView(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                         children: [
@@ -181,7 +174,6 @@ class UsersScreen extends StatelessWidget {
                           ),
                         ],
                       )
-                    // Desktop: 3 colonne affiancate con IntrinsicHeight
                     : SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                         child: Row(
@@ -226,7 +218,7 @@ class UsersScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Bottone Invite Member
+// Bottone Invite Member — ora collegato al dialog reale
 // ---------------------------------------------------------------------------
 
 class _InviteButton extends StatelessWidget {
@@ -237,18 +229,10 @@ class _InviteButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
-      onPressed: () {
-        // TODO (Blocco 2B): showInviteDialog(context)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invite dialog — coming in Block 2B'),
-          ),
-        );
-      },
+      // Collega il dialog InviteDialog (già implementato in invite_dialog.dart)
+      onPressed: () => InviteDialog.show(context),
       icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
-      label: isMobile
-          ? const SizedBox.shrink()
-          : const Text('Invite Member'),
+      label: isMobile ? const SizedBox.shrink() : const Text('Invite Member'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.stormyTeal,
         foregroundColor: AppColors.white,
