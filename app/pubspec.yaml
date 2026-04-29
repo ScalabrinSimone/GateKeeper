@@ -22,7 +22,7 @@ dependencies:
   flutter_svg: ^2.0.10
 
   # Internazionalizzazione
-  intl: ^0.19.0
+  intl: ^0.20.2
 
   # Animazioni avanzate: FadeIn, SlideY, ScaleIn ecc.
   # Si usa con .animate() extension sulle widget.
