@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+/// Singola voce di navigazione della sidebar e della bottom bar.
+///
+/// Parametri:
+/// - [label]: testo mostrato nella sidebar e nella bottom bar
+/// - [icon]: icona Material (usa preferibilmente la variante _outlined)
+/// - [route]: percorso go_router (es. '/dashboard')
 class NavigationItem {
   const NavigationItem({
     required this.label,
@@ -12,6 +18,11 @@ class NavigationItem {
   final String route;
 }
 
+/// Voci di navigazione principali dell'app.
+///
+/// ⚠️ NON includere 'Settings' qui: viene aggiunto separatamente
+/// in fondo alla [DesktopSidebar] e nella [MobileBottomNav].
+/// Aggiungerlo qui lo duplicherebbe.
 const appNavigationItems = <NavigationItem>[
   NavigationItem(
     label: 'Overview',
@@ -33,9 +44,7 @@ const appNavigationItems = <NavigationItem>[
     icon: Icons.history_toggle_off_outlined,
     route: '/events',
   ),
-  NavigationItem(
-    label: 'Settings',
-    icon: Icons.settings_outlined,
-    route: '/settings',
-  ),
+  // NOTE: 'Settings' è intenzionalmente assente da questa lista.
+  // Viene renderizzato come voce fissa in fondo alla sidebar desktop
+  // e come ultimo item della bottom navigation mobile.
 ];
