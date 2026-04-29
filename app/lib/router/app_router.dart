@@ -11,36 +11,43 @@ import '../features/settings/settings_screen.dart';
 import '../features/shell/app_shell.dart';
 import '../features/users/users_screen.dart';
 
-/// Stato di autenticazione in memoria.
+/// Stato di autenticazione globale in memoria.
 ///
-/// Tiene traccia del login dell'utente durante la sessione.
-/// In produzione qui ci sarà il JWT ricevuto da POST /api/auth/login.
+/// In produzione questo conterrà anche il JWT ricevuto da POST /api/auth/login
+/// e sarà usato come header Authorization per tutte le chiamate API.
 ///
-/// Non usiamo SharedPreferences o flutter_secure_storage per ora perché
-/// siamo ancora nella fase di mockup UI.
+/// Ora è un singleton semplice in memoria — nessuna persistenza su disco
+/// (SharedPreferences arriverà quando il backend sarà pronto).
 ///
-/// TODO: implementare persistenza JWT con flutter_secure_storage
-/// quando il backend sarà pronto.
-class _AuthState {
-  static final _AuthState instance = _AuthState._();
-  _AuthState._();
+/// Esempio d'uso:
+/// ```dart
+/// // Login riuscito:
+/// AuthState.instance.setLoggedIn(true);
+/// context.go('/dashboard');
+///
+/// // Sign out:
+/// AuthState.instance.setLoggedIn(false);
+/// context.go('/login');
+/// ```
+///
+/// TODO: aggiungere campo `String? jwtToken` quando il backend è pronto.
+/// TODO: persistere con flutter_secure_storage.
+class AuthState {
+  static final AuthState instance = AuthState._();
+  AuthState._();
 
   // ─────────────────────────────────────────────────────────────────────────
-  // TODO: per testare le schermate senza passare dal login ogni volta,
-  // cambia questa riga da:   bool isLoggedIn = false;
-  //                    a:    bool isLoggedIn = true;
-  //
-  // Ricorda di rimetterla a false prima di un demo/commit finale!
+  // TODO: per bypassare il login durante lo sviluppo, cambia a `true`.
+  // Ricorda di reimpostare `false` prima di commit/demo!
   // ─────────────────────────────────────────────────────────────────────────
   bool isLoggedIn = false;
 
-  /// Imposta il flag di login (e in futuro salverà il token JWT).
+  /// Imposta lo stato di autenticazione.
   ///
-  /// Chiamare dopo un login riuscito:
-  /// ```dart
-  /// _AuthState.instance.setLoggedIn(true);
-  /// context.go('/dashboard');
-  /// ```
+  /// Parametri:
+  /// - [value]: true = loggato, false = disconnesso
+  ///
+  /// Chiamare SEMPRE prima di context.go() per non triggerare il redirect.
   void setLoggedIn(bool value) => isLoggedIn = value;
 }
 
@@ -58,21 +65,21 @@ class _AuthState {
 /// /settings     → SettingsScreen    ┘
 /// ```
 ///
-/// Redirect automatico:
-/// - se non loggato → /login
-/// - se già loggato ma va a /login o /setup → /dashboard
+/// Redirect globale:
+/// - Non loggato → qualsiasi route protetta → /login
+/// - Già loggato → /login o /setup → /dashboard
 ///
-/// TODO: sostituire _AuthState.isLoggedIn con verifica JWT reale.
+/// TODO: sostituire AuthState.isLoggedIn con verifica JWT reale.
 abstract final class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/dashboard',
 
-    // ── Redirect globale di autenticazione ──────────────────────────────
-    // Questo redirect viene valutato a ogni navigazione.
-    // Se l'utente non è loggato e prova ad andare su una route protetta,
-    // viene rimandato a /login automaticamente.
+    // ── Redirect globale di autenticazione ──────────────────────────────────
+    // Valutato ad OGNI navigazione (context.go, context.push, browser back, ecc.).
+    // Serve come guardia: anche se qualcuno bypassa la UI, non può accedere
+    // alle route protette senza aver chiamato AuthState.setLoggedIn(true).
     redirect: (context, state) {
-      final isLoggedIn = _AuthState.instance.isLoggedIn;
+      final isLoggedIn = AuthState.instance.isLoggedIn;
       final path = state.uri.path;
 
       final publicPaths = ['/login', '/setup'];
@@ -84,14 +91,13 @@ abstract final class AppRouter {
     },
 
     routes: [
-      // ── Route FUORI dallo ShellRoute (senza sidebar/bottom nav) ───────
+      // ── Route FUORI dallo ShellRoute (senza sidebar/bottom nav) ───────────
 
       GoRoute(
         path: '/login',
         name: 'login',
         pageBuilder: (context, state) => CustomTransitionPage(
           child: const LoginScreen(),
-          // FadeTransition: più morbida di uno slide per la schermata di login
           transitionsBuilder: (context, animation, _, child) =>
               FadeTransition(opacity: animation, child: child),
           transitionDuration: const Duration(milliseconds: 250),
@@ -129,17 +135,17 @@ abstract final class AppRouter {
         ),
       ),
 
-      // ── ShellRoute: sidebar + bottom nav ─────────────────────────────
-      // Tutte le route dentro questo ShellRoute sono "avvolte" da AppShell,
-      // che gestisce sidebar (desktop) e bottom navigation (mobile).
+      // ── ShellRoute: sidebar + bottom nav ─────────────────────────────────
+      // Tutte le route dentro questo ShellRoute sono "avvolte" da AppShell.
+      // La sidebar rimane ferma; solo il contenuto centrale (child) cambia.
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
           GoRoute(
             path: '/dashboard',
             name: 'dashboard',
-            // NoTransitionPage: le route della shell non hanno animazione propria;
-            // la sidebar rimane ferma e solo il contenuto centrale cambia.
+            // NoTransitionPage: le route della shell non animano —
+            // la sidebar resta ferma e il body si sostituisce istantaneamente.
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: DashboardScreen()),
           ),
