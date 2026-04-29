@@ -10,7 +10,7 @@ import '../users_screen.dart';
 /// Layout:
 /// ```
 /// ┌────────────────────────────────────────┐
-/// │  [avatar]  Nome (You?)     ⋮           │
+/// │  [avatar]  Nome (You?)        ⋮        │
 /// │            email / No Account          │
 /// │  ──────────────────────────────────    │
 /// │  PERMISSIONS                           │
@@ -20,7 +20,7 @@ import '../users_screen.dart';
 /// ```
 ///
 /// Parametri:
-/// - [user]: dato di tipo [HouseUser]
+/// - [user]: dato di tipo [HouseUser] con nome, email, ruolo e permessi
 class UserCard extends StatelessWidget {
   const UserCard({super.key, required this.user});
 
@@ -59,7 +59,7 @@ class UserCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Pallino BLE in basso a destra sull'avatar
+                    // Pallino BLE in basso a destra: verde = online, grigio = offline
                     Positioned(
                       right: 0,
                       bottom: 0,
@@ -82,7 +82,7 @@ class UserCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
 
-                // Nome + email (o 'No Account')
+                // Nome + email (o 'No Account' per bambini senza profilo)
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -104,20 +104,82 @@ class UserCard extends StatelessWidget {
                   ),
                 ),
 
-                // Menu ⋮
-                IconButton(
-                  onPressed: () async {
-                    await HapticService.light();
-                    if (context.mounted) _showUserMenu(context);
-                  },
+                // ── Menu ⋮ ──────────────────────────────────────────────
+                // Usiamo PopupMenuButton direttamente (non showMenu manuale)
+                // perché si posiziona automaticamente rispetto al widget.
+                PopupMenuButton<_UserMenuAction>(
+                  // Icona ⋮
                   icon: const Icon(
                     Icons.more_vert,
                     color: AppColors.textSecondary,
                     size: 20,
                   ),
                   padding: const EdgeInsets.all(4),
-                  constraints: const BoxConstraints(),
-                  visualDensity: VisualDensity.compact,
+                  color: AppColors.panel,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: AppColors.border),
+                  ),
+                  // Apre il menu in alto a sinistra rispetto al bottone
+                  position: PopupMenuPosition.under,
+                  onOpened: () => HapticService.light(),
+                  onSelected: (action) async {
+                    switch (action) {
+                      case _UserMenuAction.changeRole:
+                        // TODO: aprire ChangeRoleDialog → PATCH /api/users/{id}/role
+                        await HapticService.light();
+                      case _UserMenuAction.remove:
+                        // TODO: aprire dialog di conferma → DELETE /api/users/{id}
+                        // Vibrazione pesante: azione distruttiva
+                        await HapticService.heavy();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    // ── Voce: Change Role ──
+                    const PopupMenuItem(
+                      value: _UserMenuAction.changeRole,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Change Role',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // ── Divider ──
+                    const PopupMenuDivider(height: 1),
+                    // ── Voce: Remove Member (rossa = azione distruttiva) ──
+                    const PopupMenuItem(
+                      value: _UserMenuAction.remove,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.person_remove_outlined,
+                            size: 16,
+                            color: Colors.redAccent,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Remove Member',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -162,66 +224,16 @@ class UserCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  /// PopupMenu con opzioni di gestione utente.
-  /// TODO (futuro): showModalBottomSheet con preview ruolo e conferma.
-  void _showUserMenu(BuildContext context) {
-    final RenderBox button = context.findRenderObject() as RenderBox;
-    final RenderBox overlay =
-        Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
-    final RelativeRect position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        button.localToGlobal(Offset.zero, ancestor: overlay),
-        button.localToGlobal(
-          button.size.bottomRight(Offset.zero),
-          ancestor: overlay,
-        ),
-      ),
-      Offset.zero & overlay.size,
-    );
+/// Azioni disponibili nel menu ⋮ della UserCard.
+///
+/// Usato come tipo generico di [PopupMenuButton] per avere
+/// type-safety invece di stringhe libere.
+enum _UserMenuAction {
+  /// Apre il dialog per cambiare il ruolo dell'utente
+  changeRole,
 
-    showMenu<String>(
-      context: context,
-      position: position,
-      color: AppColors.panel,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      items: [
-        const PopupMenuItem(
-          value: 'edit',
-          child: Row(
-            children: [
-              Icon(Icons.edit_outlined,
-                  size: 16, color: AppColors.textSecondary),
-              SizedBox(width: 10),
-              Text('Change Role',
-                  style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'remove',
-          child: Row(
-            children: [
-              Icon(Icons.person_remove_outlined,
-                  size: 16, color: Colors.redAccent),
-              SizedBox(width: 10),
-              Text('Remove Member',
-                  style: TextStyle(color: Colors.redAccent, fontSize: 13)),
-            ],
-          ),
-        ),
-      ],
-    ).then((value) async {
-      if (value == 'remove') {
-        // Vibrazione pesante per azione distruttiva
-        await HapticService.heavy();
-        // TODO: showConfirmDialog → DELETE /api/users/{id}
-      } else if (value == 'edit') {
-        // TODO: showChangeRoleDialog → PATCH /api/users/{id}/role
-      }
-    });
-  }
+  /// Apre il dialog di conferma per rimuovere l'utente dalla casa
+  remove,
 }

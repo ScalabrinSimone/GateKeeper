@@ -18,12 +18,12 @@ enum ObjectStatus { home, away, unknown }
 /// Oggetto fisico con tag RFID registrato nel sistema.
 ///
 /// Parametri:
-/// - [id]: ID RFID dell'etichetta
-/// - [name]: nome leggibile (es. 'Chiavi di casa')
+/// - [id]: ID RFID dell'etichetta (es. 'RFID-001')
+/// - [name]: nome leggibile (es. 'House Keys')
 /// - [category]: categoria (es. 'Keys', 'Electronics')
-/// - [status]: posizione corrente
-/// - [lastSeen]: ultima rilevazione (ISO 8601)
-/// - [icon]: icona rappresentativa
+/// - [status]: posizione corrente [ObjectStatus]
+/// - [lastSeen]: ultima rilevazione formattata (es. 'Today, 08:30 AM')
+/// - [icon]: icona [IconData] rappresentativa
 class RfidObject {
   const RfidObject({
     required this.id,
@@ -47,6 +47,7 @@ class RfidObject {
 // ---------------------------------------------------------------------------
 
 /// TODO: rimpiazzare con chiamata GET /api/objects dal backend.
+/// La risposta sarà una lista di JSON da deserializzare in [RfidObject].
 const _stubObjects = [
   RfidObject(
     id: 'RFID-001',
@@ -98,12 +99,13 @@ const _stubObjects = [
 ///
 /// Responsabilità:
 /// - visualizza tutti gli oggetti registrati con stato e ultima rilevazione;
-/// - filtro per ricerca testuale e stato (su una riga singola come da mockup);
+/// - filtro per ricerca testuale e stato su una **riga unica** (come da mockup Figma);
 /// - l'admin può aggiungere nuovi oggetti tramite [AddObjectDialog].
 ///
-/// Layout filtri: [SearchBar] + [StatusFilterRow] nella stessa Row orizzontale.
+/// Layout filtri (desktop): [SearchBar] espansa + [_StatusFilterRow] a destra
+/// sulla stessa riga orizzontale.
 ///
-/// TODO: chiamata GET /api/objects per popolare la lista.
+/// TODO: chiamata GET /api/objects per popolare la lista in modo reale.
 class ObjectsScreen extends StatefulWidget {
   const ObjectsScreen({super.key});
 
@@ -115,6 +117,7 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
   String _query = '';
   ObjectStatus? _statusFilter;
 
+  /// Filtra gli oggetti in base alla query testuale e al filtro di stato.
   List<RfidObject> get _filtered {
     return _stubObjects.where((o) {
       final matchesQuery =
@@ -131,7 +134,11 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < AppBreakpoints.mobile;
+        // Soglia per layout mobile: sotto 500px si impila verticalmente.
+        // Usiamo una soglia più bassa di AppBreakpoints.mobile (600px) perché
+        // la schermata oggetti è incassata nella shell (sidebar 230px già tolta).
+        // Così su desktop la barra ricerca+filtri è sempre in riga.
+        final isMobile = constraints.maxWidth < AppBreakpoints.objectsMobile;
 
         return SafeArea(
           child: Column(
@@ -152,9 +159,9 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Barra ricerca + filtri in riga (come da mockup Figma) ──
-                      // Su desktop: SearchBar espansa + chips filtro sulla stessa riga.
-                      // Su mobile: SearchBar sopra, chips sotto.
+                      // ── Barra ricerca + filtri ────────────────────────────
+                      // Desktop: SearchBar + chips sulla stessa riga (Row).
+                      // Mobile: SearchBar sopra, chips sotto.
                       if (isMobile) ...
                         [
                           GkSearchBar(
@@ -169,19 +176,18 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
                           ),
                         ]
                       else
-                        // Desktop: tutto in una riga
+                        // Desktop: SearchBar espansa + chips a destra nella stessa Row
                         Row(
                           children: [
-                            // SearchBar flessibile (occupa lo spazio disponibile)
                             Expanded(
                               child: GkSearchBar(
-                                hint: 'Search by name, category or RFID ID…',
+                                hint:
+                                    'Search by name, category or RFID ID…',
                                 onChanged: (v) =>
                                     setState(() => _query = v),
                               ),
                             ),
                             const SizedBox(width: 12),
-                            // Chips filtro a destra della search
                             _StatusFilterRow(
                               current: _statusFilter,
                               onChanged: (s) =>
@@ -192,7 +198,7 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
 
                       const SizedBox(height: 20),
 
-                      // Grid oggetti
+                      // ── Griglia oggetti ───────────────────────────────────
                       if (_filtered.isEmpty)
                         const GkEmptyState(
                           icon: Icons.sell_outlined,
@@ -201,6 +207,7 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
                               'Add a new RFID object or try a different search.',
                         )
                       else if (isMobile)
+                        // Mobile: lista verticale
                         Column(
                           children: [
                             for (final obj in _filtered) ...
@@ -211,8 +218,10 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
                           ],
                         )
                       else
-                        // Desktop: griglia con altezza fissa per card —
-                        // mainAxisExtent evita il childAspectRatio che causava overflow.
+                        // Desktop: griglia con altezza fissa.
+                        // mainAxisExtent = altezza fissa per ogni card;
+                        // evita il childAspectRatio che causava overflow
+                        // su contenuto di lunghezza variabile.
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -221,9 +230,6 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
                             maxCrossAxisExtent: 300,
                             crossAxisSpacing: 16,
                             mainAxisSpacing: 16,
-                            // Altezza fissa per ogni card: evita overflow
-                            // perché il contenuto (icona+nome+categoria+timestamp+id)
-                            // è sempre inferiore a 190px.
                             mainAxisExtent: 190,
                           ),
                           itemCount: _filtered.length,
@@ -254,7 +260,6 @@ class _AddObjectButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
-      // Collega AddObjectDialog (già implementato)
       onPressed: () => AddObjectDialog.show(context),
       icon: const Icon(Icons.add, size: 18),
       label: isMobile ? const SizedBox.shrink() : const Text('Add Object'),
@@ -278,8 +283,8 @@ class _AddObjectButton extends StatelessWidget {
 
 /// Riga di filtri per stato oggetto: All / At Home / Away.
 ///
-/// Non scrolla orizzontalmente su desktop perché vengono mostrati
-/// solo 3 chip che entrano sempre nella riga accanto alla search.
+/// Non fa scroll su desktop perché i 3 chip entrano sempre accanto alla search.
+/// Su mobile usa SingleChildScrollView orizzontale per sicurezza.
 class _StatusFilterRow extends StatelessWidget {
   const _StatusFilterRow({
     required this.current,
@@ -291,7 +296,6 @@ class _StatusFilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Su mobile potrebbe servire scroll orizzontale
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -321,6 +325,13 @@ class _StatusFilterRow extends StatelessWidget {
   }
 }
 
+/// Chip filtro animato per lo stato degli oggetti.
+///
+/// Parametri:
+/// - [label]: testo mostrato nel chip
+/// - [isSelected]: se true applica sfondo + bordo colorato
+/// - [onTap]: callback al tap
+/// - [color]: colore accent (default teal)
 class _FilterChip extends StatelessWidget {
   const _FilterChip({
     required this.label,
@@ -357,8 +368,7 @@ class _FilterChip extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight:
-                isSelected ? FontWeight.w600 : FontWeight.w400,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
             color: isSelected ? c : AppColors.textSecondary,
           ),
         ),

@@ -1,226 +1,393 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/services/haptic_service.dart';
-import '../../../shared/widgets/gk_dialog.dart';
-import '../../../shared/widgets/gk_text_field.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
 import '../users_screen.dart';
 
+// ---------------------------------------------------------------------------
+// InviteDialog — fedele al mockup Figma
+// ---------------------------------------------------------------------------
+//
+// Struttura del dialog (come da mockup):
+//
+//   ┌─ Invite New Member ─────────────────── ✕ ─┐
+//   │ Generate an invite link to add a new       │
+//   │ person. As Admin you can choose the role.  │
+//   │                                            │
+//   │  Select Role                               │
+//   │  ┌─────────────────────────────────────┐  │
+//   │  │ Manager                          ▼  │  │
+//   │  └─────────────────────────────────────┘  │
+//   │                                            │
+//   │  Permissions Preview                       │
+//   │  ── View History                           │
+//   │  ── Edit Object Tags                       │
+//   │  ── Dismiss Alerts                         │
+//   │  ✕ Cannot Manage Users                     │
+//   │                                            │
+//   │  Invite Link                               │
+//   │  ┌──────────────────────────── [Copy] ┐   │
+//   │  │ https://gatekeeper.local/m/...     │   │
+//   │  └────────────────────────────────────┘   │
+//   │                         [Generate Link]    │
+//   └────────────────────────────────────────────┘
+
 /// Dialog per invitare un nuovo membro nella casa.
 ///
-/// Mostra un form con:
-/// - nome utente;
-/// - email;
-/// - selezione ruolo tramite chip;
-/// - bottoni Annulla / Invite.
+/// Segue esattamente il design Figma:
+/// 1. Dropdown per selezionare il ruolo
+/// 2. Preview dei permessi associati al ruolo scelto
+/// 3. Link di invito generabile e copiabile
 ///
-/// TODO: collegare il bottone Invite a POST /api/users/invite
-/// e gestire la risposta (successo = pop + refresh lista, errore = messaggio).
+/// TODO: collegare [_generateLink] a POST /api/users/invite
+/// che dovrà restituire un token one-time e costruire il link.
 ///
 /// Utilizzo:
 /// ```dart
 /// await InviteDialog.show(context);
 /// ```
-class InviteDialog extends StatefulWidget {
-  const InviteDialog({super.key});
-
-  /// Apre il dialog con backdrop blur.
+class InviteDialog {
+  /// Apre il dialog centrato con sfondo scuro semi-trasparente.
+  ///
+  /// Usa [showDialog] con [barrierDismissible] = true (tap fuori chiude).
   static Future<void> show(BuildContext context) {
-    return GkDialog.show(
+    return showDialog<void>(
       context: context,
-      title: 'Invite Member',
-      // Non usiamo child/actions di GkDialog perché il form
-      // ha bisogno di gestire il suo stato interno con FormKey
-      child: const _InviteForm(),
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      barrierDismissible: true,
+      builder: (_) => const _InviteDialogWidget(),
     );
   }
-
-  @override
-  State<InviteDialog> createState() => _InviteDialogState();
 }
 
-class _InviteDialogState extends State<InviteDialog> {
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
-// ---------------------------------------------------------------------------
-// Form interno
-// ---------------------------------------------------------------------------
-
-class _InviteForm extends StatefulWidget {
-  const _InviteForm();
+class _InviteDialogWidget extends StatefulWidget {
+  const _InviteDialogWidget();
 
   @override
-  State<_InviteForm> createState() => _InviteFormState();
+  State<_InviteDialogWidget> createState() => _InviteDialogWidgetState();
 }
 
-class _InviteFormState extends State<_InviteForm> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-
-  // Ruolo selezionato di default: adult
+class _InviteDialogWidgetState extends State<_InviteDialogWidget> {
+  // Ruolo selezionato di default
   UserRole _selectedRole = UserRole.adult;
 
-  bool _loading = false;
+  // Link generato (null = non ancora generato)
+  String? _generatedLink;
 
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _emailCtrl.dispose();
-    super.dispose();
-  }
+  // Stato loading del bottone Generate
+  bool _generating = false;
 
-  // Mappa ruolo → etichetta mostrata nel chip
+  // true quando il link è stato copiato (mostra feedback temporaneo)
+  bool _copied = false;
+
+  // ── Mappa ruolo → label mostrata nel dropdown ──
   static const _roleLabels = {
     UserRole.admin: 'Administrator',
     UserRole.adult: 'Manager',
     UserRole.child: 'Child / Guest',
   };
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      // Vibrazione di errore se il form non è valido
-      await HapticService.error();
-      return;
-    }
+  // ── Mappa ruolo → permessi mostrati nella preview ──
+  // Ogni permesso ha: testo + granted (true = check verde, false = x rosso)
+  static const _rolePermissions = <UserRole, List<({String label, bool granted})>>{
+    UserRole.admin: [
+      (label: 'Full Control', granted: true),
+      (label: 'Manage Users', granted: true),
+      (label: 'Alert Configuration', granted: true),
+      (label: 'Cannot Manage Users', granted: false), // non applicabile
+    ],
+    UserRole.adult: [
+      (label: 'View History', granted: true),
+      (label: 'Edit Object Tags', granted: true),
+      (label: 'Dismiss Alerts', granted: true),
+      (label: 'Cannot Manage Users', granted: false),
+    ],
+    UserRole.child: [
+      (label: 'BLE Tracking Only', granted: true),
+      (label: 'View Own History', granted: true),
+      (label: 'Cannot Change Settings', granted: false),
+      (label: 'Cannot View Sensitive Alerts', granted: false),
+    ],
+  };
 
-    setState(() => _loading = true);
+  /// Simula la generazione del link di invito.
+  ///
+  /// TODO: sostituire con chiamata reale:
+  /// ```dart
+  /// final response = await ApiService.generateInviteLink(role: _selectedRole);
+  /// setState(() => _generatedLink = response.inviteUrl);
+  /// ```
+  Future<void> _generateLink() async {
+    setState(() => _generating = true);
+    await HapticService.light();
 
-    // TODO: chiamata reale → await ApiService.inviteUser(
-    //   name: _nameCtrl.text,
-    //   email: _emailCtrl.text,
-    //   role: _selectedRole,
-    // );
-    //
-    // Per ora simuliamo un ritardo di rete
-    await Future<void>.delayed(const Duration(milliseconds: 800));
+    // Stub: simula latenza di rete
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+
+    // Genera un "token" fake per il mockup
+    final roleSlug = _selectedRole.name;
+    setState(() {
+      _generatedLink =
+          'https://gatekeeper.local/m/${roleSlug.substring(0, 2)}6b3-2d9f';
+      _generating = false;
+    });
 
     await HapticService.success();
+  }
 
-    if (mounted) {
-      Navigator.of(context).pop(); // chiude il dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Invitation sent to ${_emailCtrl.text}'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    }
+  /// Copia il link negli appunti e mostra feedback temporaneo.
+  Future<void> _copyLink() async {
+    if (_generatedLink == null) return;
+    await Clipboard.setData(ClipboardData(text: _generatedLink!));
+    await HapticService.success();
+    setState(() => _copied = true);
+    // Reset del feedback dopo 2 secondi
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _copied = false);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GkTextField(
-            label: 'Name',
-            hint: 'Full name',
-            controller: _nameCtrl,
-            prefixIcon: Icons.person_outline,
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Name is required' : null,
-          ),
-          const SizedBox(height: 16),
+    final permissions = _rolePermissions[_selectedRole]!;
 
-          GkTextField(
-            label: 'Email',
-            hint: 'user@home.local',
-            controller: _emailCtrl,
-            prefixIcon: Icons.mail_outline,
-            keyboardType: TextInputType.emailAddress,
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Email is required';
-              if (!v.contains('@')) return 'Enter a valid email';
-              return null;
-            },
-          ),
-          const SizedBox(height: 20),
-
-          // Selezione ruolo — chips interattivi
-          Text('ROLE'.toUpperCase(), style: AppTextStyles.label),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: UserRole.values.map((role) {
-              final selected = _selectedRole == role;
-              return ChoiceChip(
-                label: Text(_roleLabels[role]!),
-                selected: selected,
-                onSelected: (_) async {
-                  await HapticService.light();
-                  setState(() => _selectedRole = role);
-                },
-                selectedColor: AppColors.stormyTeal,
-                backgroundColor: AppColors.panelSoft,
-                labelStyle: TextStyle(
-                  color: selected
-                      ? AppColors.white
-                      : AppColors.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-                side: BorderSide(
-                  color: selected
-                      ? AppColors.stormyTeal
-                      : AppColors.border,
-                ),
-                showCheckmark: false,
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 24),
-
-          // Bottoni azione
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+    return Dialog(
+      // Larghezza massima come nel mockup (~420px)
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      backgroundColor: AppColors.panel,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Annulla
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: AppColors.textSecondary),
+              // ── Header ────────────────────────────────────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Invite New Member',
+                      style: AppTextStyles.sectionTitle,
+                    ),
+                  ),
+                  // Bottone chiudi
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppColors.textSecondary,
+                      size: 20,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Generate an invite link to add a new person to the house. '
+                'As an Admin, you can choose their role below.',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 13,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(height: 20),
 
-              // Invite (con indicatore loading)
-              ElevatedButton(
-                onPressed: _loading ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.stormyTeal,
-                  foregroundColor: AppColors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  elevation: 0,
+              // ── Select Role ───────────────────────────────────────────
+              Text('Select Role', style: AppTextStyles.label),
+              const SizedBox(height: 8),
+              // DropdownButtonFormField: più fedele al mockup rispetto ai chips
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.panelSoft,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
                 ),
-                child: _loading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<UserRole>(
+                    value: _selectedRole,
+                    isExpanded: true,
+                    dropdownColor: AppColors.panel,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                    ),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
+                    // Al cambio ruolo: resetta il link generato (non è più valido)
+                    onChanged: (role) async {
+                      if (role == null) return;
+                      await HapticService.light();
+                      setState(() {
+                        _selectedRole = role;
+                        _generatedLink = null; // link invalidato
+                        _copied = false;
+                      });
+                    },
+                    items: UserRole.values.map((role) {
+                      return DropdownMenuItem(
+                        value: role,
+                        child: Text(_roleLabels[role]!),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Permissions Preview ───────────────────────────────────
+              Text('Permissions Preview', style: AppTextStyles.label),
+              const SizedBox(height: 10),
+              // Lista animata: si aggiorna quando cambia il ruolo
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Column(
+                  // La key cambia con il ruolo → AnimatedSwitcher fa fade
+                  key: ValueKey(_selectedRole),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: permissions.map((p) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Icon(
+                            p.granted ? Icons.check : Icons.close,
+                            size: 14,
+                            color: p.granted
+                                ? AppColors.success
+                                : AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            p.label,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: p.granted
+                                  ? AppColors.textSecondary
+                                  : AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Invite Link ───────────────────────────────────────────
+              Text('Invite Link', style: AppTextStyles.label),
+              const SizedBox(height: 8),
+              // Campo link: visibile solo se il link è stato generato
+              if (_generatedLink != null) ...
+                [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.panelSoft,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                            child: Text(
+                              _generatedLink!,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                                fontFamily: 'monospace',
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ),
-                      )
-                    : const Text('Send Invite'),
+                        // Bottone Copy con feedback visivo
+                        GestureDetector(
+                          onTap: _copyLink,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _copied
+                                  ? AppColors.success
+                                  : AppColors.stormyTeal,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _copied ? 'Copied!' : 'Copy',
+                              style: const TextStyle(
+                                color: AppColors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+              // ── Bottone Generate Link ─────────────────────────────────
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton(
+                  onPressed: _generating ? null : _generateLink,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.stormyTeal,
+                    foregroundColor: AppColors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _generating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.white,
+                          ),
+                        )
+                      // Testo cambia dopo la prima generazione
+                      : Text(
+                          _generatedLink == null
+                              ? 'Generate Link'
+                              : 'Regenerate',
+                        ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-        ],
+        ),
       ),
     );
   }

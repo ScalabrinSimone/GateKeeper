@@ -6,17 +6,21 @@ import 'theme/app_theme.dart';
 
 /// Root widget dell'app GateKeeper.
 ///
-/// - [debugShowCheckedModeBanner] è false: rimuove il banner rosso "DEBUG" in alto a destra.
+/// - [title] è impostato a stringa vuota: su desktop questo riduce al minimo
+///   il testo mostrato nella titlebar nativa dell'OS.
+///   Per nasconderla del tutto vedi il TODO in main.dart (window_manager).
+/// - [debugShowCheckedModeBanner] = false: rimuove il banner rosso "DEBUG".
 /// - [MaterialApp.router] usa go_router per la navigazione dichiarativa.
-/// - La localizzazione IT/EN viene iniettata qui una sola volta.
+/// - La localizzazione IT/EN viene iniettata qui una sola volta per tutta l'app.
 class GateKeeperApp extends StatelessWidget {
   const GateKeeperApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'GateKeeper',
-      // Rimuove il banner DEBUG rosso in alto a destra
+      // Titolo vuoto → la titlebar nativa non mostra testo.
+      // TODO: con window_manager questo diventa irrilevante (titlebar nascosta).
+      title: '',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       routerConfig: AppRouter.router,
