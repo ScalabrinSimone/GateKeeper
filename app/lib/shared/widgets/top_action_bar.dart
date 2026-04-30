@@ -481,7 +481,7 @@ class _AlertsPanel extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'View all in Event Logs',
                       style: TextStyle(
                         color: AppColors.stormyTealBright,
