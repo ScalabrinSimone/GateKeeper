@@ -41,7 +41,7 @@ final _allCategories = _stubObjects
 /// - **Categoria**: All / Keys / Electronics / ecc.  →  [ObjectCategory]
 ///
 /// Layout:
-/// - Desktop: SearchBar + filtri stato + filtro categoria in riga
+/// - Desktop: SearchBar + filtri stato + filtro categoria in riga (come Figma)
 /// - Mobile: SearchBar → filtri stato → filtro categoria (impilati)
 ///
 /// TODO: GET /api/objects per dati reali.
@@ -65,14 +65,17 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
   List<RfidObject> get _filtered {
     return _stubObjects.where((o) {
       final q = _query.toLowerCase();
-      final matchesQuery =
+      final matchesQuery = q.isEmpty ||
           o.name.toLowerCase().contains(q) ||
           o.rfidTag.toLowerCase().contains(q) ||
           o.category.name.toLowerCase().contains(q);
+
       final matchesStatus =
           _statusFilter == null || o.status == _statusFilter;
+
       final matchesCategory =
           _categoryFilter == null || o.category == _categoryFilter;
+
       return matchesQuery && matchesStatus && matchesCategory;
     }).toList();
   }
@@ -153,10 +156,10 @@ class _ObjectsScreenState extends State<ObjectsScreen> {
                   else if (isMobile)
                     Column(
                       children: [
-                        for (final obj in _filtered) ...[  
+                        for (var i = 0; i < _filtered.length; i++) ...[  
                           ObjectCard(
-                            object: obj,
-                            animationIndex: _filtered.indexOf(obj),
+                            object: _filtered[i],
+                            animationIndex: i,
                           ),
                           const SizedBox(height: 12),
                         ],
@@ -257,7 +260,7 @@ class _StatusFilterRow extends StatelessWidget {
             // ObjectStatus.outside = oggetto uscito di casa
             isSelected: current == ObjectStatus.outside,
             onTap: () => onChanged(ObjectStatus.outside),
-            color: AppColors.orange,
+            color: AppColors.warning,
           ),
         ],
       ),
