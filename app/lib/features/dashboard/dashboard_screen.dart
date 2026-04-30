@@ -34,9 +34,9 @@ class DashboardScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header con titolo a sinistra + Alerts/profilo a destra
-                PageHeader(
-                  title: isMobile ? 'Dashboard' : 'Gateway Monitor',
-                  trailing: const TopActionBar(),
+                const PageHeader(
+                  title: 'Gateway Monitor',
+                  trailing: TopActionBar(),
                 ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(
@@ -258,9 +258,9 @@ class _ActivityColumn extends StatelessWidget {
                     color: AppColors.stormyTeal.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
+                    children: const [
                       _LiveDot(),
                       SizedBox(width: 6),
                       Text(
@@ -304,7 +304,7 @@ class _ActivityColumn extends StatelessWidget {
                   objectIcon: Icons.wallet_outlined,
                   tags: ['Usually in Bedroom'],
                   icon: Icons.info_outline,
-                  borderColor: AppColors.stormyTealBright,
+                  borderColor: AppColors.stormyTeal,
                 ),
                 SizedBox(height: 14),
                 RecentActivityCard(
@@ -315,7 +315,7 @@ class _ActivityColumn extends StatelessWidget {
                   objectIcon: Icons.vpn_key_outlined,
                   tags: ['Backpack'],
                   icon: Icons.arrow_forward,
-                  borderColor: Color(0xFF4A5568),
+                  borderColor: AppColors.deepNavy,
                   cardBackground: Color(0xFF252D3D),
                 ),
               ],
