@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/providers/locale_provider.dart';
 import '../../core/providers/theme_provider.dart';
-import '../../l10n/app_localizations.dart';
 
 /// Barra di controllo rapida mostrata nella Dashboard principale.
 ///
@@ -21,19 +20,14 @@ class DashboardQuickControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
     final localeProvider = context.watch<LocaleProvider>();
-    // AppLocalizations.of(context) può restituire null se i delegati non sono
-    // ancora inizializzati; qui usiamo "!" perché in MaterialApp.router
-    // abbiamo registrato AppLocalizations.delegate.
-    final l10n = AppLocalizations.of(context)!;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         // Toggle tema dark / light
         Tooltip(
-          message: themeProvider.isDark
-              ? l10n.themeDarkLabel
-              : l10n.themeLightLabel,
+          message:
+              themeProvider.isDark ? 'Dark theme' : 'Light theme',
           child: IconButton(
             onPressed: () => context.read<ThemeProvider>().toggle(),
             icon: Icon(
@@ -47,7 +41,7 @@ class DashboardQuickControls extends StatelessWidget {
 
         // Toggle rapido lingua IT/EN
         Tooltip(
-          message: l10n.languageToggleTooltip,
+          message: 'Toggle language',
           child: TextButton(
             onPressed: () => context.read<LocaleProvider>().toggle(),
             style: TextButton.styleFrom(
