@@ -54,9 +54,10 @@ abstract final class AppColors {
   static const Color transparent = Colors.transparent;
 
   /// Variante leggermente più brillante di [stormyTeal] per hover/badge.
+  /// Non può essere const perché usa [withOpacity].
   static Color get stormyTealBright => stormyTeal.withOpacity(0.9);
 
-  /// TODO: quando verrà introdotto il logo SVG ufficiale, aggiungere qui
-  /// eventuali colori specifici derivati direttamente dal file vettoriale
-  /// (es. gradienti o toni aggiuntivi) per mantenerli centralizzati.
+  // Colori specifici per layout sidebar desktop
+  static const Color sidebarBg = Color(0xFF111827);
+  static const Color sidebarActiveBg = Color(0xFF1F2933);
 }
