@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 /// component-based. [AppColors] è utile per elementi "branded" fissi
 /// (es. gradienti di background custom, hero cards, ecc.).
 abstract final class AppColors {
+  // Brand base
   static const Color inkBlack = Color(0xFF0D1117);
   static const Color charcoalBlue = Color(0xFF41474E);
   static const Color stormyTeal = Color(0xFF00767A);
@@ -24,6 +25,8 @@ abstract final class AppColors {
   // Varianti derivate usate nel mockup scuro
   static const Color panel = Color(0xFF161B22); // card principali
   static const Color panelSoft = Color(0xFF1E242C);
+  static const Color deepNavy = Color(0xFF111827); // usata in alcune card
+
   static const Color textPrimary = Color(0xFFE6EDF7);
   static const Color textMuted = Color(0xFF8B949E);
 
@@ -37,12 +40,20 @@ abstract final class AppColors {
   /// Colore "danger" per stati critici.
   static const Color danger = Color(0xFFE5534B); // rosso caldo
 
+  /// Alias semantici richiesti dal codice esistente.
+  /// Manteniamo questi getter per evitare errori di "undefined_getter"
+  /// e avere naming descrittivo legato allo stato.
+  static const Color live = success; // badge LIVE in dashboard
+  static const Color warning = orange; // avvisi non critici
+  static const Color error = danger; // errori critici / destructive
+
   /// Bordi e linee sottili.
   static const Color border = Color(0xFF30363D);
 
   static const Color white = Colors.white;
   static const Color transparent = Colors.transparent;
 
+  /// Variante leggermente più brillante di [stormyTeal] per hover/badge.
   static Color get stormyTealBright => stormyTeal.withOpacity(0.9);
 
   /// TODO: quando verrà introdotto il logo SVG ufficiale, aggiungere qui
