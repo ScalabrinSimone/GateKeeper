@@ -258,94 +258,93 @@ class _EventsScreenState extends State<EventsScreen> {
                 ),
 
               // ── Mobile: search + chip tipo ────────────────────────────────
-              if (!isDesktop) ...
-                [
-                  // Search bar
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (v) => setState(() => _searchQuery = v),
-                      style: const TextStyle(
-                          color: AppColors.textPrimary, fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: 'Search logs (users, objects, events)...',
-                        hintStyle:
-                            const TextStyle(color: AppColors.textMuted),
-                        prefixIcon: const Icon(Icons.search,
-                            color: AppColors.textMuted, size: 18),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                        filled: true,
-                        fillColor: AppColors.panelSoft,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.stormyTeal),
-                        ),
+              if (!isDesktop) ...[
+                // Search bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                    style: const TextStyle(
+                        color: AppColors.textPrimary, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Search logs (users, objects, events)...',
+                      hintStyle:
+                          const TextStyle(color: AppColors.textMuted),
+                      prefixIcon: const Icon(Icons.search,
+                          color: AppColors.textMuted, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      filled: true,
+                      fillColor: AppColors.panelSoft,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: AppColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: AppColors.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: AppColors.stormyTeal),
                       ),
                     ),
                   ),
-                  // Chip filtro tipo a scorrimento orizzontale
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: _typeFilters.map((f) {
-                          final (type, label) = f;
-                          final active = _typeFilter == type;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: GestureDetector(
-                              onTap: () async {
-                                await HapticService.light();
-                                setState(() => _typeFilter = type);
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                curve: Curves.easeInOut,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 6),
-                                decoration: BoxDecoration(
+                ),
+                // Chip filtro tipo a scorrimento orizzontale
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _typeFilters.map((f) {
+                        final (type, label) = f;
+                        final active = _typeFilter == type;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: GestureDetector(
+                            onTap: () async {
+                              await HapticService.light();
+                              setState(() => _typeFilter = type);
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeInOut,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? AppColors.stormyTeal
+                                    : AppColors.panelSoft,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
                                   color: active
                                       ? AppColors.stormyTeal
-                                      : AppColors.panelSoft,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: active
-                                        ? AppColors.stormyTeal
-                                        : AppColors.border,
-                                  ),
+                                      : AppColors.border,
                                 ),
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    color: active
-                                        ? AppColors.white
-                                        : AppColors.textSecondary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                              ),
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  color: active
+                                      ? AppColors.white
+                                      : AppColors.textSecondary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
-                          );
-                        }).toList(),
-                      ),
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
-                ],
+                ),
+              ],
 
               // ── Lista / tabella eventi ────────────────────────────────────
               Expanded(
@@ -888,8 +887,9 @@ class _DesktopEventRow extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: AppColors.panel,
                                 borderRadius: BorderRadius.circular(6),
-                                border: const BorderSide(
+                                border: Border.all(
                                   color: AppColors.border,
+                                  width: 1,
                                 ),
                               ),
                               child: Text(
