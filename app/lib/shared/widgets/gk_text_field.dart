@@ -86,7 +86,9 @@ class GkTextField extends StatelessWidget {
             // Bordo quando il campo ha il focus
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(
+              // NOTA: qui non possiamo usare `const` perché
+              // AppColors.stormyTealBright è un getter non-const.
+              borderSide: BorderSide(
                 color: AppColors.stormyTealBright,
                 width: 1.5,
               ),
