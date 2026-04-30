@@ -50,25 +50,25 @@ class AccountScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Profilo ───────────────────────────────────────────────
-              _SectionHeader(title: 'Profile'),
+              const _SectionHeader(title: 'Profile'),
               const SizedBox(height: 16),
-              _ProfileCard(),
+              const _ProfileCard(),
               const SizedBox(height: 28),
 
               // ── Sicurezza ─────────────────────────────────────────────
-              _SectionHeader(title: 'Security'),
+              const _SectionHeader(title: 'Security'),
               const SizedBox(height: 16),
-              _SecurityCard(),
+              const _SecurityCard(),
               const SizedBox(height: 28),
 
               // ── Notifiche personali ───────────────────────────────────
-              _SectionHeader(title: 'Personal Notifications'),
+              const _SectionHeader(title: 'Personal Notifications'),
               const SizedBox(height: 16),
-              _NotificationPrefsCard(),
+              const _NotificationPrefsCard(),
               const SizedBox(height: 32),
 
               // ── Logout ────────────────────────────────────────────────
-              _LogoutButton(),
+              const _LogoutButton(),
             ],
           ),
         ),
@@ -97,6 +97,8 @@ class _SectionHeader extends StatelessWidget {
 /// TODO: rendere modificabile con EditProfileDialog
 /// che chiama PATCH /api/users/me
 class _ProfileCard extends StatelessWidget {
+  const _ProfileCard();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -174,6 +176,8 @@ class _ProfileCard extends StatelessWidget {
 ///
 /// Apre un [GkDialog] con due campi: nuova password + conferma.
 class _SecurityCard extends StatelessWidget {
+  const _SecurityCard();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -271,6 +275,8 @@ class _SecurityCard extends StatelessWidget {
 
 /// Card con toggle per le notifiche personali dell'utente.
 class _NotificationPrefsCard extends StatefulWidget {
+  const _NotificationPrefsCard();
+
   @override
   State<_NotificationPrefsCard> createState() =>
       _NotificationPrefsCardState();
@@ -301,7 +307,7 @@ class _NotificationPrefsCardState extends State<_NotificationPrefsCard> {
               setState(() => _exitAlerts = v);
             },
           ),
-          Divider(height: 1, color: AppColors.border, indent: 16),
+          const Divider(height: 1, color: AppColors.border, indent: 16),
           _PrefTile(
             label: 'Entry alerts',
             subtitle: 'When someone arrives home',
@@ -311,7 +317,7 @@ class _NotificationPrefsCardState extends State<_NotificationPrefsCard> {
               setState(() => _entryAlerts = v);
             },
           ),
-          Divider(height: 1, color: AppColors.border, indent: 16),
+          const Divider(height: 1, color: AppColors.border, indent: 16),
           _PrefTile(
             label: 'Child safety alerts',
             subtitle: 'Unsupervised exit, no phone nearby',
@@ -352,71 +358,35 @@ class _PrefTile extends StatelessWidget {
         style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
       ),
       value: value,
-      onChanged: onChanged,
+      // Flutter 3.31 ha deprecato activeColor in favore di activeTrackColor
+      // e activeThumbColor. Usiamo i nuovi campi per evitare warning.
+      activeTrackColor: AppColors.stormyTeal.withValues(alpha: 0.4),
       activeColor: AppColors.stormyTealBright,
-      inactiveTrackColor: AppColors.panelSoft,
+      onChanged: onChanged,
     );
   }
 }
 
-/// Bottone logout con dialog di conferma.
+/// Pulsante logout con conferma.
 class _LogoutButton extends StatelessWidget {
+  const _LogoutButton();
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () => _confirmLogout(context),
-        icon: const Icon(Icons.logout, size: 18),
-        label: const Text('Sign Out'),
-        style: OutlinedButton.styleFrom(
-          // FIX: era Colors.redAccent — usa AppColors.danger dalla palette
-          foregroundColor: AppColors.danger,
-          side: const BorderSide(color: AppColors.danger),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () async {
+          // TODO: ApiService.logout() → invalida JWT sul backend
+          await HapticService.light();
+          if (context.mounted) context.go('/login');
+        },
+        icon: const Icon(Icons.logout, color: AppColors.error, size: 18),
+        label: const Text(
+          'Sign out',
+          style: TextStyle(color: AppColors.error, fontSize: 14),
         ),
       ),
-    );
-  }
-
-  void _confirmLogout(BuildContext context) {
-    GkDialog.show(
-      context: context,
-      title: 'Sign Out',
-      child: const Text(
-        'Are you sure you want to sign out?',
-        style: TextStyle(color: AppColors.textSecondary),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel',
-              style: TextStyle(color: AppColors.textSecondary)),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            await HapticService.heavy();
-            // TODO: ApiService.logout() → invalida JWT sul backend
-            if (context.mounted) {
-              Navigator.of(context).pop(); // chiude dialog
-              context.go('/login');         // torna al login
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            // FIX: era Colors.redAccent — usa AppColors.danger dalla palette
-            backgroundColor: AppColors.danger,
-            foregroundColor: AppColors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          child: const Text('Sign Out'),
-        ),
-      ],
     );
   }
 }
