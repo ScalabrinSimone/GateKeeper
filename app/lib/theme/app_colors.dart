@@ -26,10 +26,26 @@ abstract final class AppColors {
   static const Color panelSoft = Color(0xFF1E242C);
   static const Color textPrimary = Color(0xFFE6EDF7);
   static const Color textMuted = Color(0xFF8B949E);
+
+  /// Colore di testo secondario (alias per [textMuted]) per compatibilità
+  /// con il codice esistente. Usato in dashboard, activity feed, ecc.
+  static const Color textSecondary = textMuted;
+
+  /// Colore "success" per stati online/presenti.
+  static const Color success = Color(0xFF2ECC71); // verde brillante
+
+  /// Colore "danger" per stati critici.
+  static const Color danger = Color(0xFFE5534B); // rosso caldo
+
+  /// Bordi e linee sottili.
   static const Color border = Color(0xFF30363D);
 
   static const Color white = Colors.white;
   static const Color transparent = Colors.transparent;
 
   static Color get stormyTealBright => stormyTeal.withOpacity(0.9);
+
+  /// TODO: quando verrà introdotto il logo SVG ufficiale, aggiungere qui
+  /// eventuali colori specifici derivati direttamente dal file vettoriale
+  /// (es. gradienti o toni aggiuntivi) per mantenerli centralizzati.
 }

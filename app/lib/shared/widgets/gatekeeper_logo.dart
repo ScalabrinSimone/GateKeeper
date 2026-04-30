@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
-
 /// Logo GateKeeper usato nel login e nella sidebar.
 ///
-/// In un unico posto così, se cambiamo asset (PNG → SVG) basta modificare
-/// qui e il resto dell'app resta invariato.
+/// In un unico posto così, se in futuro passiamo dal PNG all'SVG
+/// (usando flutter_svg) sarà sufficiente modificare questo widget.
+///
+/// TODO: sostituire Image.asset con SvgPicture.asset quando il logo
+/// SVG ufficiale sarà disponibile:
+///
+/// ```dart
+/// // Dipendenza già presente in pubspec.yaml:
+/// // flutter_svg: ^2.0.10
+/// import 'package:flutter_svg/flutter_svg.dart';
+///
+/// SvgPicture.asset('assets/images/gatekeeper_logo.svg', ...)
+/// ```
 class GateKeeperLogo extends StatelessWidget {
   const GateKeeperLogo({super.key, this.height = 64, this.compact = false});
 
@@ -17,24 +26,10 @@ class GateKeeperLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Image.asset(
-          'assets/images/gatekeeper_logo.png',
-          height: height,
-        ),
-        if (!compact) ...[
-          const SizedBox(width: 8),
-          Text(
-            'GateKeeper',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.lavenderBlush,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ],
-      ],
+    return Image.asset(
+      'assets/images/gatekeeper_logo.png',
+      height: height,
+      // La versione compatta può essere gestita con padding/clip nel parent.
     );
   }
 }
