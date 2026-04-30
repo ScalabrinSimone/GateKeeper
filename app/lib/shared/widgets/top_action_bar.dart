@@ -478,9 +478,9 @@ class _AlertsPanel extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: GestureDetector(
                 onTap: onViewAll, // FIX: usa onViewAll invece di stub vuoto
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
+                  children: const [
                     Text(
                       'View all in Event Logs',
                       style: TextStyle(
