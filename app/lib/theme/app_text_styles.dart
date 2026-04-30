@@ -16,8 +16,7 @@ abstract final class AppTextStyles {
     height: 1.1,
   );
 
-  static const TextStyle sectionTitle = TextStyle(
-    fontSize: 24,
+  static const TextStyle sectionTitle = TextStyle(\n    fontSize: 24,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
   );
@@ -43,6 +42,13 @@ abstract final class AppTextStyles {
 
   static const TextStyle metric = TextStyle(
     fontSize: 32,
+    fontWeight: FontWeight.w700,
+    color: AppColors.textPrimary,
+  );
+
+  /// Titolo brand nella sidebar ("GateKeeper").
+  static const TextStyle sidebarTitle = TextStyle(
+    fontSize: 18,
     fontWeight: FontWeight.w700,
     color: AppColors.textPrimary,
   );
