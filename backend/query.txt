@@ -1,0 +1,51 @@
+- SE ADMIN O ADULTO O BAMBINO (UNA COLONNA IN users CON ENUM)
+
+
+-- Utente
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    hash_psw TEXT NOT NULL,
+    username TEXT NOT NULL,
+    role TEXT CHECK(role IN ('admin', 'adult', 'child')) DEFAULT 'adult',
+    uuid TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    last_seen_at TIMESTAMP,
+    current_location TEXT CHECK(current_location IN ('inside', 'outside', 'unknown')) DEFAULT 'unknown',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Oggetto
+CREATE TABLE objects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    rfid_tag TEXT UNIQUE NOT NULL,  -- EPC Gen2
+    category TEXT DEFAULT 'other',
+    is_essential BOOLEAN DEFAULT 0,
+    alert_rules TEXT DEFAULT '{}',  -- JSON: {rain: true, night: true}
+    current_status TEXT CHECK(current_status IN ('inside', 'outside', 'unknown')) DEFAULT 'inside',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Associazione users-objects (renamed to user_devices, added proper FKs)
+CREATE TABLE user_devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    object_id INTEGER NOT NULL REFERENCES objects(id),
+    UNIQUE(user_id, object_id)
+);
+
+-- Evento di passaggio (added household_id for index)
+CREATE TABLE events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES users(id),
+    event_type TEXT CHECK(event_type IN ('passage_in', 'passage_out', 'alert', 'system')) NOT NULL,
+    direction TEXT CHECK(direction IN ('in', 'out')),
+    detected_objects TEXT DEFAULT '[]',
+    detected_users TEXT DEFAULT '[]',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indici per performance
+CREATE INDEX idx_events_user ON events(user_id, created_at);
+CREATE INDEX idx_objects_rfid ON objects(rfid_tag);

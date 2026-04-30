@@ -2,3 +2,4 @@ fastapi
 uvicorn[standard]
 werkzeug
 bleak>=0.21.0
+pi-rc522

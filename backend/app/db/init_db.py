@@ -1,9 +1,10 @@
-"""Inizializzatore semplice del database per il progetto di test.
+"""Inizializzatore del database conforme allo schema in query.txt.
 
-Questo script crea un file SQLite `test.db` (nella root del progetto)
-con tre tabelle: `utenti`, `dispositivi` e `log_accessi`.
+Questo modulo crea/ricrea `test.db` nella root del progetto con le
+tabelle: `users`, `objects`, `user_devices`, `events` e gli indici.
 
-Esempio di esecuzione: `python -m app.db.init_db`
+Esempio:
+    python -m app.db.init_db
 """
 
 import sqlite3
@@ -12,47 +13,63 @@ from pathlib import Path
 # Percorso del file SQLite: ../test.db (root del progetto)
 DB_PATH = Path(__file__).resolve().parents[2] / "test.db"
 
-# Schema SQL, mantenuto leggibile
-SCHEMA = """
+
+NEW_SCHEMA = """
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE IF NOT EXISTS utenti (
+CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    api_token TEXT
+    email TEXT UNIQUE NOT NULL,
+    hash_psw TEXT NOT NULL,
+    username TEXT NOT NULL,
+    role TEXT CHECK(role IN ('admin', 'adult', 'child')) DEFAULT 'adult',
+    uuid TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    last_seen_at TIMESTAMP,
+    current_location TEXT CHECK(current_location IN ('inside', 'outside', 'unknown')) DEFAULT 'unknown',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS dispositivi (
+CREATE TABLE IF NOT EXISTS devices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT NOT NULL,
-    tipo TEXT,
-    owner_id INTEGER NOT NULL,
-    FOREIGN KEY(owner_id) REFERENCES utenti(id) ON DELETE CASCADE
+    name TEXT NOT NULL,
+    rfid_tag TEXT UNIQUE NOT NULL,
+    category TEXT DEFAULT 'other',
+    is_essential BOOLEAN DEFAULT 0,
+    alert_rules TEXT DEFAULT '{}',
+    current_status TEXT CHECK(current_status IN ('inside', 'outside', 'unknown')) DEFAULT 'inside',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS log_accessi (
+CREATE TABLE IF NOT EXISTS user_devices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    dispositivo_id INTEGER NOT NULL,
-    utente_id INTEGER,
-    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-    action TEXT,
-    FOREIGN KEY(dispositivo_id) REFERENCES dispositivi(id) ON DELETE CASCADE,
-    FOREIGN KEY(utente_id) REFERENCES utenti(id)
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    device_id INTEGER NOT NULL REFERENCES devices(id),
+    UNIQUE(user_id, device_id)
 );
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES users(id),
+    event_type TEXT CHECK(event_type IN ('passage_in', 'passage_out', 'alert', 'system')) NOT NULL,
+    direction TEXT CHECK(direction IN ('in', 'out')),
+    detected_objects TEXT DEFAULT '[]',
+    detected_users TEXT DEFAULT '[]',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_devices_rfid ON devices(rfid_tag);
 """
 
 
 def init_db(path: Path = DB_PATH) -> None:
-    """Crea il file DB e le tabelle se non esistono.
+    """Crea (o ricrea) il file DB con lo schema definito in NEW_SCHEMA.
 
-    Usa un context manager per chiudere la connessione automaticamente.
+    Se esiste un DB precedente viene rimosso.
     """
-    # assicurati che la cartella esista
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    # se esiste un DB precedente lo rimuoviamo per ricrearne uno nuovo
     if path.exists():
         try:
             path.unlink()
@@ -60,46 +77,8 @@ def init_db(path: Path = DB_PATH) -> None:
         except Exception as e:
             print(f"Impossibile rimuovere il DB esistente: {e}")
 
-    # nuovo schema conforme alla struttura richiesta dall'utente
-    NEW_SCHEMA = """
-    PRAGMA foreign_keys = ON;
-
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS devices (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS user_device (
-        association_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        device_id INTEGER NOT NULL,
-        UNIQUE(user_id, device_id),
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        device_id INTEGER NOT NULL,
-        action TEXT NOT NULL CHECK(action IN ('ENTRATO','USCITO')),
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
-    );
-    """
-
     with sqlite3.connect(path) as conn:
-        cur = conn.cursor()
-        cur.executescript(NEW_SCHEMA)
+        conn.executescript(NEW_SCHEMA)
         conn.commit()
     print(f"Nuovo database creato: {path}")
 
