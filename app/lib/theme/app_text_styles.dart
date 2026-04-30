@@ -16,7 +16,8 @@ abstract final class AppTextStyles {
     height: 1.1,
   );
 
-  static const TextStyle sectionTitle = TextStyle(\n    fontSize: 24,
+  static const TextStyle sectionTitle = TextStyle(
+    fontSize: 24,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
   );
