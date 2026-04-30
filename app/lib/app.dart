@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/providers/locale_provider.dart';
-import '../../core/providers/theme_provider.dart';
-import '../../l10n/app_localizations.dart';
-import '../../router/app_router.dart';
-import '../../theme/app_theme.dart';
+import 'core/providers/locale_provider.dart';
+import 'core/providers/theme_provider.dart';
+import 'l10n/app_localizations.dart';
+import 'router/app_router.dart';
+import 'theme/app_theme.dart';
 
 /// Root widget dell'app GateKeeper.
 ///
@@ -48,7 +49,7 @@ class _AppView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // consumer2 = ascolta due provider contemporaneamente
+    // Consumer2 = ascolta due provider contemporaneamente
     return Consumer2<ThemeProvider, LocaleProvider>(
       builder: (context, themeProvider, localeProvider, _) {
         return MaterialApp.router(
@@ -66,7 +67,8 @@ class _AppView extends StatelessWidget {
           // Lingua corrente dal provider
           locale: localeProvider.locale,
           supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
+          // Importante: niente `const` qui, perché i delegati non sono const.
+          localizationsDelegates: [
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
