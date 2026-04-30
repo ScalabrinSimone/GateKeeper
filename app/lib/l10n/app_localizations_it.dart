@@ -16,4 +16,19 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get settingsTitle => 'Impostazioni';
+
+  @override
+  String get settingsAppearanceTitle => 'Aspetto';
+
+  @override
+  String get settingsThemeLabel => 'Tema';
+
+  @override
+  String get settingsThemeDark => 'Scuro';
+
+  @override
+  String get settingsThemeLight => 'Chiaro';
+
+  @override
+  String get settingsLanguageLabel => 'Lingua';
 }
