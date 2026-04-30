@@ -462,7 +462,7 @@ class _AlertRulesContent extends StatelessWidget {
                   child: Row(
                     children: [
                       // TODO: implementare TimePickerDialog per selezionare l'ora
-                      _TimeChip(label: '10:00 PM'),
+                      const _TimeChip(label: '10:00 PM'),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 8),
                         child: Text('to',
@@ -470,7 +470,7 @@ class _AlertRulesContent extends StatelessWidget {
                                 color: AppColors.textSecondary,
                                 fontSize: 13)),
                       ),
-                      _TimeChip(label: '07:00 AM'),
+                      const _TimeChip(label: '07:00 AM'),
                     ],
                   ),
                 ),
@@ -520,6 +520,7 @@ class _AlertRuleRow extends StatelessWidget {
           Switch.adaptive(
             value: value,
             onChanged: onChanged,
+            activeTrackColor: AppColors.stormyTeal.withValues(alpha: 0.4),
             activeColor: AppColors.stormyTealBright,
           ),
         ],
@@ -941,6 +942,8 @@ class _AppearanceContent extends StatelessWidget {
                   Switch.adaptive(
                     value: theme.isDark,
                     onChanged: (_) => theme.toggle(),
+                    activeTrackColor:
+                        AppColors.stormyTeal.withValues(alpha: 0.4),
                     activeColor: AppColors.stormyTealBright,
                   ),
                 ],
@@ -1014,7 +1017,7 @@ class _AppearanceContent extends StatelessWidget {
         // ── Info app ───────────────────────────────────────────────────────
         GlassCard(
           padding: EdgeInsets.zero,
-          child: SettingsTile(
+          child: const SettingsTile(
             label: 'About GateKeeper',
             subtitle: 'v0.1.0-alpha — Smart tag, safe exit',
             icon: Icons.info_outline,
@@ -1076,12 +1079,11 @@ class _ThemePreviewChip extends StatelessWidget {
                     color: textColor,
                     fontSize: 12,
                     fontWeight: FontWeight.w500)),
-            if (isSelected) ...
-              [
-                const SizedBox(height: 4),
-                Icon(Icons.check_circle,
-                    color: AppColors.stormyTealBright, size: 14),
-              ],
+            if (isSelected) ...[
+              const SizedBox(height: 4),
+              const Icon(Icons.check_circle,
+                  color: AppColors.stormyTealBright, size: 14),
+            ],
           ],
         ),
       ),
@@ -1150,8 +1152,9 @@ class _LanguageOptionTile extends StatelessWidget {
                           fontWeight: isSelected
                               ? FontWeight.w600
                               : FontWeight.w400)),
-                  Text(subtitle,
-                      style: const TextStyle(
+                  const SizedBox(height: 2),
+                  const Text('App language',
+                      style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 12)),
                 ],
@@ -1217,6 +1220,8 @@ class _DataPrivacyContent extends StatelessWidget {
                 trailing: Switch.adaptive(
                   value: notifEntry,
                   onChanged: onNotifEntry,
+                  activeTrackColor:
+                      AppColors.stormyTeal.withValues(alpha: 0.4),
                   activeColor: AppColors.stormyTealBright,
                 ),
               ),
@@ -1226,6 +1231,8 @@ class _DataPrivacyContent extends StatelessWidget {
                 trailing: Switch.adaptive(
                   value: notifExit,
                   onChanged: onNotifExit,
+                  activeTrackColor:
+                      AppColors.stormyTeal.withValues(alpha: 0.4),
                   activeColor: AppColors.stormyTealBright,
                 ),
               ),
@@ -1236,6 +1243,8 @@ class _DataPrivacyContent extends StatelessWidget {
                 trailing: Switch.adaptive(
                   value: notifAlert,
                   onChanged: onNotifAlert,
+                  activeTrackColor:
+                      AppColors.stormyTeal.withValues(alpha: 0.4),
                   activeColor: AppColors.stormyTealBright,
                 ),
               ),
@@ -1245,6 +1254,8 @@ class _DataPrivacyContent extends StatelessWidget {
                 trailing: Switch.adaptive(
                   value: notifForgotten,
                   onChanged: onNotifForgotten,
+                  activeTrackColor:
+                      AppColors.stormyTeal.withValues(alpha: 0.4),
                   activeColor: AppColors.stormyTealBright,
                 ),
               ),
@@ -1254,6 +1265,8 @@ class _DataPrivacyContent extends StatelessWidget {
                 trailing: Switch.adaptive(
                   value: notifUnauthorized,
                   onChanged: onNotifUnauthorized,
+                  activeTrackColor:
+                      AppColors.stormyTeal.withValues(alpha: 0.4),
                   activeColor: AppColors.stormyTealBright,
                 ),
               ),
