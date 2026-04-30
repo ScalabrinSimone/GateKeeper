@@ -79,7 +79,7 @@ final _stubEvents = [
     timestamp: DateTime.now().subtract(const Duration(hours: 0, minutes: 15)),
     userName: null,
     alertMessage: 'Object passed gateway without authenticated BLE device',
-    objectNames: ['MacBook Pro'],
+    objectNames: const ['MacBook Pro'],
   ),
   GkEvent(
     id: 'e2',
@@ -88,7 +88,7 @@ final _stubEvents = [
     timestamp: DateTime.now().subtract(const Duration(hours: 0, minutes: 45)),
     userName: 'Bob',
     alertMessage: 'User exited but usually carries tagged item',
-    objectNames: ['Wallet'],
+    objectNames: const ['Wallet'],
   ),
   GkEvent(
     id: 'e3',
@@ -96,7 +96,7 @@ final _stubEvents = [
     direction: EventDirection.in_,
     timestamp: DateTime.now().subtract(const Duration(hours: 1, minutes: 30)),
     userName: 'Alice',
-    objectNames: ['House Keys', 'Backpack'],
+    objectNames: const ['House Keys', 'Backpack'],
   ),
   GkEvent(
     id: 'e4',
@@ -104,14 +104,14 @@ final _stubEvents = [
     direction: EventDirection.out,
     timestamp: DateTime.now().subtract(const Duration(hours: 2, minutes: 15)),
     userName: 'Charlie',
-    objectNames: ['Car Keys'],
+    objectNames: const ['Car Keys'],
   ),
   GkEvent(
     id: 'e5',
     type: EventType.scan,
     direction: EventDirection.in_,
     timestamp: DateTime.now().subtract(const Duration(hours: 4)),
-    objectNames: [],
+    objectNames: const [],
     alertMessage: 'Daily automated gateway health check completed',
   ),
   GkEvent(
@@ -120,7 +120,7 @@ final _stubEvents = [
     direction: EventDirection.in_,
     timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 2)),
     userName: 'Charlie',
-    objectNames: ['Car Keys'],
+    objectNames: const ['Car Keys'],
   ),
   GkEvent(
     id: 'e7',
@@ -128,7 +128,7 @@ final _stubEvents = [
     direction: EventDirection.out,
     timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
     userName: 'Bob',
-    objectNames: ['Wallet'],
+    objectNames: const ['Wallet'],
   ),
 ];
 
@@ -400,8 +400,7 @@ enum _DateRange {
   DateTime? get cutoff {
     final now = DateTime.now();
     return switch (this) {
-      _DateRange.today =>
-        DateTime(now.year, now.month, now.day),
+      _DateRange.today => DateTime(now.year, now.month, now.day),
       _DateRange.last7Days => now.subtract(const Duration(days: 7)),
       _DateRange.last30Days => now.subtract(const Duration(days: 30)),
       _DateRange.allTime => null,
@@ -481,8 +480,8 @@ class _DesktopFilterBar extends StatelessWidget {
                   color: AppColors.textPrimary, fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'Search logs (users, objects, events)...',
-                hintStyle: const TextStyle(
-                    color: AppColors.textMuted, fontSize: 13),
+                hintStyle:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 13),
                 prefixIcon: const Icon(Icons.search,
                     color: AppColors.textMuted, size: 16),
                 filled: true,
@@ -491,13 +490,11 @@ class _DesktopFilterBar extends StatelessWidget {
                     horizontal: 14, vertical: 10),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide:
-                      const BorderSide(color: AppColors.border),
+                  borderSide: const BorderSide(color: AppColors.border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide:
-                      const BorderSide(color: AppColors.border),
+                  borderSide: const BorderSide(color: AppColors.border),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -601,7 +598,7 @@ class _DropdownFilter<T> extends StatelessWidget {
                 width: 18,
                 child: isSelected
                     ? const Icon(Icons.check,
-                        size: 14, color: AppColors.stormyTealBright)
+                        size: 14, color: AppColors.stormyTeal)
                     : null,
               ),
               const SizedBox(width: 6),
@@ -609,7 +606,7 @@ class _DropdownFilter<T> extends StatelessWidget {
                 labelFor(item),
                 style: TextStyle(
                   color: isSelected
-                      ? AppColors.stormyTealBright
+                      ? AppColors.stormyTeal
                       : AppColors.textPrimary,
                   fontSize: 13,
                   fontWeight:
@@ -722,22 +719,22 @@ class _DesktopEventsTable extends StatelessWidget {
             Expanded(
               child: ListView(
                 children: [
-                  for (final entry in _grouped.entries) ...
-                    [
-                      Padding(
-                        padding:
-                            const EdgeInsets.fromLTRB(16, 14, 16, 6),
-                        child: Text(entry.key,
-                            style: AppTextStyles.label),
-                      ),
-                      const Divider(color: AppColors.border, height: 1),
-                      ...entry.value.map((event) => _DesktopEventRow(
+                  for (final entry in _grouped.entries) ...[
+                    Padding(
+                      padding:
+                          const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                      child:
+                          Text(entry.key, style: AppTextStyles.label),
+                    ),
+                    const Divider(color: AppColors.border, height: 1),
+                    ...entry.value.map((event) => _DesktopEventRow(
+                          event: event,
+                          onTap: () => EventDetailSheet.show(
+                            context,
                             event: event,
-                            onTap: () => EventDetailSheet.show(
-                                context,
-                                event: event),
-                          )),
-                    ],
+                          ),
+                        )),
+                  ],
                 ],
               ),
             ),
@@ -757,7 +754,7 @@ class _DesktopEventRow extends StatelessWidget {
   Color get _typeColor => switch (event.type) {
         EventType.alert => AppColors.warning,
         EventType.entry => AppColors.success,
-        EventType.exit => AppColors.stormyTealBright,
+        EventType.exit => AppColors.stormyTeal,
         EventType.scan => AppColors.textMuted,
       };
 
@@ -778,8 +775,7 @@ class _DesktopEventRow extends StatelessWidget {
   String get _description {
     if (event.alertMessage != null) return event.alertMessage!;
     final user = event.userName ?? 'Unknown';
-    final dir =
-        event.direction == EventDirection.out ? 'exited' : 'entered';
+    final dir = event.direction == EventDirection.out ? 'exited' : 'entered';
     final objs = event.objectNames.isEmpty
         ? 'no objects'
         : event.objectNames.join(', ');
@@ -801,21 +797,24 @@ class _DesktopEventRow extends StatelessWidget {
       onTap: onTap,
       hoverColor: AppColors.panel.withValues(alpha: 0.5),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: const BoxDecoration(
           border: Border(
-              bottom: BorderSide(
-                  color: AppColors.border, width: 0.5)),
+            bottom: BorderSide(color: AppColors.border, width: 0.5),
+          ),
         ),
         child: Row(
           children: [
             // Timestamp
             SizedBox(
               width: 120,
-              child: Text(_timeStr,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 12)),
+              child: Text(
+                _timeStr,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
             ),
             // Badge tipo con icona
             SizedBox(
@@ -846,7 +845,9 @@ class _DesktopEventRow extends StatelessWidget {
                 child: Text(
                   _description,
                   style: const TextStyle(
-                      color: AppColors.textPrimary, fontSize: 13),
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -857,7 +858,9 @@ class _DesktopEventRow extends StatelessWidget {
               child: Text(
                 event.userName ?? 'System / Unknown',
                 style: const TextStyle(
-                    color: AppColors.textSecondary, fontSize: 13),
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -865,30 +868,39 @@ class _DesktopEventRow extends StatelessWidget {
             Expanded(
               flex: 2,
               child: event.objectNames.isEmpty
-                  ? const Text('—',
+                  ? const Text(
+                      '—',
                       style: TextStyle(
-                          color: AppColors.textMuted, fontSize: 13))
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    )
                   : Wrap(
                       spacing: 4,
                       runSpacing: 4,
                       children: event.objectNames
-                          .map((obj) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.panel,
-                                  borderRadius:
-                                      BorderRadius.circular(6),
-                                  border: Border.all(
-                                      color: AppColors.border),
+                          .map(
+                            (obj) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.panel,
+                                borderRadius: BorderRadius.circular(6),
+                                border: const BorderSide(
+                                  color: AppColors.border,
                                 ),
-                                child: Text(
-                                  obj,
-                                  style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 11),
+                              ),
+                              child: Text(
+                                obj,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11,
                                 ),
-                              ))
+                              ),
+                            ),
+                          )
                           .toList(),
                     ),
             ),
@@ -911,7 +923,7 @@ class _EventTile extends StatelessWidget {
   Color get _color => switch (event.type) {
         EventType.alert => AppColors.warning,
         EventType.entry => AppColors.success,
-        EventType.exit => AppColors.stormyTealBright,
+        EventType.exit => AppColors.stormyTeal,
         EventType.scan => AppColors.textMuted,
       };
 
@@ -974,33 +986,45 @@ class _EventTile extends StatelessWidget {
                             Icon(_icon, color: _color, size: 15),
                             const SizedBox(width: 6),
                             Expanded(
-                              child: Text(_title,
-                                  style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
-                            ),
-                            Text(_fmt(event.timestamp),
+                              child: Text(
+                                _title,
                                 style: const TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 11)),
+                                  color: AppColors.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _fmt(event.timestamp),
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 11,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(_desc,
-                            style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis),
+                        Text(
+                          _desc,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Icon(Icons.chevron_right,
-                      color: AppColors.textMuted, size: 16),
+                  child: Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textMuted,
+                    size: 16,
+                  ),
                 ),
               ],
             ),
