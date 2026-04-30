@@ -311,7 +311,7 @@ class _ObjectsList extends StatelessWidget {
                   Container(
                     width: 5,
                     height: 5,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppColors.stormyTealBright,
                       shape: BoxShape.circle,
                     ),
