@@ -1,102 +1,145 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../shared/widgets/gatekeeper_logo.dart';
 import '../../theme/app_colors.dart';
-import 'navigation_item.dart';
+import '../../theme/app_text_styles.dart';
 
-/// Sidebar desktop principale.
+/// Sidebar principale per layout desktop.
 ///
-/// Contiene:
-/// - Logo GateKeeper in alto
-/// - Voci di navigazione principali (Overview, Users, RFID, Event Logs)
-/// - Voce Settings fissata in fondo
+/// Evidenzia la voce attiva in base alla location corrente
+/// usando [GoRouterState.location]. Questo evita di mantenere
+/// uno stato manuale ed è resiliente alla navigazione programmatica.
 ///
-/// NOTA: la logica di navigazione (route) è centralizzata in
-/// [appNavigationItems] e in [AppRouter]. Questa sidebar si occupa solo
-/// della parte visuale; il click navigation è gestito dentro
-/// [_DesktopNavItems] tramite go_router.
+/// TODO: collegare il badge Alert alla pagina Event Logs con filtro alert.
 class DesktopSidebar extends StatelessWidget {
   const DesktopSidebar({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final router = GoRouter.of(context);
+    final location = router.routerDelegate.currentConfiguration.uri.toString();
+
     return Container(
-      width: 260,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      width: 220,
       decoration: const BoxDecoration(
-        color: AppColors.panel,
-        borderRadius: BorderRadius.only(
-          topRight: Radius.circular(24),
-          bottomRight: Radius.circular(24),
+        border: Border(
+          right: BorderSide(color: AppColors.border),
         ),
+        color: AppColors.sidebarBg,
       ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Logo brand in alto
-          GateKeeperLogo(height: 40, compact: true),
-          SizedBox(height: 32),
-          // Contenuto esistente di navigazione ripristinato sotto il logo
-          _DesktopNavItems(),
-        ],
-      ),
-    );
-  }
-}
-
-/// Lista voci di navigazione della sidebar desktop.
-///
-/// Usa [NavigationItem] per etichette/icone/route in modo coerente
-/// con la bottom nav mobile.
-class _DesktopNavItems extends StatelessWidget {
-  const _DesktopNavItems();
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Voci principali
-          for (final item in appNavigationItems) ...[
-            _SidebarItem(item: item),
-            const SizedBox(height: 4),
-          ],
-          const Spacer(),
-          const Divider(color: AppColors.border),
+          const _SidebarHeader(),
           const SizedBox(height: 8),
-          const _SettingsItem(),
+          _NavItem(
+            icon: Icons.dashboard_outlined,
+            label: 'Overview',
+            // Rotte principali definite in app_router.dart
+            route: '/dashboard',
+            isActive: location.startsWith('/dashboard'),
+          ),
+          _NavItem(
+            icon: Icons.group_outlined,
+            label: 'Users & Roles',
+            route: '/users',
+            isActive: location.startsWith('/users'),
+          ),
+          _NavItem(
+            icon: Icons.key_outlined,
+            label: 'RFID Objects',
+            route: '/objects',
+            isActive: location.startsWith('/objects'),
+          ),
+          _NavItem(
+            icon: Icons.list_alt_outlined,
+            label: 'Event Logs',
+            route: '/events',
+            isActive: location.startsWith('/events'),
+          ),
+          const Spacer(),
+          const Divider(color: AppColors.border, height: 1),
+          _NavItem(
+            icon: Icons.settings_outlined,
+            label: 'Settings',
+            route: '/settings',
+            isActive: location.startsWith('/settings'),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
 }
 
-class _SidebarItem extends StatelessWidget {
-  const _SidebarItem({required this.item});
-
-  final NavigationItem item;
+class _SidebarHeader extends StatelessWidget {
+  const _SidebarHeader();
 
   @override
   Widget build(BuildContext context) {
-    final router = GoRouterState.of(context);
-    final isActive = router.uri.toString().startsWith(item.route);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.stormyTeal.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.vpn_key,
+                color: AppColors.stormyTealBright, size: 18),
+          ),
+          const SizedBox(width: 10),
+          const Text('GateKeeper', style: AppTextStyles.sidebarTitle),
+        ],
+      ),
+    );
+  }
+}
 
+/// Singola voce di navigazione nella sidebar desktop.
+///
+/// Parametri:
+/// - [icon]: icona principale
+/// - [label]: testo
+/// - [route]: path go_router
+/// - [isActive]: se la voce è correntemente selezionata
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.route,
+    required this.isActive,
+  });
+
+  final IconData icon;
+  final String label;
+  final String route;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: () => context.go(item.route),
+      onTap: () {
+        // Naviga solo se non siamo già sulla stessa route per evitare
+        // di ricostruire inutilmente lo stack.
+        if (!isActive) context.go(route);
+      },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: isActive
-              ? AppColors.stormyTeal.withValues(alpha: 0.18)
+              ? AppColors.sidebarActiveBg
               : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
         child: Row(
           children: [
             Icon(
-              item.icon,
+              icon,
               size: 18,
               color: isActive
                   ? AppColors.stormyTealBright
@@ -104,54 +147,14 @@ class _SidebarItem extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              item.label,
+              label,
               style: TextStyle(
                 color: isActive
                     ? AppColors.stormyTealBright
                     : AppColors.textSecondary,
                 fontSize: 14,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsItem extends StatelessWidget {
-  const _SettingsItem();
-
-  @override
-  Widget build(BuildContext context) {
-    final router = GoRouterState.of(context);
-    final isActive = router.uri.toString().startsWith('/settings');
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: () => context.go('/settings'),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.stormyTeal.withValues(alpha: 0.18)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: const [
-            Icon(
-              Icons.settings_outlined,
-              size: 18,
-              color: AppColors.textSecondary,
-            ),
-            SizedBox(width: 10),
-            Text(
-              'Settings',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
+                fontWeight:
+                    isActive ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
           ],
