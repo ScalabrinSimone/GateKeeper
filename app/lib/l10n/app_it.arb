@@ -2,5 +2,11 @@
   "@@locale": "it",
   "appName": "GateKeeper",
   "dashboardTitle": "Dashboard",
-  "settingsTitle": "Impostazioni"
+  "settingsTitle": "Impostazioni",
+
+  "settingsAppearanceTitle": "Aspetto",
+  "settingsThemeLabel": "Tema",
+  "settingsThemeDark": "Scuro",
+  "settingsThemeLight": "Chiaro",
+  "settingsLanguageLabel": "Lingua"
 }
