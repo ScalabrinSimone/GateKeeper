@@ -480,8 +480,8 @@ class _AlertsPanel extends StatelessWidget {
                 onTap: onViewAll, // FIX: usa onViewAll invece di stub vuoto
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text(
+                  children: [
+                    const Text(
                       'View all in Event Logs',
                       style: TextStyle(
                         color: AppColors.stormyTealBright,
@@ -489,7 +489,7 @@ class _AlertsPanel extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Icon(
                       Icons.arrow_forward,
                       size: 14,
