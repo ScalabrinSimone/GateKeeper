@@ -617,7 +617,7 @@ class _GatewayDeviceContent extends StatelessWidget {
                       color: AppColors.stormyTeal.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.router_outlined,
+                    child: Icon(Icons.router_outlined,
                         color: AppColors.stormyTealBright, size: 18),
                   ),
                   const SizedBox(width: 12),
@@ -1081,7 +1081,7 @@ class _ThemePreviewChip extends StatelessWidget {
                     fontWeight: FontWeight.w500)),
             if (isSelected) ...[
               const SizedBox(height: 4),
-              const Icon(Icons.check_circle,
+              Icon(Icons.check_circle,
                   color: AppColors.stormyTealBright, size: 14),
             ],
           ],
@@ -1162,7 +1162,7 @@ class _LanguageOptionTile extends StatelessWidget {
             ),
             // Check se selezionata
             if (isSelected)
-              const Icon(Icons.check_circle,
+              Icon(Icons.check_circle,
                   color: AppColors.stormyTealBright, size: 18),
           ],
         ),
