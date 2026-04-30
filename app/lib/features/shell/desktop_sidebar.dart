@@ -87,8 +87,11 @@ class _SidebarHeader extends StatelessWidget {
               color: AppColors.stormyTeal.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.vpn_key,
-                color: AppColors.stormyTealBright, size: 18),
+            child: Icon(
+              Icons.vpn_key,
+              color: AppColors.stormyTealBright,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 10),
           const Text('GateKeeper', style: AppTextStyles.sidebarTitle),
