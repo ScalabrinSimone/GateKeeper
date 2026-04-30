@@ -20,7 +20,13 @@ class AppearanceSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
     final localeProvider = context.watch<LocaleProvider>();
-    final l10n = AppLocalizations.of(context);
+
+    // AppLocalizations.of(context) può teoricamente restituire null se
+    // chiamato fuori da un MaterialApp con i delegati registrati.
+    // In GateKeeper sappiamo che AppearanceSection è sempre costruita
+    // dentro l'albero principale dell'app, quindi usiamo "!" per
+    // indicare al compilatore che in questo contesto non sarà mai null.
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,16 +70,14 @@ class AppearanceSection extends StatelessWidget {
           children: [
             Expanded(child: Text(l10n.settingsLanguageLabel)),
             SegmentedButton<String>(
-              segments: [
-                ButtonSegment(value: 'it', label: const Text('Italiano')),
-                ButtonSegment(value: 'en', label: const Text('English')),
+              segments: const [
+                ButtonSegment(value: 'it', label: Text('Italiano')),
+                ButtonSegment(value: 'en', label: Text('English')),
               ],
               selected: {localeProvider.locale.languageCode},
               onSelectionChanged: (values) {
                 final code = values.first;
-                context
-                    .read<LocaleProvider>()
-                    .setLocale(Locale(code));
+                context.read<LocaleProvider>().setLocale(Locale(code));
               },
             ),
           ],
