@@ -7,48 +7,61 @@ import 'app_text_styles.dart';
 ///
 /// Contiene due [ThemeData] completi:
 /// - [darkTheme]: tema scuro (default, principale)
-/// - [lightTheme]: tema chiaro (Lavender Blush surfaces + Ink Black text)
+/// - [lightTheme]: tema chiaro (variante chiara per testare la UI)
 ///
-/// Entrambi usano Material 3 con la stessa palette brand (teal + orange).
-/// I widget che hardcodano [AppColors] vedranno sempre i colori dark;
-/// per widget theme-aware usare [AppThemeColors.of(context)].
-abstract final class AppTheme {
-  // ── Dark Theme ─────────────────────────────────────────────────────────
+/// Entrambi usano Material 3 con la stessa palette brand (Stormy Teal + Orange)
+/// definita in [AppColors]. I widget che hardcodano i colori di
+/// [AppColors] vedranno sempre il look "mockup" scuro; per widget realmente
+/// theme-aware è meglio usare `Theme.of(context).colorScheme.*`.
+class AppTheme {
+  AppTheme._();
 
-  /// Tema scuro: sfondo Ink Black, superfici Navy, testo bianco.
+  // ── Dark Theme (mockup principale) ─────────────────────────────────────
+
+  /// Tema scuro di riferimento: sfondo Ink Black, pannelli Charcoal,
+  /// accenti Stormy Teal / Orange, testi chiari.
   static ThemeData get darkTheme {
+    // Costruiamo un ColorScheme coerente partendo dal colore brand teal.
     final cs = ColorScheme.fromSeed(
       seedColor: AppColors.stormyTeal,
       brightness: Brightness.dark,
     ).copyWith(
-      primary:    AppColors.stormyTeal,
-      secondary:  AppColors.orange,
-      surface:    AppColors.panel,
-      onSurface:  AppColors.textPrimary,
-      onPrimary:  AppColors.white,
+      primary: AppColors.stormyTeal,
+      secondary: AppColors.orange,
+      background: AppColors.inkBlack,
+      surface: AppColors.panel,
+      onSurface: AppColors.textPrimary,
+      onPrimary: AppColors.white,
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: cs,
+
+      // Lo sfondo principale dell'app (Scaffold, Shell) riprende il mockup
+      // con il gradiente molto scuro. Per mantenere la flessibilità usiamo
+      // comunque una tinta piatta vicina.
       scaffoldBackgroundColor: AppColors.inkBlack,
       fontFamily: AppTextStyles.fontFamily,
+
       cardColor: AppColors.panel,
       dividerColor: AppColors.border,
       splashFactory: InkRipple.splashFactory,
+
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.transparent,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
       ),
+
       inputDecorationTheme: _inputTheme(
         fill: AppColors.panelSoft,
         border: AppColors.border,
         focus: AppColors.stormyTealBright,
         hint: AppColors.textMuted,
       ),
-      // Popup / dialog background
+
       dialogBackgroundColor: AppColors.panel,
       popupMenuTheme: PopupMenuThemeData(
         color: AppColors.panel,
@@ -61,51 +74,60 @@ abstract final class AppTheme {
     );
   }
 
-  // ── Light Theme ────────────────────────────────────────────────────────
+  // ── Light Theme (variante chiara sperimentale) ─────────────────────────
 
-  /// Tema chiaro: sfondo Lavender Blush, superfici bianche, testo Ink Black.
+  /// Tema chiaro: sfondo Lavender Blush, pannelli chiari, testo Ink Black.
   ///
-  /// Mantiene la stessa palette brand (teal CTA, orange stato) per coerenza.
+  /// La palette di base rimane la stessa (Stormy Teal + Orange) ma con
+  /// contrasti invertiti per testare la leggibilità in ambienti molto luminosi.
   static ThemeData get lightTheme {
     final cs = ColorScheme.fromSeed(
       seedColor: AppColors.stormyTeal,
       brightness: Brightness.light,
     ).copyWith(
-      primary:    AppColorsLight.stormyTeal,
-      secondary:  AppColorsLight.orange,
-      surface:    AppColorsLight.panel,
-      onSurface:  AppColorsLight.textPrimary,
-      onPrimary:  AppColorsLight.white,
+      primary: AppColors.stormyTeal,
+      secondary: AppColors.orange,
+      background: AppColors.lavenderBlush,
+      surface: Colors.white,
+      onSurface: AppColors.inkBlack,
+      onPrimary: Colors.white,
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: cs,
-      scaffoldBackgroundColor: AppColorsLight.inkBlack, // Lavender Blush
+
+      // Lo sfondo generale passa a Lavender Blush per staccare dalle card
+      // bianche e mantenere un minimo di "brand" anche in light mode.
+      scaffoldBackgroundColor: AppColors.lavenderBlush,
       fontFamily: AppTextStyles.fontFamily,
-      cardColor: AppColorsLight.panel,
-      dividerColor: AppColorsLight.border,
+
+      cardColor: Colors.white,
+      dividerColor: AppColors.charcoalBlue.withOpacity(0.12),
       splashFactory: InkRipple.splashFactory,
+
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
       ),
+
       inputDecorationTheme: _inputTheme(
-        fill: AppColorsLight.panelSoft,
-        border: AppColorsLight.border,
-        focus: AppColorsLight.stormyTealBright,
-        hint: AppColorsLight.textMuted,
+        fill: Colors.white,
+        border: AppColors.charcoalBlue.withOpacity(0.18),
+        focus: AppColors.stormyTeal,
+        hint: AppColors.charcoalBlue.withOpacity(0.6),
       ),
-      dialogBackgroundColor: AppColorsLight.panel,
+
+      dialogBackgroundColor: Colors.white,
       popupMenuTheme: PopupMenuThemeData(
-        color: AppColorsLight.panel,
+        color: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: AppColorsLight.border),
+          side: BorderSide(color: AppColors.charcoalBlue.withOpacity(0.16)),
         ),
-        elevation: 8,
+        elevation: 6,
       ),
     );
   }

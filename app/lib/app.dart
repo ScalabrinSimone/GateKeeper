@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
-import 'core/providers/locale_provider.dart';
-import 'core/providers/theme_provider.dart';
-import 'router/app_router.dart';
-import 'theme/app_theme.dart';
+import '../../core/providers/locale_provider.dart';
+import '../../core/providers/theme_provider.dart';
+import '../../l10n/app_localizations.dart';
+import '../../router/app_router.dart';
+import '../../theme/app_theme.dart';
 
 /// Root widget dell'app GateKeeper.
 ///
@@ -52,7 +52,7 @@ class _AppView extends StatelessWidget {
     return Consumer2<ThemeProvider, LocaleProvider>(
       builder: (context, themeProvider, localeProvider, _) {
         return MaterialApp.router(
-          title: '',
+          title: 'GateKeeper',
           debugShowCheckedModeBanner: false,
 
           // Tema: dark o light in base al provider
@@ -65,11 +65,9 @@ class _AppView extends StatelessWidget {
 
           // Lingua corrente dal provider
           locale: localeProvider.locale,
-          supportedLocales: const [
-            Locale('it'),
-            Locale('en'),
-          ],
+          supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: const [
+            AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
