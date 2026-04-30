@@ -184,25 +184,29 @@ class _SetupScreenState extends State<SetupScreen> {
 
   // Restituisce il widget dello step corrente
   Widget _buildStep() {
-    return switch (_currentStep) {
-      0 => _StepHomeName(
+    switch (_currentStep) {
+      case 0:
+        return _StepHomeName(
           key: const ValueKey(0),
           controller: _homeNameCtrl,
-        ),
-      1 => _StepAdminAccount(
+        );
+      case 1:
+        return _StepAdminAccount(
           key: const ValueKey(1),
           emailCtrl: _adminEmailCtrl,
           passCtrl: _adminPassCtrl,
-        ),
-      2 => _StepGatewayConnect(
+        );
+      case 2:
+        return _StepGatewayConnect(
           key: const ValueKey(2),
           controller: _gatewayCtrl,
-        ),
-      _ => const SizedBox.shrink(),
-    };
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
-  static final _primaryBtnStyle = ElevatedButton.styleFrom(
+  static final ButtonStyle _primaryBtnStyle = ElevatedButton.styleFrom(
     backgroundColor: AppColors.stormyTeal,
     foregroundColor: AppColors.white,
     padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
