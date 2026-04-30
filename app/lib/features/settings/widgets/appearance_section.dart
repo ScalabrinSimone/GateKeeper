@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/providers/locale_provider.dart';
-import '../../core/providers/theme_provider.dart';
-import '../../l10n/app_localizations.dart';
+import '../../../core/providers/locale_provider.dart';
+import '../../../core/providers/theme_provider.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Schermata delle impostazioni di aspetto (tema + lingua).
 ///
