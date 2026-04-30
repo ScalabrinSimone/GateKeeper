@@ -88,7 +88,7 @@ class _SetupScreenState extends State<SetupScreen> {
               children: [
                 // Header
                 const SizedBox(height: 40),
-                const Icon(
+                Icon(
                   Icons.shield_outlined,
                   color: AppColors.stormyTealBright,
                   size: 48,
