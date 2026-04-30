@@ -21,19 +21,25 @@ class DashboardQuickControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
     final localeProvider = context.watch<LocaleProvider>();
-    final l10n = AppLocalizations.of(context);
+    // AppLocalizations.of(context) può restituire null se i delegati non sono
+    // ancora inizializzati; qui usiamo "!" perché in MaterialApp.router
+    // abbiamo registrato AppLocalizations.delegate.
+    final l10n = AppLocalizations.of(context)!;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         // Toggle tema dark / light
         Tooltip(
-          message:
-              themeProvider.isDark ? l10n.themeDarkLabel : l10n.themeLightLabel,
+          message: themeProvider.isDark
+              ? l10n.themeDarkLabel
+              : l10n.themeLightLabel,
           child: IconButton(
             onPressed: () => context.read<ThemeProvider>().toggle(),
             icon: Icon(
-              themeProvider.isDark ? Icons.dark_mode_rounded : Icons.light_mode,
+              themeProvider.isDark
+                  ? Icons.dark_mode_rounded
+                  : Icons.light_mode,
             ),
           ),
         ),
@@ -45,7 +51,8 @@ class DashboardQuickControls extends StatelessWidget {
           child: TextButton(
             onPressed: () => context.read<LocaleProvider>().toggle(),
             style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
               ),
