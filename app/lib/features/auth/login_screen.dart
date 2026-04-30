@@ -66,7 +66,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       context.go('/dashboard');
-    } on ApiException catch (e) {
+    } on AuthException catch (e) {
+      // AuthException è definita in auth_service.dart e viene lanciata
+      // quando le credenziali sono errate o il gateway non risponde.
       setState(() => _errorMessage = e.message);
     } catch (e) {
       setState(() => _errorMessage = 'Unexpected error: $e');
@@ -113,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
-                      border: const BorderSide(color: AppColors.error),
+                      border: Border.all(color: AppColors.error),
                     ),
                     child: Row(
                       children: [
