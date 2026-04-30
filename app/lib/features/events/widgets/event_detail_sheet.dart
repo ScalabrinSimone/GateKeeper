@@ -129,7 +129,7 @@ class _EventDetailContent extends StatelessWidget {
               ),
 
               const SizedBox(height: 24),
-              Divider(height: 1, color: AppColors.border),
+              const Divider(height: 1, color: AppColors.border),
               const SizedBox(height: 20),
 
               // Dettagli
@@ -153,42 +153,41 @@ class _EventDetailContent extends StatelessWidget {
                 _ObjectsList(objects: event.objectNames),
 
               // Alert se l'evento ha generato una notifica
-              if (event.alertMessage != null) ...
-                [
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.warning.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.notifications_outlined,
-                            color: AppColors.warning,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              event.alertMessage!,
-                              style: const TextStyle(
-                                color: AppColors.warning,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
+              if (event.alertMessage != null) ...[
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.4),
                       ),
                     ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.notifications_outlined,
+                          color: AppColors.warning,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            event.alertMessage!,
+                            style: const TextStyle(
+                              color: AppColors.warning,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
+              ],
 
               // TODO: bottone Dismiss Alert
               // if (event.alertMessage != null)
