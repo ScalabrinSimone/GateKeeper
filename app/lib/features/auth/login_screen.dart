@@ -7,6 +7,7 @@ import '../../shared/widgets/gatekeeper_logo.dart';
 import '../../shared/widgets/gk_text_field.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../core/services/api_service.dart';
 
 /// Schermata di login completa per GateKeeper.
 ///
@@ -66,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       context.go('/dashboard');
-    } on AuthException catch (e) {
+    } on ApiException catch (e) {
       // AuthException è definita in auth_service.dart e viene lanciata
       // quando le credenziali sono errate o il gateway non risponde.
       setState(() => _errorMessage = e.message);
