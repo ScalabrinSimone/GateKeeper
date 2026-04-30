@@ -114,9 +114,11 @@ class _ProfileCard extends StatelessWidget {
           CircleAvatar(
             radius: 28,
             backgroundColor: AppColors.stormyTeal.withValues(alpha: 0.25),
-            child: const Text(
+            child: Text(
               'A',
               style: TextStyle(
+                // Non possiamo usare const qui perché stormyTealBright
+                // è un getter non-const.
                 color: AppColors.stormyTealBright,
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
