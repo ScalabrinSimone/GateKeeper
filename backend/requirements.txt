@@ -1,4 +1,7 @@
-# Requirements per raspberry
 
 fastapi
 uvicorn
+pydantic
+werkzeug
+pyserial
+bleak
