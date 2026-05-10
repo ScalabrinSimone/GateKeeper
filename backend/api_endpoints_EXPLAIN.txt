@@ -1,0 +1,203 @@
+
+DOCUMENTAZIONE API - DEVICE ACCESS API
+======================================
+
+Base URL
+---------
+Durante l'esecuzione locale il server risponde di norma su:
+http://127.0.0.1:8000
+
+Nota importante
+---------------
+All'avvio del server parte anche il lettore RFID in background.
+Il thread RFID non blocca le richieste API: il server continua a
+rispondere mentre il lettore legge i tag.
+
+ENDPOINT DISPONIBILI
+---------------------
+
+1) GET /
+   - Scopo: controllo rapido dello stato del server.
+   - Risposta: messaggio di benvenuto.
+
+2) USERS
+   a) POST /users
+      - Crea un utente.
+      - Campi principali:
+        * username (obbligatorio)
+        * password (obbligatorio)
+        * email (opzionale, se manca viene generata automaticamente)
+        * role: admin | adult | child
+        * uuid
+        * is_active
+        * last_seen_at
+        * current_location: inside | outside | unknown
+
+   b) GET /users
+      - Elenca tutti gli utenti.
+      - Filtri opzionali:
+        * role
+        * is_active
+        * current_location
+
+   c) GET /users/{user_id}
+      - Recupera un utente per id.
+
+   d) GET /users/by-username/{username}
+      - Recupera un utente per username.
+
+   e) PUT /users/{user_id}
+      - Aggiorna un utente esistente.
+      - Ogni campo è opzionale.
+
+   f) DELETE /users/{user_id}
+      - Elimina un utente.
+      - Le relazioni collegate vengono rimosse tramite cascade.
+
+3) DEVICES
+   a) POST /devices
+      - Crea un dispositivo.
+      - Campi principali:
+        * name (obbligatorio)
+        * rfid_tag (opzionale, se manca viene generato)
+        * category
+        * is_essential
+        * alert_rules
+        * current_status: inside | outside | unknown
+
+   b) GET /devices
+      - Elenca tutti i dispositivi.
+      - Filtri opzionali:
+        * category
+        * current_status
+        * is_essential
+
+   c) GET /devices/{device_id}
+      - Recupera un dispositivo per id.
+
+   d) GET /devices/by-rfid/{rfid_tag}
+      - Recupera un dispositivo tramite il tag RFID.
+
+   e) PUT /devices/{device_id}
+      - Aggiorna un dispositivo.
+
+   f) DELETE /devices/{device_id}
+      - Elimina un dispositivo.
+
+4) USER-DEVICES
+   a) POST /user-devices
+      - Crea un'associazione tra un utente e un dispositivo.
+      - Campi:
+        * user_id
+        * device_id
+
+   b) GET /user-devices
+      - Elenca le associazioni.
+      - Filtri opzionali:
+        * user_id
+        * device_id
+
+   c) GET /user-devices/{association_id}
+      - Recupera una singola associazione.
+
+   d) DELETE /user-devices/{association_id}
+      - Elimina l'associazione.
+
+5) LOGS
+   a) POST /logs
+      - Crea un log di ingresso/uscita.
+      - Campi:
+        * user_id
+        * device_id
+        * action: ENTRATO | USCITO
+
+   b) GET /logs
+      - Elenca i log.
+      - Filtri opzionali:
+        * user_id
+        * device_id
+        * action
+
+   c) GET /logs/{log_id}
+      - Recupera un log per id.
+
+   d) PUT /logs/{log_id}
+      - Aggiorna un log.
+
+   e) DELETE /logs/{log_id}
+      - Elimina un log.
+
+6) EVENTS
+   a) POST /events
+      - Crea un evento generico.
+      - Campi:
+        * user_id (opzionale)
+        * event_type: passage_in | passage_out | alert | system
+        * direction: in | out
+        * detected_objects
+        * detected_users
+
+   b) GET /events
+      - Elenca gli eventi.
+      - Filtri opzionali:
+        * user_id
+        * event_type
+
+   c) GET /events/{event_id}
+      - Recupera un evento per id.
+
+   d) PUT /events/{event_id}
+      - Aggiorna un evento.
+
+   e) DELETE /events/{event_id}
+      - Elimina un evento.
+
+ESEMPI RAPIDI
+-------------
+Creazione utente:
+POST /users
+{
+  "username": "mario",
+  "password": "secret",
+  "email": "mario@example.com"
+}
+
+Creazione dispositivo:
+POST /devices
+{
+  "name": "Sensor1",
+  "rfid_tag": "E2000017221101441890ABCD"
+}
+
+Associazione:
+POST /user-devices
+{
+  "user_id": 1,
+  "device_id": 1
+}
+
+Log:
+POST /logs
+{
+  "user_id": 1,
+  "device_id": 1,
+  "action": "ENTRATO"
+}
+
+Evento:
+POST /events
+{
+  "user_id": 1,
+  "event_type": "system",
+  "detected_objects": [{"source": "rfid_reader", "rfid_tag": "TAG123"}],
+  "detected_users": []
+}
+
+COME AVVIARE
+------------
+Il metodo consigliato è:
+python run_all.py
+
+Opzionalmente:
+python run_all.py --reset-db
+per rigenerare il database da zero.

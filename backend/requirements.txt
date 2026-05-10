@@ -1,5 +1,7 @@
+
 fastapi
-uvicorn[standard]
+uvicorn
+pydantic
 werkzeug
-bleak>=0.21.0
-pyserial>=3.5
+pyserial
+bleak
