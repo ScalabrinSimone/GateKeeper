@@ -1,3 +1,4 @@
+"""
 # ── Dipendenze backend GateKeeper ─────────────────────────────────────────────
 # Installa con: pip install -r requirements.txt
 # Consigliato: usare un virtualenv (python -m venv .venv && source .venv/bin/activate)
@@ -29,3 +30,27 @@ python-multipart==0.0.9
 # TODO: aggiungi asyncpg + databases se passi a PostgreSQL
 # asyncpg==0.29.0
 # databases[postgresql]==0.9.0
+"""
+# Runtime diretto del progetto
+fastapi==0.136.1
+uvicorn==0.46.0
+pydantic==2.13.4
+Werkzeug==3.1.8
+pyserial==3.5
+bleak==3.0.2
+
+# Dipendenze runtime usate dal codice o richieste dai pacchetti principali
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.13.0
+click==8.3.3
+h11==0.16.0
+idna==3.13
+pydantic-core==2.46.4
+typing-extensions==4.15.0
+typing-inspection==0.4.2
+starlette==1.0.0
+
+# Necessaria su Linux/Raspberry Pi per bleak
+# (installata automaticamente su molte piattaforme, ma qui la rendiamo esplicita)
+# dbus-fast>=1.83.0; sys_platform == "linux"        <-----------------------------------------------------------------------
