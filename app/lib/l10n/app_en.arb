@@ -1,0 +1,12 @@
+{
+  "@@locale": "en",
+  "appName": "GateKeeper",
+  "dashboardTitle": "Dashboard",
+  "settingsTitle": "Settings",
+
+  "settingsAppearanceTitle": "Appearance",
+  "settingsThemeLabel": "Theme",
+  "settingsThemeDark": "Dark",
+  "settingsThemeLight": "Light",
+  "settingsLanguageLabel": "Language"
+}

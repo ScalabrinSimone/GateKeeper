@@ -1,7 +1,31 @@
+# ── Dipendenze backend GateKeeper ─────────────────────────────────────────────
+# Installa con: pip install -r requirements.txt
+# Consigliato: usare un virtualenv (python -m venv .venv && source .venv/bin/activate)
 
-fastapi
-uvicorn
-pydantic
-werkzeug
-pyserial
-bleak
+# Framework web asincrono
+fastapi==0.111.0
+
+# Server ASGI (gira FastAPI)
+uvicorn[standard]==0.29.0
+
+# ORM per il database
+sqlalchemy==2.0.30
+
+# Validazione settings da env
+pydantic-settings==2.2.1
+
+# Hashing password (bcrypt sotto)
+passlib[bcrypt]==1.7.4
+
+# JWT (JSON Web Token) per autenticazione
+python-jose[cryptography]==3.3.0
+
+# Parsing form data (login OAuth2)
+python-multipart==0.0.9
+
+# TODO: aggiungi aiofiles se vuoi upload file
+# aiofiles==23.2.1
+
+# TODO: aggiungi asyncpg + databases se passi a PostgreSQL
+# asyncpg==0.29.0
+# databases[postgresql]==0.9.0
