@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Lettore RFID UHF seriale.
+"""Lettore RFID UHF seriale con output terminale pulito ed elegante.
 
 FEATURES:
 - Lettura RFID continua
@@ -12,29 +11,6 @@ FEATURES:
 - Modalità "solo tag unici"
 - Callback custom on_tag(tag)
 - Compatibile standalone/thread/API
-
-=========================================================
-CONFIGURAZIONE RAPIDA
-=========================================================
-
-RF_POWER
-    Potenza RFID:
-        "00" -> minima
-        "1B" -> MASSIMA
-
-SCAN_INTERVAL
-    Intervallo inventory in secondi.
-    Più basso = scansione più aggressiva.
-
-SERIAL_TIMEOUT
-    Timeout seriale.
-
-SHOW_ONLY_UNIQUE_TAGS
-    True  -> stampa solo nuovi tag
-    False -> stampa tutti i tag continuamente
-
-UNIQUE_TAG_RESET_SECONDS
-    Dopo quanti secondi un tag viene considerato "nuovo".
 """
 
 from __future__ import annotations
@@ -67,28 +43,14 @@ BAUD = 38400
 # ---------------------------------------------------------
 # POTENZA RFID
 # ---------------------------------------------------------
-#
-# Range:
-#   "00" -> minimo
-#   "1B" -> MASSIMO
-#
-# ---------------------------------------------------------
 
 RF_POWER = "1B"
 
 # ---------------------------------------------------------
 # VELOCITÀ SCANSIONE
 # ---------------------------------------------------------
-#
-# Più basso = scansione più veloce
-#
-# 0.02 = molto aggressivo
-# 0.05 = stabile
-# 0.10 = più leggero
-#
-# ---------------------------------------------------------
 
-SCAN_INTERVAL = 0.02
+SCAN_INTERVAL = 0.05
 
 # ---------------------------------------------------------
 # TIMEOUT SERIALE
@@ -99,24 +61,11 @@ SERIAL_TIMEOUT = 0.05
 # ---------------------------------------------------------
 # MOSTRA SOLO TAG UNICI
 # ---------------------------------------------------------
-#
-# True:
-#   mostra solo nuovi tag
-#
-# False:
-#   mostra tutto continuamente
-#
-# ---------------------------------------------------------
 
 SHOW_ONLY_UNIQUE_TAGS = False
 
 # ---------------------------------------------------------
 # RESET TAG UNICI
-# ---------------------------------------------------------
-#
-# Dopo quanti secondi
-# un tag viene considerato nuovo.
-#
 # ---------------------------------------------------------
 
 UNIQUE_TAG_RESET_SECONDS = 3.0
@@ -125,45 +74,61 @@ UNIQUE_TAG_RESET_SECONDS = 3.0
 # CACHE TAG
 # =========================================================
 
-seen_tags: dict[str, float] = {}
+seenTags: dict[str, float] = {}
+
+# =========================================================
+# UTILS LOGGING
+# =========================================================
+
+
+def getTimestamp() -> str:
+    return time.strftime("%H:%M:%S")
+
+
+def log(level: str, message: str) -> None:
+    print(f"[{getTimestamp()}] [RFID] {level:<7} {message}")
+
+
+def printSection(title: str) -> None:
+    line = "─" * max(8, len(title) + 2)
+
+    print()
+    print(f"┌{line}┐")
+    print(f"│ {title} │")
+    print(f"└{line}┘")
+
 
 # =========================================================
 # FUNZIONI SERIALI
 # =========================================================
 
 
-def send_cmd(
+def sendCommand(
     ser: serial.Serial,
     cmd: str,
     wait: float = 0.10
 ) -> str:
-    """
-    Invia comando al lettore RFID.
-    """
+    """Invia comando al lettore RFID."""
 
     payload = b"\n" + cmd.encode("ascii") + b"\r"
 
-    print(f"\nTX -> {cmd}")
+    log("TX", cmd)
 
     ser.write(payload)
     ser.flush()
 
     time.sleep(wait)
 
-    n = ser.in_waiting
-
-    data = ser.read(n if n else 1)
+    bytesWaiting = ser.in_waiting
+    data = ser.read(bytesWaiting if bytesWaiting else 1)
 
     try:
-        text = data.decode(
-            "ascii",
-            errors="ignore"
-        )
+        text = data.decode("ascii", errors="ignore")
     except Exception:
         text = str(data)
 
     if text:
-        print("RX ->", repr(text))
+        log("RX", repr(text))
 
     return text
 
@@ -173,10 +138,8 @@ def send_cmd(
 # =========================================================
 
 
-def parse_tag(line: str) -> Optional[str]:
-    """
-    Estrae EPC dalla risposta RFID.
-    """
+def parseTag(line: str) -> Optional[str]:
+    """Estrae EPC dalla risposta RFID."""
 
     line = line.strip()
 
@@ -191,32 +154,27 @@ def parse_tag(line: str) -> Optional[str]:
 # =========================================================
 
 
-def should_show_tag(tag: str) -> bool:
-    """
-    Decide se mostrare il tag.
-    """
+def shouldShowTag(tag: str) -> bool:
+    """Decide se mostrare il tag."""
 
     if not SHOW_ONLY_UNIQUE_TAGS:
         return True
 
     now = time.time()
 
-    # Pulizia cache vecchia
-    expired = []
+    expiredTags = []
 
-    for epc, timestamp in seen_tags.items():
+    for epc, timestamp in seenTags.items():
         if now - timestamp > UNIQUE_TAG_RESET_SECONDS:
-            expired.append(epc)
+            expiredTags.append(epc)
 
-    for epc in expired:
-        del seen_tags[epc]
+    for epc in expiredTags:
+        del seenTags[epc]
 
-    # Tag già visto
-    if tag in seen_tags:
+    if tag in seenTags:
         return False
 
-    # Nuovo tag
-    seen_tags[tag] = now
+    seenTags[tag] = now
 
     return True
 
@@ -226,33 +184,26 @@ def should_show_tag(tag: str) -> bool:
 # =========================================================
 
 
-def configure_reader(
+def configureReader(
     ser: serial.Serial
 ) -> None:
-    """
-    Configura il lettore RFID.
-    """
+    """Configura il lettore RFID."""
 
-    print("\n===================================")
-    print("CONFIGURAZIONE RFID")
-    print("===================================")
+    printSection("CONFIGURAZIONE RFID")
 
-    # Stop inventory
-    send_cmd(ser, "u")
+    sendCommand(ser, "u")
 
-    # Potenza RFID
-    print(f"\n>>> POTENZA RFID: {RF_POWER}")
+    log("INFO", f"Potenza RFID impostata a {RF_POWER}")
 
-    send_cmd(ser, f"N1,{RF_POWER}")
+    sendCommand(ser, f"N1,{RF_POWER}")
 
-    # Verifica potenza
-    print("\nVerifica potenza corrente:")
-    send_cmd(ser, "N0,00")
+    log("INFO", "Verifica potenza corrente")
 
-    # Salva configurazione
-    send_cmd(ser, "W")
+    sendCommand(ser, "N0,00")
 
-    print("\nConfigurazione completata.")
+    sendCommand(ser, "W")
+
+    log("OK", "Configurazione completata")
 
 
 # =========================================================
@@ -260,13 +211,11 @@ def configure_reader(
 # =========================================================
 
 
-def run_reader(
+def runReader(
     stop_event: Optional[threading.Event] = None,
     on_tag: Optional[Callable[[str], None]] = None,
 ) -> None:
-    """
-    Avvia il lettore RFID.
-    """
+    """Avvia il lettore RFID."""
 
     global PORT
 
@@ -275,81 +224,44 @@ def run_reader(
     if stop_event is None:
         stop_event = threading.Event()
 
-    print("\n===================================")
-    print("LETTORE RFID UHF")
-    print("===================================")
+    printSection("LETTORE RFID UHF")
 
-    print("Porta seriale:", PORT)
-    print("Baudrate:", BAUD)
-
-    print("\nCONFIG:")
-    print("RF_POWER =", RF_POWER)
-    print("SCAN_INTERVAL =", SCAN_INTERVAL)
-    print("SERIAL_TIMEOUT =", SERIAL_TIMEOUT)
-    print("SHOW_ONLY_UNIQUE_TAGS =", SHOW_ONLY_UNIQUE_TAGS)
-    print("UNIQUE_TAG_RESET_SECONDS =", UNIQUE_TAG_RESET_SECONDS)
+    log("INFO", f"Porta seriale: {PORT}")
+    log("INFO", f"Baudrate: {BAUD}")
+    log("INFO", f"RF_POWER: {RF_POWER}")
+    log("INFO", f"SCAN_INTERVAL: {SCAN_INTERVAL}")
+    log("INFO", f"SERIAL_TIMEOUT: {SERIAL_TIMEOUT}")
+    log("INFO", f"SHOW_ONLY_UNIQUE_TAGS: {SHOW_ONLY_UNIQUE_TAGS}")
+    log("INFO", f"UNIQUE_TAG_RESET_SECONDS: {UNIQUE_TAG_RESET_SECONDS}")
 
     try:
-
-        with serial.Serial(
-            PORT,
-            BAUD,
-            timeout=SERIAL_TIMEOUT
-        ) as ser:
-
-            # Pulizia buffer
+        with serial.Serial(PORT, BAUD, timeout=SERIAL_TIMEOUT) as ser:
             ser.reset_input_buffer()
             ser.reset_output_buffer()
 
-            # =============================================
-            # TEST COMUNICAZIONE
-            # =============================================
+            printSection("TEST COMUNICAZIONE")
 
-            print("\n===================================")
-            print("TEST COMUNICAZIONE")
-            print("===================================")
+            sendCommand(ser, "V")
+            sendCommand(ser, "S")
 
-            send_cmd(ser, "V")
-            send_cmd(ser, "S")
+            configureReader(ser)
 
-            # =============================================
-            # CONFIGURAZIONE RFID
-            # =============================================
+            printSection("SCANSIONE RFID ATTIVA")
 
-            configure_reader(ser)
-
-            # =============================================
-            # AVVIO SCANSIONE
-            # =============================================
-
-            print("\n===================================")
-            print("SCANSIONE RFID ATTIVA")
-            print("===================================")
-
-            print("Avvicina un tag RFID UHF...\n")
+            log("OK", "Avvicina un tag RFID UHF")
 
             buffer = ""
-
-            # Timer inventory
-            last_inventory = 0.0
-
-            # =============================================
-            # LOOP CONTINUO
-            # =============================================
+            lastInventory = 0.0
 
             while not stop_event.is_set():
-
                 now = time.time()
 
-                # Inventory periodica
-                if now - last_inventory >= SCAN_INTERVAL:
-
+                if now - lastInventory >= SCAN_INTERVAL:
                     ser.write(b"\nU\r")
                     ser.flush()
 
-                    last_inventory = now
+                    lastInventory = now
 
-                # Lettura seriale
                 data = ser.read(1024).decode(
                     "ascii",
                     errors="ignore"
@@ -358,130 +270,66 @@ def run_reader(
                 if data:
                     buffer += data
 
-                # =========================================
-                # PARSING LINEE
-                # =========================================
-
                 while "\n" in buffer or "\r" in buffer:
-
                     if "\n" in buffer:
-                        line, buffer = buffer.split(
-                            "\n",
-                            1
-                        )
+                        line, buffer = buffer.split("\n", 1)
                     else:
-                        line, buffer = buffer.split(
-                            "\r",
-                            1
-                        )
+                        line, buffer = buffer.split("\r", 1)
 
-                    tag = parse_tag(line)
+                    tag = parseTag(line)
 
                     if not tag:
                         continue
 
-                    # Filtro unici
-                    if not should_show_tag(tag):
+                    if not shouldShowTag(tag):
                         continue
 
-                    print("\n==============================")
-                    print("TAG RFID TROVATO")
-                    print("==============================")
-                    print("EPC:", tag)
+                    printSection("TAG RFID TROVATO")
 
-                    # Callback
+                    log("OK", f"EPC: {tag}")
+
                     if on_tag is not None:
-
                         try:
                             on_tag(tag)
 
                         except Exception as exc:
-
-                            print(
-                                "Errore callback RFID:",
-                                exc
+                            log(
+                                "ERROR",
+                                f"Errore callback RFID: {exc}"
                             )
 
     except serial.SerialException as exc:
-
-        print("\nErrore seriale RFID:")
-        print(exc)
+        log("ERROR", f"Errore seriale RFID: {exc}")
 
     except KeyboardInterrupt:
-
-        print("\nStop manuale lettore RFID.")
+        log("WARN", "Stop manuale lettore RFID")
 
     finally:
-
         try:
             if "ser" in locals():
-
-                # Stop inventory
                 ser.write(b"\nu\r")
                 ser.flush()
 
         except Exception:
             pass
 
-        print("\nLettore RFID fermato.")
+        log("INFO", "Lettore RFID fermato")
 
 
 # =========================================================
-# MAIN
+# AVVIO STANDALONE
 # =========================================================
 
 
 def main() -> None:
-    """
-    Avvio manuale terminale.
-    """
-
     parser = argparse.ArgumentParser(
-        description="RFID UHF Reader"
+        description="Lettore RFID UHF seriale"
     )
 
-    parser.add_argument(
-        "--run-seconds",
-        type=float,
-        default=None,
-        help="Durata esecuzione in secondi."
-    )
+    parser.parse_args()
 
-    args = parser.parse_args()
+    runReader()
 
-    stop_event = threading.Event()
-
-    # Modalità continua
-    if args.run_seconds is None:
-
-        run_reader(
-            stop_event=stop_event
-        )
-
-        return
-
-    # Modalità timeout
-    timer = threading.Timer(
-        args.run_seconds,
-        stop_event.set
-    )
-
-    timer.start()
-
-    try:
-
-        run_reader(
-            stop_event=stop_event
-        )
-
-    finally:
-
-        timer.cancel()
-
-
-# =========================================================
-# ENTRYPOINT
-# =========================================================
 
 if __name__ == "__main__":
     main()

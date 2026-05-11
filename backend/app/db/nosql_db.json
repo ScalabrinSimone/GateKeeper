@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "version": 1,
+    "next_ids": {
+      "users": 1,
+      "devices": 1,
+      "user_devices": 1,
+      "logs": 1,
+      "events": 1
+    }
+  },
+  "users": [],
+  "devices": [],
+  "user_devices": [],
+  "logs": [],
+  "events": []
+}

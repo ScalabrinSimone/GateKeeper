@@ -205,7 +205,7 @@ def _start_rfid_thread() -> None:
 
     _rfid_stop_event.clear()
     _rfid_thread = threading.Thread(
-        target=rfidreader.run_reader,
+        target=rfidreader.runReader,
         kwargs={"stop_event": _rfid_stop_event, "on_tag": _rfid_tag_callback},
         daemon=True,
         name="rfid-reader-thread",
