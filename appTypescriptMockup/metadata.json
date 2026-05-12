@@ -1,0 +1,6 @@
+{
+  "name": "GateKeeper",
+  "description": "Smart IoT home monitoring system for tracking people and objects via RFID and BLE.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

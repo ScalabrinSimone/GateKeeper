@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  /* Shared Base */
+  --color-stormy-teal: #00767A;
+  --color-orange-gold: #FFA400;
+  
+  /* Dark Mode Stack */
+  --color-dark-bg: #0D1117;
+  --color-dark-card: #161B22;
+  --color-dark-border: #41474E;
+  --color-dark-text: #F0E2E7;
+  
+  /* Light Mode Stack */
+  --color-light-bg: #F8F9FA;
+  --color-light-card: #FFFFFF;
+  --color-light-border: #E9ECEF;
+  --color-light-text: #1A1D23;
+  
+  /* Custom Spacing / Border Radius */
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-3xl: 2.5rem;
+}
+
+@layer base {
+  body {
+    @apply transition-colors duration-500 antialiased selection:bg-orange-gold selection:text-dark-bg;
+  }
+}
+
+@layer components {
+  .bento-card {
+    @apply border transition-all duration-300 rounded-[3rem];
+  }
+  
+  .dark .bento-card {
+    @apply bg-dark-card border-dark-border;
+  }
+  
+  .light .bento-card {
+    @apply bg-light-card border-light-border shadow-sm;
+  }
+
+  .glass-dark {
+    @apply backdrop-blur-xl border transition-all duration-300 rounded-[3rem];
+  }
+
+  .dark .glass-dark {
+    @apply bg-dark-bg/60 border-white/5;
+  }
+  
+  .light .glass-dark {
+    @apply bg-white/60 border-light-border shadow-lg;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-dark-bg;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-dark-border rounded-full hover:bg-stormy-teal transition-colors;
+}
+
+/* Glassmorphism utility */
+.glass {
+  @apply backdrop-blur-md border rounded-[3rem];
+}
+.dark .glass {
+  @apply bg-dark-card/40 border-dark-border/50;
+}
+.light .glass {
+  @apply bg-white/40 border-light-border/50 shadow-sm;
+}
