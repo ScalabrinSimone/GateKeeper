@@ -47,12 +47,14 @@ Keep code modular, but do not over-engineer. Use isolates or background/concurre
 
 ## UI and design rules
 
-The app is based on a Figma design, but there is also a newer mockup generated in Google AI Studio using React code (inside the `gatekeeper/appTypescriptMockup/` folder; this folder is reference material only). Both can be used together:
+The app is based on a Figma design (link to the design: https://www.figma.com/design/2Zrv2fRfSS4Q03uPzlnUbG/IoT?node-id=0-1&t=NYWGb2SOjEBMqXk6-1), but there is also a newer mockup generated in Google AI Studio using React code (inside the `gatekeeper/appTypescriptMockup/` folder; this folder is reference material only). Both can be used together:
 
 - use Figma as the primary design reference when structure and design details are clear,
-- use the newer Google AI Studio mockup to improve layout, spacing, hierarchy, polish, and modern UI decisions,
+- use the newer Google AI Studio mockup to improve layout, spacing, hierarchy, polish, and modern UI decisions (and If you think that this layout is better than the figma one, use this),
 - merge the **best aspects of both** based on UX/UI efficiency, modernity and design,
 - do not blindly copy either source if it would worsen usability or Flutter architecture.
+
+Remember that I want a modern app, with fluid animations and responisve (also with haptic feedbacks for mobile). It needs also to be performance.
 
 UI constraints that must be preserved:
 
