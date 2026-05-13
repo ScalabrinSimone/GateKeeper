@@ -1,0 +1,12 @@
+#Flutter.
+.dart_tool/
+.packages
+.pub/
+build/
+
+#IDE.
+.idea/
+*.iml
+
+#Generated.
+lib/generated/
