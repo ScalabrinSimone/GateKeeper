@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app.dart';
@@ -24,6 +26,3 @@ Future<void> main() async {
 
   runApp(GateKeeperApp(settings: settings, auth: auth));
 }
-
-//Piccolo helper per ignorare un Future senza linter warning.
-void unawaited(Future<void> future) {}
