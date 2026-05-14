@@ -1,4 +1,3 @@
-
 """API FastAPI del progetto.
 
 Questo modulo espone CRUD completi per:
@@ -17,14 +16,28 @@ from __future__ import annotations
 import threading
 from typing import Any, List, Optional, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Request, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.db import models
 from app.rfid import rfidreader
+from app.security import tokens as gk_tokens
+from app.security.mailer import send_mail
+from app.services import discovery as gk_discovery
 
 
 app = FastAPI(title="Device Access API", version="2.0.0")
+
+# CORS aperta: l'app Flutter (anche web/dev) deve poter chiamare l'API da localhost
+# e dalla LAN. In produzione domestica resta dietro tunnel; in dev è utile.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # --------------------------------------------------------------------------------------
@@ -597,3 +610,368 @@ def delete_event(event_id: int):
     if not models.delete_event(event_id):
         raise HTTPException(status_code=404, detail="Event not found")
     return {"deleted": True, "event_id": event_id}
+
+
+# ======================================================================================
+# AUTH / PAIRING / HUB / INVITES / RECOVERY
+# ======================================================================================
+class LoginRequest(BaseModel):
+    """Login: accetta username o email + password."""
+    identifier: str
+    password: str
+
+
+class RegisterAdminRequest(BaseModel):
+    """Creazione dell'admin durante il primo pairing."""
+    house_name: str
+    username: str
+    password: str
+    email: str
+    factory_code: Optional[str] = None
+
+
+class PairStatus(BaseModel):
+    paired: bool
+    house_name: Optional[str] = None
+    admin_user_id: Optional[int] = None
+    paired_at: Optional[str] = None
+    api_version: str = "2.0.0"
+
+
+class HubInfo(BaseModel):
+    paired: bool
+    house_name: Optional[str] = None
+    api_version: str = "2.0.0"
+    requires_factory_code: bool = False
+
+
+class TokenResponse(BaseModel):
+    token: str
+    user: UserOut
+
+
+class InviteCreate(BaseModel):
+    role: str = "adult"
+    suggested_name: Optional[str] = None
+    ttl_hours: int = 24 * 7
+
+
+class InviteOut(BaseModel):
+    id: int
+    token: str
+    role: str
+    suggested_name: Optional[str] = None
+    created_by: int
+    created_at: str
+    expires_at: str
+    consumed: bool
+
+
+class InviteAccept(BaseModel):
+    token: str
+    username: str
+    password: str
+    email: Optional[str] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class FactoryResetRequest(BaseModel):
+    confirm: bool = False
+
+
+def _get_current_user(authorization: Optional[str] = Header(default=None)) -> dict:
+    """Dependency: estrae l'utente corrente dal token Bearer."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="missing bearer token")
+    token = authorization.split(" ", 1)[1].strip()
+    payload = gk_tokens.decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="invalid or expired token")
+    user_id = int(payload.get("sub", 0))
+    user = models.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="user not found")
+    return user
+
+
+def _require_admin(user: dict = Depends(_get_current_user)) -> dict:
+    """Dependency: blocca chi non è admin."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="admin only")
+    return user
+
+
+# --------------------------------------------------------------------------------------
+# HUB / PAIRING (pubblici)
+# --------------------------------------------------------------------------------------
+@app.get("/hub/info", response_model=HubInfo)
+def hub_info():
+    """Info pubbliche dell'hub, usate dall'app per capire se va fatto pairing."""
+    state = models.get_hub()
+    return HubInfo(
+        paired=bool(state.get("paired")),
+        house_name=state.get("house_name"),
+        requires_factory_code=bool(state.get("factory_code")) and not state.get("paired"),
+    )
+
+
+@app.get("/hub/status", response_model=PairStatus)
+def hub_status():
+    """Stato dettagliato dell'hub (paired/admin/house_name/...)."""
+    state = models.get_hub()
+    return PairStatus(
+        paired=bool(state.get("paired")),
+        house_name=state.get("house_name"),
+        admin_user_id=state.get("admin_user_id"),
+        paired_at=state.get("paired_at"),
+    )
+
+
+@app.post("/hub/pair", response_model=TokenResponse)
+def hub_pair(req: RegisterAdminRequest):
+    """Primo pairing dell'hub: crea l'admin e marca l'hub come configurato.
+
+    Se è impostato un `factory_code` (dopo un reset di fabbrica), deve
+    coincidere con quello passato.
+    """
+    state = models.get_hub()
+    if state.get("paired"):
+        raise HTTPException(status_code=409, detail="hub already paired")
+
+    expected_code = state.get("factory_code")
+    if expected_code:
+        if not req.factory_code or req.factory_code.strip().upper() != str(expected_code).upper():
+            raise HTTPException(status_code=403, detail="invalid factory code")
+
+    if not req.house_name.strip():
+        raise HTTPException(status_code=400, detail="house_name required")
+
+    try:
+        user_id = models.create_user(
+            username=req.username,
+            password=req.password,
+            email=req.email,
+            role="admin",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    models.set_hub({
+        "paired": True,
+        "house_name": req.house_name.strip(),
+        "admin_user_id": user_id,
+        "paired_at": now_iso,
+        "factory_code": None,
+    })
+
+    user = models.get_user_by_id(user_id)
+    token = gk_tokens.encode_token({"sub": user_id, "role": "admin"})
+    return TokenResponse(token=token, user=user)
+
+
+@app.post("/hub/factory-reset")
+def hub_factory_reset(req: FactoryResetRequest, _admin: dict = Depends(_require_admin)):
+    """Reset di fabbrica: svuota i database e disaccoppia l'hub.
+
+    Va richiamato dall'admin via app. Sul Raspberry è possibile anche tramite
+    `scripts/factory_reset.py`.
+    """
+    if not req.confirm:
+        raise HTTPException(status_code=400, detail="confirm=true required")
+    gk_tokens.reset_secret()
+    new_state = models.factory_reset_all()
+    return {"reset": True, "factory_code": new_state.get("factory_code")}
+
+
+# --------------------------------------------------------------------------------------
+# AUTH
+# --------------------------------------------------------------------------------------
+@app.post("/auth/login", response_model=TokenResponse)
+def auth_login(req: LoginRequest):
+    """Login con username/email + password. Restituisce token + utente."""
+    state = models.get_hub()
+    if not state.get("paired"):
+        raise HTTPException(status_code=409, detail="hub not paired yet")
+
+    user = models.verify_user_password(req.identifier, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="invalid credentials")
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=403, detail="user disabled")
+
+    token = gk_tokens.encode_token({"sub": user["id"], "role": user.get("role")})
+    return TokenResponse(token=token, user=user)
+
+
+@app.get("/auth/me", response_model=UserOut)
+def auth_me(user: dict = Depends(_get_current_user)):
+    """Ritorna l'utente del token corrente."""
+    return user
+
+
+@app.post("/auth/logout")
+def auth_logout(_user: dict = Depends(_get_current_user)):
+    """Logout client-side: il token va eliminato lato app. Qui solo ack."""
+    return {"logout": True}
+
+
+# --------------------------------------------------------------------------------------
+# PASSWORD RECOVERY
+# --------------------------------------------------------------------------------------
+@app.post("/auth/forgot-password")
+def auth_forgot_password(req: ForgotPasswordRequest):
+    """Avvia recupero password: invia mail (o scrive su outbox.log se manca SMTP)."""
+    record = models.create_password_reset(req.email)
+    # Risposta sempre uguale per non rivelare se l'email esiste.
+    if record is not None:
+        try:
+            send_mail(
+                to=record["email"],
+                subject="GateKeeper · Recupero password",
+                body=(
+                    "Ciao,\n\n"
+                    "Hai chiesto di reimpostare la password di GateKeeper.\n"
+                    f"Codice di reset: {record['token']}\n"
+                    "Apri l'app, vai su 'Reimposta password' e incolla il codice.\n"
+                    "Se non sei stato tu, ignora questa email.\n"
+                ),
+            )
+        except Exception as exc:
+            print(f"[AUTH] forgot-password mail error: {exc}")
+    return {"sent": True}
+
+
+@app.post("/auth/reset-password")
+def auth_reset_password(req: ResetPasswordRequest):
+    """Consuma un token di reset e imposta la nuova password."""
+    try:
+        ok = models.consume_password_reset(req.token, req.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not ok:
+        raise HTTPException(status_code=400, detail="invalid or expired token")
+    return {"reset": True}
+
+
+# --------------------------------------------------------------------------------------
+# INVITES
+# --------------------------------------------------------------------------------------
+@app.post("/invites", response_model=InviteOut)
+def invite_create(req: InviteCreate, admin: dict = Depends(_require_admin)):
+    """Crea un invito (solo admin). Il token può essere condiviso come link."""
+    try:
+        record = models.create_invite(
+            created_by_user_id=admin["id"],
+            role=req.role,
+            suggested_name=req.suggested_name,
+            ttl_hours=req.ttl_hours,
+        )
+        return record
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/invites", response_model=List[InviteOut])
+def invite_list(active_only: bool = True, _admin: dict = Depends(_require_admin)):
+    """Elenca gli inviti (solo admin)."""
+    return models.list_invites(active_only=active_only)
+
+
+@app.get("/invites/by-token/{token}", response_model=InviteOut)
+def invite_get(token: str):
+    """Recupera info di un invito (pubblico, serve all'app per mostrare il form)."""
+    record = models.get_invite_by_token(token)
+    if not record:
+        raise HTTPException(status_code=404, detail="invite not found")
+    if record.get("consumed"):
+        raise HTTPException(status_code=410, detail="invite already used")
+    return record
+
+
+@app.post("/invites/accept", response_model=TokenResponse)
+def invite_accept(req: InviteAccept):
+    """Accetta un invito e crea il nuovo membro. Restituisce token utente."""
+    try:
+        user = models.consume_invite(
+            token=req.token,
+            username=req.username,
+            password=req.password,
+            email=req.email,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    token = gk_tokens.encode_token({"sub": user["id"], "role": user.get("role")})
+    return TokenResponse(token=token, user=user)
+
+
+@app.delete("/invites/{invite_id}")
+def invite_delete(invite_id: int, _admin: dict = Depends(_require_admin)):
+    """Revoca un invito non consumato (solo admin)."""
+    ok = models.revoke_invite(invite_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="invite not found")
+    return {"deleted": True}
+
+
+# --------------------------------------------------------------------------------------
+# HUB DISCOVERY THREAD (avvio insieme al server)
+# --------------------------------------------------------------------------------------
+_discovery_stop_event = threading.Event()
+_discovery_thread: Optional[threading.Thread] = None
+
+
+def _start_discovery_thread(api_port: int = 8000) -> None:
+    """Avvia il listener di discovery in background."""
+    global _discovery_thread
+    if _discovery_thread is not None and _discovery_thread.is_alive():
+        return
+    _discovery_stop_event.clear()
+
+    def _runner() -> None:
+        gk_discovery.run_discovery_listener(
+            api_port=api_port,
+            get_hub_info=lambda: models.get_hub(),
+            stop_event=_discovery_stop_event,
+        )
+
+    _discovery_thread = threading.Thread(
+        target=_runner,
+        daemon=True,
+        name="discovery-listener-thread",
+    )
+    _discovery_thread.start()
+    print("Thread discovery avviato.")
+
+
+def _stop_discovery_thread() -> None:
+    """Ferma il listener di discovery."""
+    global _discovery_thread
+    _discovery_stop_event.set()
+    if _discovery_thread is not None:
+        _discovery_thread.join(timeout=3)
+        _discovery_thread = None
+    print("Thread discovery fermato.")
+
+
+@app.on_event("startup")
+def on_startup_discovery() -> None:
+    """Avvia il discovery listener allo startup (porta API di default 8000)."""
+    import os
+    api_port = int(os.environ.get("GK_API_PORT", "8000"))
+    _start_discovery_thread(api_port=api_port)
+
+
+@app.on_event("shutdown")
+def on_shutdown_discovery() -> None:
+    _stop_discovery_thread()

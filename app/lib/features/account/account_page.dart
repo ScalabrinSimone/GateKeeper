@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/i18n/app_l10n.dart';
+import '../../core/state/auth_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
@@ -8,23 +10,56 @@ import '../../shared/widgets/section_header.dart';
 
 //Pagina profilo / account utente.
 class AccountPage extends StatelessWidget {
-  const AccountPage({super.key});
+  const AccountPage({super.key, required this.auth});
+
+  final AuthController auth;
+
+  Future<void> _logout(BuildContext context) async {
+    final l10n = AppL10n.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.t('logout')),
+        content: Text(l10n.t('logoutConfirm')),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.t('cancel'))),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.t('logout')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await auth.logout();
+    if (context.mounted) context.go('/welcome');
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
+    final user = auth.user;
+    final displayName = user?.username ?? 'Member';
+    final role = user?.role ?? 'adult';
+    final email = user?.email ?? '';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionHeader(title: l10n.t('account'), subtitle: l10n.t('profileRole')),
+          SectionHeader(title: l10n.t('account'), subtitle: role.toUpperCase()),
           LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= 900;
-              final avatar = _AvatarBlock(name: 'Marco Rossi', role: l10n.t('profileRole'), logoutLabel: l10n.t('logout'));
+              final avatar = _AvatarBlock(
+                name: displayName,
+                role: role.toUpperCase(),
+                logoutLabel: l10n.t('logout'),
+                onLogout: () => _logout(context),
+              );
               final info = Column(
                 children: [
                   _ProfileInfo(),
@@ -61,10 +96,21 @@ class AccountPage extends StatelessWidget {
 }
 
 class _AvatarBlock extends StatelessWidget {
-  const _AvatarBlock({required this.name, required this.role, required this.logoutLabel});
+  const _AvatarBlock({
+    required this.name,
+    required this.role,
+    required this.logoutLabel,
+    required this.onLogout,
+  });
   final String name;
   final String role;
   final String logoutLabel;
+  final VoidCallback onLogout;
+
+  String get _initial {
+    final t = name.trim();
+    return t.isEmpty ? '?' : t.substring(0, 1).toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,9 +135,9 @@ class _AvatarBlock extends StatelessWidget {
                 ],
               ),
               alignment: Alignment.center,
-              child: const Text(
-                'M',
-                style: TextStyle(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic),
+              child: Text(
+                _initial,
+                style: const TextStyle(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic),
               ),
             ),
             Positioned(
@@ -123,7 +169,7 @@ class _AvatarBlock extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: GKButton(
-            onPressed: () {},
+            onPressed: onLogout,
             icon: Icons.logout_rounded,
             label: logoutLabel,
             variant: GKButtonVariant.danger,

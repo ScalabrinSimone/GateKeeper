@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from .storage import (
     DB_LOCK,
@@ -904,3 +904,254 @@ def delete_event(event_id: int) -> bool:
             return False
         save_db(db)
         return True
+
+
+# --------------------------------------------------------------------------------------
+# AUTH HELPERS
+# --------------------------------------------------------------------------------------
+def verify_user_password(identifier: str, password: str) -> Optional[Dict[str, Any]]:
+    """Verifica username/email + password. Ritorna l'utente se ok, altrimenti None."""
+    from werkzeug.security import check_password_hash
+
+    if not identifier or not password:
+        return None
+
+    identifier_norm = identifier.strip().lower()
+    with DB_LOCK:
+        db = load_db()
+        for record in db["users"]:
+            if (
+                str(record.get("username", "")).lower() == identifier_norm
+                or str(record.get("email", "")).lower() == identifier_norm
+            ):
+                try:
+                    if check_password_hash(record.get("hash_psw", ""), password):
+                        return {
+                            "id": record.get("id"),
+                            "email": record.get("email"),
+                            "username": record.get("username"),
+                            "role": record.get("role"),
+                            "uuid": record.get("uuid"),
+                            "is_active": bool(record.get("is_active")),
+                            "last_seen_at": record.get("last_seen_at"),
+                            "current_location": record.get("current_location"),
+                            "created_at": record.get("created_at"),
+                        }
+                except Exception:
+                    return None
+                return None
+    return None
+
+
+# --------------------------------------------------------------------------------------
+# INVITES (link per invitare un nuovo membro)
+# --------------------------------------------------------------------------------------
+def create_invite(
+    created_by_user_id: int,
+    role: str = "adult",
+    suggested_name: Optional[str] = None,
+    ttl_hours: int = 24 * 7,
+) -> Dict[str, Any]:
+    """Genera un invito monouso a tempo. Restituisce l'invito con il token."""
+    from secrets import token_urlsafe
+    from datetime import timedelta
+
+    role = _validate_choice(role, ("admin", "adult", "child"), "role", default="adult")
+    _ensure_user_exists(created_by_user_id)
+
+    token = token_urlsafe(16)
+    expires = datetime.now(timezone.utc) + timedelta(hours=max(1, int(ttl_hours)))
+
+    with DB_LOCK:
+        db = load_db()
+        invite_id = next_id(db, "invites")
+        record = {
+            "id": invite_id,
+            "token": token,
+            "role": role,
+            "suggested_name": suggested_name,
+            "created_by": created_by_user_id,
+            "created_at": _now_iso(),
+            "expires_at": expires.replace(microsecond=0).isoformat(),
+            "consumed": False,
+            "consumed_by": None,
+            "consumed_at": None,
+        }
+        db["invites"].append(record)
+        save_db(db)
+        return record
+
+
+def list_invites(active_only: bool = True) -> List[Dict[str, Any]]:
+    """Elenca gli inviti generati. Se active_only, esclude i consumati/scaduti."""
+    now = datetime.now(timezone.utc)
+    with DB_LOCK:
+        db = load_db()
+        out: List[Dict[str, Any]] = []
+        for record in db.get("invites", []):
+            if active_only:
+                if record.get("consumed"):
+                    continue
+                try:
+                    if datetime.fromisoformat(record["expires_at"]) < now:
+                        continue
+                except Exception:
+                    continue
+            out.append(dict(record))
+        return sorted(out, key=lambda item: item["id"], reverse=True)
+
+
+def get_invite_by_token(token: str) -> Optional[Dict[str, Any]]:
+    """Recupera un invito tramite token. Non lo consuma."""
+    with DB_LOCK:
+        db = load_db()
+        for record in db.get("invites", []):
+            if record.get("token") == token:
+                return dict(record)
+    return None
+
+
+def consume_invite(
+    token: str,
+    username: str,
+    password: str,
+    email: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Consuma un invito: crea il nuovo utente con il ruolo previsto."""
+    if not username or not password:
+        raise ValueError("username e password sono obbligatori")
+
+    with DB_LOCK:
+        db = load_db()
+        invite_record = None
+        for record in db.get("invites", []):
+            if record.get("token") == token:
+                invite_record = record
+                break
+
+        if invite_record is None:
+            raise ValueError("invito non trovato")
+        if invite_record.get("consumed"):
+            raise ValueError("invito già consumato")
+        try:
+            expires = datetime.fromisoformat(invite_record["expires_at"])
+        except Exception:
+            raise ValueError("invito non valido")
+        if expires < datetime.now(timezone.utc):
+            raise ValueError("invito scaduto")
+
+        role = invite_record.get("role", "adult")
+
+    # Creazione utente (usa il lock internamente).
+    user_id = create_user(
+        username=username,
+        password=password,
+        email=email,
+        role=role,
+    )
+
+    with DB_LOCK:
+        db = load_db()
+        for record in db.get("invites", []):
+            if record.get("token") == token:
+                record["consumed"] = True
+                record["consumed_by"] = user_id
+                record["consumed_at"] = _now_iso()
+                break
+        save_db(db)
+        user = get_user_by_id(user_id)
+        return user or {"id": user_id}
+
+
+def revoke_invite(invite_id: int) -> bool:
+    """Cancella un invito non ancora consumato."""
+    with DB_LOCK:
+        db = load_db()
+        return delete_by_id(db.get("invites", []), invite_id) and (save_db(db) or True)
+
+
+# --------------------------------------------------------------------------------------
+# PASSWORD RESET
+# --------------------------------------------------------------------------------------
+def create_password_reset(email: str, ttl_minutes: int = 30) -> Optional[Dict[str, Any]]:
+    """Crea un token di reset password. Restituisce None se l'email non esiste."""
+    from secrets import token_urlsafe
+    from datetime import timedelta
+
+    user = get_user_by_email(email)
+    if not user:
+        return None
+
+    token = token_urlsafe(20)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=max(5, int(ttl_minutes)))
+
+    with DB_LOCK:
+        db = load_db()
+        reset_id = next_id(db, "password_resets")
+        record = {
+            "id": reset_id,
+            "user_id": user["id"],
+            "email": user["email"],
+            "token": token,
+            "created_at": _now_iso(),
+            "expires_at": expires.replace(microsecond=0).isoformat(),
+            "used": False,
+        }
+        db["password_resets"].append(record)
+        save_db(db)
+        return record
+
+
+def consume_password_reset(token: str, new_password: str) -> bool:
+    """Usa un token di reset per impostare una nuova password."""
+    if not new_password or len(new_password) < 6:
+        raise ValueError("password troppo corta (min. 6 caratteri)")
+
+    with DB_LOCK:
+        db = load_db()
+        target = None
+        for record in db.get("password_resets", []):
+            if record.get("token") == token:
+                target = record
+                break
+        if target is None:
+            return False
+        if target.get("used"):
+            return False
+        try:
+            expires = datetime.fromisoformat(target["expires_at"])
+        except Exception:
+            return False
+        if expires < datetime.now(timezone.utc):
+            return False
+
+        user_id = int(target["user_id"])
+        target["used"] = True
+        target["used_at"] = _now_iso()
+        save_db(db)
+
+    # Aggiornamento password fuori dal blocco precedente per riusare update_user.
+    return update_user(user_id, password=new_password)
+
+
+# --------------------------------------------------------------------------------------
+# HUB STATE (singleton meta)
+# --------------------------------------------------------------------------------------
+def get_hub() -> Dict[str, Any]:
+    """Stato dell'hub (paired/admin/house_name/factory_code)."""
+    from .storage import get_hub_state
+    return get_hub_state()
+
+
+def set_hub(updates: Dict[str, Any]) -> Dict[str, Any]:
+    """Aggiorna lo stato dell'hub."""
+    from .storage import set_hub_state
+    return set_hub_state(updates)
+
+
+def factory_reset_all() -> Dict[str, Any]:
+    """Svuota tutto e rigenera un factory code per il prossimo pairing."""
+    from secrets import token_hex
+    from .storage import factory_reset as storage_reset
+    new_code = token_hex(3).upper()  # es. "9F2A1C"
+    return storage_reset(factory_code=new_code)

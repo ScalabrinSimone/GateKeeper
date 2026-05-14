@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/repositories/repositories.dart';
 import '../../shared/data/mock_data.dart';
 import '../../shared/models/enums.dart';
 import '../../shared/models/gate_event.dart';
@@ -15,6 +16,7 @@ enum _RangeFilter { day, week, month }
 enum _SeverityFilter { all, critical, info }
 
 //Pagina cronologia eventi con filtri (giorno/settimana/mese e severità).
+//Carica dal backend; in caso di errore usa i mock locali.
 class EventsPage extends StatefulWidget {
   const EventsPage({super.key});
 
@@ -26,10 +28,36 @@ class _EventsPageState extends State<EventsPage> {
   String _search = '';
   _RangeFilter _range = _RangeFilter.day;
   _SeverityFilter _severity = _SeverityFilter.all;
+  List<GateEvent> _events = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final remote = await EventsRepository.list();
+      if (!mounted) return;
+      setState(() {
+        _events = remote;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _events = MockData.events;
+        _loading = false;
+      });
+    }
+  }
 
   List<GateEvent> _filtered(String langCode) {
     final now = DateTime.now();
-    return MockData.events.where((e) {
+    return _events.where((e) {
       final matchSearch = e.descriptionFor(langCode).toLowerCase().contains(_search.toLowerCase());
       final matchSeverity = _severity == _SeverityFilter.all
           || (_severity == _SeverityFilter.critical && e.severity == EventSeverity.critical)
@@ -57,7 +85,15 @@ class _EventsPageState extends State<EventsPage> {
     final theme = Theme.of(context);
     final events = _filtered(l10n.languageCode);
 
-    return SingleChildScrollView(
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.stormyTeal));
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: AppColors.stormyTeal,
+      child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,6 +167,7 @@ class _EventsPageState extends State<EventsPage> {
           ),
         ],
       ),
+    ),
     );
   }
 }

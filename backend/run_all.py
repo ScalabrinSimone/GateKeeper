@@ -137,7 +137,24 @@ def main() -> None:
         help="Reset database all'avvio"
     )
 
+    parser.add_argument(
+        "--factory-reset",
+        action="store_true",
+        help="Esegue un factory reset (svuota DB e rigenera factory_code)"
+    )
+
+    parser.add_argument(
+        "--seed-test",
+        action="store_true",
+        help="Popola un account di test (utente: test / password: test1234)"
+    )
+
     args = parser.parse_args()
+
+    # Esponiamo la porta API come variabile d'ambiente per altri thread
+    # (es. discovery listener che la include nella sua risposta).
+    import os
+    os.environ["GK_API_PORT"] = str(args.port)
 
     printSection("AVVIO PROGETTO")
 
@@ -162,6 +179,26 @@ def main() -> None:
         "OK",
         "Database inizializzato"
     )
+
+    if args.factory_reset:
+        from app.db import models as gk_models
+        from app.security import tokens as gk_tokens
+
+        gk_tokens.reset_secret()
+        new_state = gk_models.factory_reset_all()
+        log("INFO", f"Factory reset eseguito. Codice: {new_state.get('factory_code')}")
+
+    if args.seed_test:
+        # Esegue lo script di seed via subprocess per non sporcare lo stato qui.
+        import runpy
+        from pathlib import Path
+
+        seed_path = Path(__file__).resolve().parent / "seed_test_user.py"
+        if seed_path.exists():
+            log("INFO", "Eseguo seed account di test")
+            runpy.run_path(str(seed_path), run_name="__main__")
+        else:
+            log("WARN", f"Script di seed non trovato: {seed_path}")
 
     startBleThread()
 

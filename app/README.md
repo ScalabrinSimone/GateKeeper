@@ -141,24 +141,146 @@ I dati di esempio in `shared/data/mock_data.dart` simulano una famiglia di
 4 membri, 5 oggetti smart e una manciata di eventi (alcuni risolti, alcuni
 critici).
 
-## 8. Integrazione backend (TODO prossimo step)
+## 8. Integrazione backend
 
-L'app è progettata per essere agganciata al backend FastAPI senza riscritture:
+L'app è collegata al backend FastAPI tramite un layer dedicato in
+`lib/data/`. Le pagine non chiamano mai HTTP direttamente: passano sempre
+da repository / API client.
 
-- creare un layer `lib/data/api/` con un client HTTP (es. `dio`/`http`),
-- aggiungere `lib/data/repositories/` con `UserRepository`,
-  `DeviceRepository`, `EventRepository`,
-- sostituire ogni accesso a `MockData` con il repository,
-- introdurre (se serve) un piccolo store/cache (es. `riverpod`,
-  oppure `ValueNotifier` per restare minimal).
+### 8.1 Layer dati
 
-Endpoint noti (dal backend del progetto):
+```
+lib/data/
+  api/
+    api_client.dart          // HTTP client con bearer token e timeout
+    api_exception.dart       // errore tipato (statusCode, isUnauthorized, ...)
+    dto.dart                 // DTO 1:1 col backend
+    auth_api.dart            // /auth/login, /auth/me, /auth/forgot-password, ...
+    hub_api.dart             // /hub/info, /hub/pair, /hub/factory-reset
+    users_api.dart           // /users CRUD
+    devices_api.dart         // /devices CRUD
+    events_api.dart          // /events
+    logs_api.dart            // /logs
+    invites_api.dart         // /invites e accept
+  gatekeeper_api.dart        // facade singleton con tutti gli endpoint
+  services/
+    discovery_service.dart   // UDP broadcast per trovare il Pi in LAN
+  repositories/
+    repositories.dart        // DTO -> modelli di dominio (AppUser, ...)
+```
 
-- `/` server status,
-- `/users`, `/devices`, `/user-devices`, `/logs`, `/events` con CRUD.
+### 8.2 Configurazione URL
 
-L'onboarding e il pairing con il Raspberry Pi (BLE/Cloudflare Tunnel)
-verranno aggiunti in un secondo step (vedi TODO sotto).
+`core/config/api_config.dart` mantiene la base URL persistita. All'avvio:
+
+1. `ApiConfig.load()` legge l'ultima base URL salvata,
+2. l'utente può cambiarla manualmente o, meglio, scoprirla via
+   `DiscoveryService.discover()` durante il pairing.
+
+### 8.3 Sessione e auth
+
+`core/state/auth_controller.dart` (`AuthController`) è il `ChangeNotifier`
+che governa la sessione:
+
+| Stage             | UI mostrata                          |
+|-------------------|--------------------------------------|
+| `loading`         | Splash (mentre verifica token/hub)   |
+| `offline`         | `pair_choice_page` (welcome)         |
+| `needsPairing`    | `pair_choice_page` (welcome)         |
+| `needsLogin`      | `login_page`                         |
+| `authenticated`   | shell + pagine principali            |
+
+Il token è salvato in `flutter_secure_storage` (su web fallback a
+`shared_preferences`).
+
+### 8.4 Endpoint usati
+
+Tutti quelli base (`/users`, `/devices`, `/events`, `/logs`) **più**
+quelli aggiunti al backend per supportare il flusso completo:
+
+- `GET /hub/info` — stato pairing pubblico,
+- `POST /hub/pair` — primo pairing con admin + factory code,
+- `POST /hub/factory-reset` — reset di fabbrica (solo admin),
+- `POST /auth/login` / `GET /auth/me` / `POST /auth/logout`,
+- `POST /auth/forgot-password` / `POST /auth/reset-password`,
+- `POST /invites` / `GET /invites` / `GET /invites/by-token/{t}` /
+  `POST /invites/accept` / `DELETE /invites/{id}`.
+
+## 9. Onboarding e pairing del Raspberry
+
+Il flusso di primo avvio è disegnato come un prodotto consumer.
+
+1. **Welcome** (`/welcome`, `PairChoicePage`): l'utente sceglie
+   _Accedi_ (hub già configurato) o _Configura Raspberry_.
+   Su **web** l'opzione di pairing è disabilitata (`PlatformInfo.canPairDevice`).
+2. **Discovery** (`/onboarding/discover`, `DiscoveryPage`):
+   `DiscoveryService` invia un broadcast UDP `GATEKEEPER_DISCOVER?` sulla
+   porta 51820 e raccoglie le risposte. Ogni hub trovato è mostrato come
+   tile: tappando si salva la base URL e si passa allo step successivo.
+   È sempre disponibile una connessione manuale tramite URL.
+3. **Setup wizard** (`/onboarding/setup`, `SetupWizardPage`):
+   - Step 0: introduzione (cosa fa GateKeeper, in 3 punti),
+   - Step 1: creazione admin (`/hub/pair` con factory_code se richiesto),
+   - Step 2: scelta tag essenziali (chiavi/portafoglio/ecc.),
+     create con `POST /devices`,
+   - Step 3: generazione inviti (`POST /invites`) per i membri,
+     condivisibili tramite copia/incolla,
+   - Step 4: conferma e ingresso in app.
+
+### 9.1 Reset/disaccoppiamento
+
+Esistono due modi per disaccoppiare l'hub:
+
+- **Dall'app, solo admin**: Impostazioni → _Factory reset_.
+  Chiama `POST /hub/factory-reset` con `confirm=true`, che cancella tutto
+  il database e rigenera un `factory_code` (mostrato in console / dal device
+  fisico). L'app viene riportata su `/welcome`.
+- **Direttamente sul Raspberry**: lo script
+  `backend/scripts/factory_reset.py` esegue la stessa operazione localmente
+  e stampa il nuovo `factory_code`.
+
+## 10. Inviti, recupero password, notifiche
+
+- **Inviti**: il link di un invito può essere condiviso come token testuale.
+  Il destinatario apre l'app, tocca _Ho un codice di invito_, incolla il
+  token e crea il proprio account. Il ruolo viene ereditato dall'invito.
+  È supportato anche il deep link `/invite/:token`.
+- **Recupero password**: schermata `/recover`. L'utente inserisce la mail,
+  riceve un codice via SMTP (se configurato) o via file `outbox.log` (se
+  no), poi imposta una nuova password.
+- **Notifiche locali**: `NotificationsController` inizializza
+  `flutter_local_notifications` (Android/iOS/macOS/Linux/Windows). Sul web
+  resta inerte. Permette di mostrare avvisi anche con app aperta in
+  background. Per il push "vero" (server → device con app chiusa) si
+  potrà collegare FCM/APNs in un secondo step.
+
+## 11. Multipiattaforma
+
+L'app gira su Windows, macOS, Linux, Android, iOS, Web. Restrizioni:
+
+- **Pairing**: solo PC o smartphone (richiede UDP). Sul web è disponibile
+  solo il login.
+- **Notifiche di sistema con app chiusa**: solo mobile.
+- **Storage sicuro del token**: nativo via `flutter_secure_storage`, su
+  web fallback a `shared_preferences`.
+
+## 12. Account di test
+
+In sviluppo, è disponibile un seed per saltare il pairing:
+
+```powershell
+cd backend
+python run_all.py --seed-test
+```
+
+Lo script crea automaticamente:
+
+- admin di test: `test` / `test1234` (email `test@local.test`),
+- casa "Casa Demo", dispositivi e log demo,
+- un invito attivo (token stampato in console).
+
+Una volta partito il backend, in app basta scegliere _Accedi_ e usare
+queste credenziali.
 
 ## 9. Setup e avvio
 
@@ -195,17 +317,17 @@ Il primo avvio web genera anche le risorse in `web/` (già committate).
 - `ChangeNotifier` + `addListener` è il pattern più leggero per uno stato
   globale "tipo Provider", senza dipendere da librerie esterne.
 
-## 12. TODO noti
+## 13. TODO noti
 
-- Integrazione reale col backend FastAPI (sostituire `MockData`).
-- Onboarding/pairing Raspberry Pi (BLE + Cloudflare Tunnel/Zero Trust).
-- Notifiche push (FCM/APNs) con piano e schermata gestione canali.
-- Auth con JWT, gestione sessione e refresh token.
-- Generare `app_localizations.dart` da `.arb` (quando lo si vuole integrare
-  con strumenti di traduzione esterni); ora `AppL10n` runtime è sufficiente.
-- Test widget e unitari per ogni feature.
+- Refresh token e revoca server-side dei token (oggi il token è solo verificato
+  via HMAC + TTL).
+- Push remoto vero (FCM/APNs) per notifiche con app chiusa.
+- Sostituire del tutto `MockData` quando il backend è raggiungibile
+  (attualmente è usato come fallback se l'API non risponde).
+- Cloudflare Tunnel/Zero Trust per l'accesso remoto al Raspberry.
+- Test widget per il wizard di onboarding.
 
-## 13. Convenzioni commenti
+## 14. Convenzioni commenti
 
 Tutti i commenti seguono la regola del progetto: iniziano con `//` senza
 spazio, terminano con un punto, sono in italiano. Esempi:

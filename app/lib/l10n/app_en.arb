@@ -84,5 +84,16 @@
   "joined": "Joined",
   "email": "Email",
   "navHistoryShort": "Log",
-  "alertsHint": "Important alerts from the system."
+  "alertsHint": "Important alerts from the system.",
+  "welcomeTitle": "Welcome to GateKeeper",
+  "welcomeSubtitle": "Sign in to an existing home or set up a new Raspberry hub.",
+  "signInAction": "Sign in",
+  "pairAction": "Start setup",
+  "haveInvite": "I have an invite code",
+  "discoverTitle": "Find your hub",
+  "noHubFound": "No hub found. Make sure the Raspberry is on and on the same Wi-Fi network.",
+  "factoryResetTitle": "Factory reset",
+  "factoryResetConfirm": "Are you sure? Users, devices, logs and events will be erased.",
+  "openApp": "Open app",
+  "joinHome": "Join the home"
 }

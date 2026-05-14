@@ -264,4 +264,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get alertsHint => 'Important alerts from the system.';
+
+  @override
+  String get welcomeTitle => 'Welcome to GateKeeper';
+
+  @override
+  String get welcomeSubtitle =>
+      'Sign in to an existing home or set up a new Raspberry hub.';
+
+  @override
+  String get signInAction => 'Sign in';
+
+  @override
+  String get pairAction => 'Start setup';
+
+  @override
+  String get haveInvite => 'I have an invite code';
+
+  @override
+  String get discoverTitle => 'Find your hub';
+
+  @override
+  String get noHubFound =>
+      'No hub found. Make sure the Raspberry is on and on the same Wi-Fi network.';
+
+  @override
+  String get factoryResetTitle => 'Factory reset';
+
+  @override
+  String get factoryResetConfirm =>
+      'Are you sure? Users, devices, logs and events will be erased.';
+
+  @override
+  String get openApp => 'Open app';
+
+  @override
+  String get joinHome => 'Join the home';
 }

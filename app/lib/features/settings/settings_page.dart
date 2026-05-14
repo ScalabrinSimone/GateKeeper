@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/config/api_config.dart';
 import '../../core/i18n/app_l10n.dart';
+import '../../core/state/auth_controller.dart';
 import '../../core/state/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/api/api_exception.dart';
+import '../../data/api/dto.dart';
+import '../../data/gatekeeper_api.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
 import '../../shared/widgets/section_header.dart';
 
-//Vista impostazioni con 4 sezioni: preferenze, connettività, notifiche, sistema.
+//Vista impostazioni con sezioni: preferenze, connettività, notifiche, account, sistema.
+//Le azioni reali (logout, factory reset, generazione inviti) sono cablate
+//all'AuthController e all'API.
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required this.settings});
+  const SettingsPage({super.key, required this.settings, required this.auth});
 
   final SettingsController settings;
+  final AuthController auth;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -19,11 +29,163 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool _pushOn = true;
+  bool _resetting = false;
+
+  Future<void> _doLogout(AppL10n l10n) async {
+    final ok = await _confirm(
+      title: l10n.t('logout'),
+      body: l10n.t('logoutConfirm'),
+      confirmLabel: l10n.t('logout'),
+      danger: true,
+    );
+    if (!ok) return;
+    await widget.auth.logout();
+    if (!mounted) return;
+    context.go('/welcome');
+  }
+
+  Future<void> _doFactoryReset(AppL10n l10n) async {
+    if (!widget.auth.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('factoryResetAdminOnly'))),
+      );
+      return;
+    }
+    final ok = await _confirm(
+      title: l10n.t('factoryResetTitle'),
+      body: l10n.t('factoryResetConfirm'),
+      confirmLabel: l10n.t('factoryResetTitle'),
+      danger: true,
+    );
+    if (!ok) return;
+
+    setState(() => _resetting = true);
+    try {
+      await widget.auth.factoryReset();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('factoryResetDone'))),
+      );
+      context.go('/welcome');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _resetting = false);
+    }
+  }
+
+  Future<void> _generateInvite(AppL10n l10n) async {
+    final role = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n.t('generateInvite'),
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 14),
+              for (final r in ['admin', 'adult', 'child'])
+                ListTile(
+                  leading: Icon(_roleIcon(r), color: AppColors.stormyTeal),
+                  title: Text(r.toUpperCase()),
+                  onTap: () => Navigator.of(ctx).pop(r),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (role == null) return;
+
+    try {
+      final inv = await GateKeeperApi.instance.invites.create(role: role);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.t('generateInvite')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${l10n.t('role')}: ${inv.role.toUpperCase()}'),
+              const SizedBox(height: 8),
+              SelectableText(inv.token, style: const TextStyle(fontFamily: 'monospace')),
+            ],
+          ),
+          actions: [
+            TextButton.icon(
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              label: Text(l10n.t('copyCode')),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: inv.token));
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.t('copiedToClipboard'))),
+                  );
+                }
+              },
+            ),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.t('close'))),
+          ],
+        ),
+      );
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  IconData _roleIcon(String role) {
+    switch (role) {
+      case 'admin':
+        return Icons.shield_rounded;
+      case 'child':
+        return Icons.child_care_rounded;
+      default:
+        return Icons.person_rounded;
+    }
+  }
+
+  Future<bool> _confirm({
+    required String title,
+    required String body,
+    required String confirmLabel,
+    bool danger = false,
+  }) async {
+    final l10n = AppL10n.of(context);
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.t('cancel'))),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: danger ? AppColors.danger : AppColors.stormyTeal,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return res ?? false;
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final settings = widget.settings;
+    final hub = widget.auth.hubInfo;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
@@ -67,16 +229,15 @@ class _SettingsPageState extends State<SettingsPage> {
             title: l10n.t('connectivity'),
             children: [
               _Tile(
-                icon: Icons.bluetooth_rounded,
-                title: l10n.t('raspberryPairing'),
-                subtitle: 'BLE • OK',
-                trailing: GKButton(onPressed: () {}, label: l10n.t('pair'), variant: GKButtonVariant.ghost, dense: true),
-              ),
-              _Tile(
-                icon: Icons.wifi_rounded,
-                title: l10n.t('wifiHome'),
-                subtitle: 'Home_Fastweb_Gate',
-                trailing: GKButton(onPressed: () {}, label: l10n.t('edit'), variant: GKButtonVariant.ghost, dense: true),
+                icon: Icons.router_rounded,
+                title: l10n.t('currentHub'),
+                subtitle: '${hub?.houseName ?? l10n.t('houseLabel')} • ${ApiConfig.baseUrl}',
+                trailing: GKButton(
+                  onPressed: () => context.go('/onboarding/discover'),
+                  label: l10n.t('changeHub'),
+                  variant: GKButtonVariant.ghost,
+                  dense: true,
+                ),
               ),
             ],
           ),
@@ -93,29 +254,51 @@ class _SettingsPageState extends State<SettingsPage> {
                   onChanged: (v) => setState(() => _pushOn = v),
                 ),
               ),
-              _Tile(
-                icon: Icons.volume_up_rounded,
-                title: l10n.t('audioHub'),
-                subtitle: l10n.t('doorBeeper'),
-                trailing: GKButton(onPressed: () {}, label: l10n.t('test'), variant: GKButtonVariant.ghost, dense: true),
-              ),
             ],
           ),
+          if (widget.auth.isAdmin)
+            _Section(
+              title: l10n.t('invites'),
+              children: [
+                _Tile(
+                  icon: Icons.person_add_alt_rounded,
+                  title: l10n.t('inviteMember'),
+                  subtitle: l10n.t('manageInvites'),
+                  trailing: GKButton(
+                    onPressed: () => _generateInvite(l10n),
+                    label: l10n.t('generateInvite'),
+                    variant: GKButtonVariant.secondary,
+                    dense: true,
+                  ),
+                ),
+              ],
+            ),
           _Section(
-            title: l10n.t('system'),
+            title: l10n.t('account'),
             children: [
               _Tile(
-                icon: Icons.storage_rounded,
-                title: l10n.t('databaseBackup'),
-                subtitle: l10n.t('lastBackup'),
-                trailing: GKButton(onPressed: () {}, label: l10n.t('sync'), variant: GKButtonVariant.ghost, dense: true),
+                icon: Icons.logout_rounded,
+                title: l10n.t('logoutTitle'),
+                subtitle: l10n.t('logoutSubtitle'),
+                trailing: GKButton(
+                  onPressed: () => _doLogout(l10n),
+                  label: l10n.t('logout'),
+                  variant: GKButtonVariant.ghost,
+                  dense: true,
+                ),
               ),
-              _Tile(
-                icon: Icons.memory_rounded,
-                title: l10n.t('firmware'),
-                subtitle: 'v1.4.2',
-                trailing: GKButton(onPressed: () {}, label: l10n.t('update'), variant: GKButtonVariant.ghost, dense: true),
-              ),
+              if (widget.auth.isAdmin)
+                _Tile(
+                  icon: Icons.delete_forever_rounded,
+                  title: l10n.t('factoryResetTitle'),
+                  subtitle: l10n.t('factoryResetSubtitle'),
+                  trailing: GKButton(
+                    onPressed: _resetting ? null : () => _doFactoryReset(l10n),
+                    label: l10n.t('factoryResetTitle'),
+                    variant: GKButtonVariant.danger,
+                    dense: true,
+                  ),
+                ),
             ],
           ),
         ],

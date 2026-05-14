@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/repositories/repositories.dart';
 import '../../shared/data/mock_data.dart';
 import '../../shared/models/smart_object.dart';
 import '../../shared/widgets/gk_button.dart';
@@ -10,50 +11,91 @@ import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
 
 //Vista oggetti smart con griglia card.
-class ObjectsPage extends StatelessWidget {
+//Carica dal backend con fallback a mock.
+class ObjectsPage extends StatefulWidget {
   const ObjectsPage({super.key});
+
+  @override
+  State<ObjectsPage> createState() => _ObjectsPageState();
+}
+
+class _ObjectsPageState extends State<ObjectsPage> {
+  List<SmartObject> _objects = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final remote = await DevicesRepository.list();
+      if (!mounted) return;
+      setState(() {
+        _objects = remote;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _objects = MockData.objects;
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    final objects = MockData.objects;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeader(
-            title: l10n.t('objects'),
-            subtitle: l10n.t('monitorObjects'),
-            actions: [
-              GKButton(
-                onPressed: () {},
-                label: l10n.t('addTag'),
-                icon: Icons.add_rounded,
-                variant: GKButtonVariant.secondary,
-              ),
-            ],
-          ),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final w = constraints.maxWidth;
-              final cols = w >= 1100 ? 3 : (w >= 700 ? 2 : 1);
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: cols,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  mainAxisExtent: 220,
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.stormyTeal));
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: AppColors.stormyTeal,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(
+              title: l10n.t('objects'),
+              subtitle: l10n.t('monitorObjects'),
+              actions: [
+                GKButton(
+                  onPressed: () {},
+                  label: l10n.t('addTag'),
+                  icon: Icons.add_rounded,
+                  variant: GKButtonVariant.secondary,
                 ),
-                itemCount: objects.length,
-                itemBuilder: (context, i) => _ObjectCard(object: objects[i]),
-              );
-            },
-          ),
-        ],
+              ],
+            ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final cols = w >= 1100 ? 3 : (w >= 700 ? 2 : 1);
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: cols,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    mainAxisExtent: 220,
+                  ),
+                  itemCount: _objects.length,
+                  itemBuilder: (context, i) => _ObjectCard(object: _objects[i]),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

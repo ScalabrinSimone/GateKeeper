@@ -1,17 +1,171 @@
 {
   "meta": {
-    "version": 1,
+    "version": 2,
     "next_ids": {
-      "users": 1,
-      "devices": 1,
-      "user_devices": 1,
-      "logs": 1,
-      "events": 1
+      "users": 4,
+      "devices": 4,
+      "user_devices": 4,
+      "logs": 3,
+      "events": 3,
+      "invites": 3,
+      "password_resets": 1
+    },
+    "hub": {
+      "paired": true,
+      "house_name": "Casa Demo",
+      "admin_user_id": 1,
+      "paired_at": "2026-05-14T06:57:09+00:00",
+      "factory_code": null
     }
   },
-  "users": [],
-  "devices": [],
-  "user_devices": [],
-  "logs": [],
-  "events": []
+  "users": [
+    {
+      "id": 1,
+      "email": "test@local.test",
+      "hash_psw": "scrypt:32768:8:1$7VNps54idWkKRecM$7a3e277918a824bae21d6ea3a1dfad16276cf14acabbc95770c2469765d5f05b00352ae49f4f143fb0cde57b43fb1f2825a1fd5ffdd12c77b266ce4942eba80a",
+      "username": "test",
+      "role": "admin",
+      "uuid": "92f68361-745c-4d00-a7ef-014ce4ef5b31",
+      "is_active": true,
+      "last_seen_at": null,
+      "current_location": "unknown",
+      "created_at": "2026-05-14T06:57:09+00:00"
+    },
+    {
+      "id": 2,
+      "email": "elena@demo.test",
+      "hash_psw": "scrypt:32768:8:1$KeyMZSAL25fg8stw$417659ef7da65d36b27524e126389abca09c3bd9ecff36a6f7a325ce370efa13b6ec9a5c97b00a87226748e9477197dac455ca8294394d4dc69d5489ffd53ff5",
+      "username": "elena",
+      "role": "adult",
+      "uuid": "6c225634-9bb6-48bc-bce8-7a1b2b07df59",
+      "is_active": true,
+      "last_seen_at": null,
+      "current_location": "unknown",
+      "created_at": "2026-05-14T06:57:10+00:00"
+    },
+    {
+      "id": 3,
+      "email": "luca@demo.test",
+      "hash_psw": "scrypt:32768:8:1$73QJtj448cT1q0mY$5ddd2e0c574e36d8b2425c572f97f72b4b41d42cec02dc8d01985c943acd5c2cd6a2e8b46c3eb53989b20c7f040f0815d9ea8d8ae58d29fd8994b76bd09405e5",
+      "username": "luca",
+      "role": "child",
+      "uuid": "e0af91e9-9416-4a83-ad9c-30140bdf167f",
+      "is_active": true,
+      "last_seen_at": null,
+      "current_location": "unknown",
+      "created_at": "2026-05-14T06:57:10+00:00"
+    }
+  ],
+  "devices": [
+    {
+      "id": 1,
+      "name": "Chiavi Auto",
+      "rfid_tag": "RFID-TEST-001",
+      "category": "keys",
+      "is_essential": true,
+      "alert_rules": "{}",
+      "current_status": "inside",
+      "created_at": "2026-05-14T06:57:10+00:00"
+    },
+    {
+      "id": 2,
+      "name": "Ombrello Rosso",
+      "rfid_tag": "RFID-TEST-002",
+      "category": "umbrella",
+      "is_essential": false,
+      "alert_rules": "{}",
+      "current_status": "inside",
+      "created_at": "2026-05-14T06:57:10+00:00"
+    },
+    {
+      "id": 3,
+      "name": "Zaino Scuola",
+      "rfid_tag": "RFID-TEST-003",
+      "category": "bag",
+      "is_essential": true,
+      "alert_rules": "{}",
+      "current_status": "inside",
+      "created_at": "2026-05-14T06:57:10+00:00"
+    }
+  ],
+  "user_devices": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "device_id": 1
+    },
+    {
+      "id": 2,
+      "user_id": 3,
+      "device_id": 3
+    },
+    {
+      "id": 3,
+      "user_id": 2,
+      "device_id": 2
+    }
+  ],
+  "logs": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "device_id": 1,
+      "action": "ENTRATO",
+      "created_at": "2026-05-14T06:57:10+00:00"
+    },
+    {
+      "id": 2,
+      "user_id": 3,
+      "device_id": 3,
+      "action": "USCITO",
+      "created_at": "2026-05-14T06:57:10+00:00"
+    }
+  ],
+  "events": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "event_type": "passage_in",
+      "direction": "in",
+      "detected_objects": "[{\"rfid_tag\": \"RFID-TEST-001\"}]",
+      "detected_users": "[{\"user_id\": 1, \"username\": \"test\"}]",
+      "created_at": "2026-05-14T06:57:10+00:00"
+    },
+    {
+      "id": 2,
+      "user_id": 3,
+      "event_type": "passage_out",
+      "direction": "out",
+      "detected_objects": "[{\"rfid_tag\": \"RFID-TEST-003\"}]",
+      "detected_users": "[{\"user_id\": 3, \"username\": \"luca\"}]",
+      "created_at": "2026-05-14T06:57:10+00:00"
+    }
+  ],
+  "invites": [
+    {
+      "id": 1,
+      "token": "6O55_jJha8gCOmVpqzFLiw",
+      "role": "adult",
+      "suggested_name": "Membro Demo",
+      "created_by": 1,
+      "created_at": "2026-05-14T06:57:10+00:00",
+      "expires_at": "2026-06-13T06:57:10+00:00",
+      "consumed": false,
+      "consumed_by": null,
+      "consumed_at": null
+    },
+    {
+      "id": 2,
+      "token": "HEcogdG9b7iRGSItF61ibg",
+      "role": "adult",
+      "suggested_name": null,
+      "created_by": 1,
+      "created_at": "2026-05-14T06:57:38+00:00",
+      "expires_at": "2026-05-21T06:57:38+00:00",
+      "consumed": false,
+      "consumed_by": null,
+      "consumed_at": null
+    }
+  ],
+  "password_resets": []
 }

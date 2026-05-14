@@ -607,6 +607,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Important alerts from the system.'**
   String get alertsHint;
+
+  /// No description provided for @welcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to GateKeeper'**
+  String get welcomeTitle;
+
+  /// No description provided for @welcomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to an existing home or set up a new Raspberry hub.'**
+  String get welcomeSubtitle;
+
+  /// No description provided for @signInAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signInAction;
+
+  /// No description provided for @pairAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Start setup'**
+  String get pairAction;
+
+  /// No description provided for @haveInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'I have an invite code'**
+  String get haveInvite;
+
+  /// No description provided for @discoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find your hub'**
+  String get discoverTitle;
+
+  /// No description provided for @noHubFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No hub found. Make sure the Raspberry is on and on the same Wi-Fi network.'**
+  String get noHubFound;
+
+  /// No description provided for @factoryResetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Factory reset'**
+  String get factoryResetTitle;
+
+  /// No description provided for @factoryResetConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure? Users, devices, logs and events will be erased.'**
+  String get factoryResetConfirm;
+
+  /// No description provided for @openApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Open app'**
+  String get openApp;
+
+  /// No description provided for @joinHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Join the home'**
+  String get joinHome;
 }
 
 class _AppLocalizationsDelegate

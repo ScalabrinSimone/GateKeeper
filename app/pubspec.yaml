@@ -15,6 +15,16 @@ dependencies:
   flutter_svg: ^2.0.16
   intl: ^0.20.2
   shared_preferences: ^2.3.2
+  # HTTP client con interceptor, timeout e gestione errori coerente.
+  http: ^1.2.2
+  # Storage sicuro multipiattaforma per il token di sessione.
+  flutter_secure_storage: ^9.2.2
+  # Apertura URL (es. mailto) e gestione deep link semplice.
+  url_launcher: ^6.3.0
+  # Notifiche locali multipiattaforma (Android/iOS/macOS/Windows/Linux).
+  flutter_local_notifications: ^17.2.3
+  # UUID utile per id locali (es. session id, idempotency).
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:

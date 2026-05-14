@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/repositories/repositories.dart';
 import '../../shared/data/mock_data.dart';
 import '../../shared/models/app_user.dart';
 import '../../shared/models/enums.dart';
@@ -12,54 +13,100 @@ import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
 
 //Vista membri del nucleo familiare.
-class MembersPage extends StatelessWidget {
+//Carica i dati dal backend; in caso di errore mostra i mock come fallback,
+//così la UI resta utilizzabile offline e in fase di sviluppo.
+class MembersPage extends StatefulWidget {
   const MembersPage({super.key});
+
+  @override
+  State<MembersPage> createState() => _MembersPageState();
+}
+
+class _MembersPageState extends State<MembersPage> {
+  late Future<List<AppUser>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<List<AppUser>> _load() async {
+    try {
+      return await UsersRepository.list();
+    } catch (_) {
+      return MockData.users;
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _future = _load());
+    await _future;
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    final users = MockData.users;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeader(
-            title: l10n.t('members'),
-            subtitle: l10n.t('manageFamily'),
-            actions: [
-              GKButton(
-                onPressed: () {},
-                label: l10n.t('inviteMember'),
-                icon: Icons.person_add_alt_rounded,
-                variant: GKButtonVariant.secondary,
-              ),
-            ],
-          ),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final cols = constraints.maxWidth >= 1100 ? 3 : (constraints.maxWidth >= 700 ? 2 : 1);
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: cols,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  mainAxisExtent: 260,
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      color: AppColors.stormyTeal,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(
+              title: l10n.t('members'),
+              subtitle: l10n.t('manageFamily'),
+              actions: [
+                GKButton(
+                  onPressed: () {},
+                  label: l10n.t('inviteMember'),
+                  icon: Icons.person_add_alt_rounded,
+                  variant: GKButtonVariant.secondary,
                 ),
-                itemCount: users.length + 1,
-                itemBuilder: (context, i) {
-                  if (i == users.length) {
-                    return _InviteCard(label: l10n.t('inviteMember'));
-                  }
-                  return _MemberCard(user: users[i]);
-                },
-              );
-            },
-          ),
-        ],
+              ],
+            ),
+            FutureBuilder<List<AppUser>>(
+              future: _future,
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 80),
+                    child: Center(child: CircularProgressIndicator(color: AppColors.stormyTeal)),
+                  );
+                }
+                final users = snap.data ?? const <AppUser>[];
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cols = constraints.maxWidth >= 1100
+                        ? 3
+                        : (constraints.maxWidth >= 700 ? 2 : 1);
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: cols,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        mainAxisExtent: 260,
+                      ),
+                      itemCount: users.length + 1,
+                      itemBuilder: (context, i) {
+                        if (i == users.length) {
+                          return _InviteCard(label: l10n.t('inviteMember'));
+                        }
+                        return _MemberCard(user: users[i]);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

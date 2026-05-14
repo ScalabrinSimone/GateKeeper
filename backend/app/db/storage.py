@@ -37,7 +37,15 @@ from pathlib import Path
 from typing import Any, Dict, Iterable
 
 DB_PATH = Path(__file__).resolve().with_name("nosql_db.json")
-TABLES = ("users", "devices", "user_devices", "logs", "events")
+TABLES = (
+    "users",
+    "devices",
+    "user_devices",
+    "logs",
+    "events",
+    "invites",
+    "password_resets",
+)
 
 DB_LOCK = threading.RLock()
 
@@ -46,8 +54,16 @@ def _empty_db() -> Dict[str, Any]:
     """Crea una struttura DB vuota con contatori ID iniziali."""
     return {
         "meta": {
-            "version": 1,
+            "version": 2,
             "next_ids": {table: 1 for table in TABLES},
+            # Stato dell'hub: singolo record (non è una tabella).
+            "hub": {
+                "paired": False,
+                "house_name": None,
+                "admin_user_id": None,
+                "paired_at": None,
+                "factory_code": None,
+            },
         },
         **{table: [] for table in TABLES},
     }
@@ -98,6 +114,15 @@ def _normalize_db(raw: Any) -> Dict[str, Any]:
                 except Exception:
                     value = 1
                 normalized["meta"]["next_ids"][table] = max(1, value)
+        # Hub singleton: viene letto se presente, altrimenti resta il default.
+        hub = meta.get("hub", {})
+        if isinstance(hub, dict):
+            current = normalized["meta"]["hub"]
+            current["paired"] = bool(hub.get("paired", current["paired"]))
+            current["house_name"] = hub.get("house_name", current["house_name"])
+            current["admin_user_id"] = hub.get("admin_user_id", current["admin_user_id"])
+            current["paired_at"] = hub.get("paired_at", current["paired_at"])
+            current["factory_code"] = hub.get("factory_code", current["factory_code"])
 
     for table in TABLES:
         records = raw.get(table, [])
@@ -240,3 +265,39 @@ def filter_records(records: Iterable[Dict[str, Any]], **criteria: Any) -> list[D
         if ok:
             result.append(dict(record))
     return result
+
+
+# ----------------------------------------------------------------------
+# HUB SINGLETON
+# ----------------------------------------------------------------------
+def get_hub_state(path: Path = DB_PATH) -> Dict[str, Any]:
+    """Ritorna lo stato corrente dell'hub (paired/admin/house_name/...)."""
+    with DB_LOCK:
+        db = load_db(path)
+        return dict(db["meta"].get("hub", {}))
+
+
+def set_hub_state(updates: Dict[str, Any], path: Path = DB_PATH) -> Dict[str, Any]:
+    """Aggiorna lo stato dell'hub (merge superficiale)."""
+    with DB_LOCK:
+        db = load_db(path)
+        hub = dict(db["meta"].get("hub", {}))
+        for k, v in updates.items():
+            hub[k] = v
+        db["meta"]["hub"] = hub
+        save_db(db, path)
+        return hub
+
+
+def factory_reset(path: Path = DB_PATH, *, factory_code: str | None = None) -> Dict[str, Any]:
+    """Svuota completamente il database e marca l'hub come non accoppiato.
+
+    Conserva (o rigenera) un `factory_code` da mostrare sull'hub fisico
+    per consentire un nuovo pairing.
+    """
+    with DB_LOCK:
+        fresh = _empty_db()
+        if factory_code:
+            fresh["meta"]["hub"]["factory_code"] = factory_code
+        _atomic_write(path, fresh)
+        return fresh["meta"]["hub"]

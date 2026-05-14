@@ -84,5 +84,16 @@
   "joined": "Membro dal",
   "email": "Email",
   "navHistoryShort": "Log",
-  "alertsHint": "Avvisi importanti dal sistema."
+  "alertsHint": "Avvisi importanti dal sistema.",
+  "welcomeTitle": "Benvenuto in GateKeeper",
+  "welcomeSubtitle": "Inizia accedendo a una casa esistente o configurando un nuovo hub Raspberry.",
+  "signInAction": "Accedi",
+  "pairAction": "Avvia configurazione",
+  "haveInvite": "Ho un codice di invito",
+  "discoverTitle": "Cerca il tuo hub",
+  "noHubFound": "Nessun hub trovato. Assicurati che il Raspberry sia acceso e nella stessa rete WiFi.",
+  "factoryResetTitle": "Reset di fabbrica",
+  "factoryResetConfirm": "Sei sicuro? Verranno cancellati utenti, dispositivi, log ed eventi.",
+  "openApp": "Entra in app",
+  "joinHome": "Unisciti alla casa"
 }

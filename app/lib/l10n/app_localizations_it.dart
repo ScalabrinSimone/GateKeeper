@@ -266,4 +266,40 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get alertsHint => 'Avvisi importanti dal sistema.';
+
+  @override
+  String get welcomeTitle => 'Benvenuto in GateKeeper';
+
+  @override
+  String get welcomeSubtitle =>
+      'Inizia accedendo a una casa esistente o configurando un nuovo hub Raspberry.';
+
+  @override
+  String get signInAction => 'Accedi';
+
+  @override
+  String get pairAction => 'Avvia configurazione';
+
+  @override
+  String get haveInvite => 'Ho un codice di invito';
+
+  @override
+  String get discoverTitle => 'Cerca il tuo hub';
+
+  @override
+  String get noHubFound =>
+      'Nessun hub trovato. Assicurati che il Raspberry sia acceso e nella stessa rete WiFi.';
+
+  @override
+  String get factoryResetTitle => 'Reset di fabbrica';
+
+  @override
+  String get factoryResetConfirm =>
+      'Sei sicuro? Verranno cancellati utenti, dispositivi, log ed eventi.';
+
+  @override
+  String get openApp => 'Entra in app';
+
+  @override
+  String get joinHome => 'Unisciti alla casa';
 }

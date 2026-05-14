@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/i18n/app_l10n.dart';
+import '../../core/state/auth_controller.dart';
 import '../../core/state/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import 'gk_logo.dart';
@@ -21,11 +22,13 @@ class AppShell extends StatelessWidget {
   const AppShell({
     required this.navigationShell,
     required this.settings,
+    required this.auth,
     super.key,
   });
 
   final StatefulNavigationShell navigationShell;
   final SettingsController settings;
+  final AuthController auth;
 
   static const List<_NavItem> _items = [
     _NavItem(labelKey: 'dashboard', icon: Icons.home_rounded, path: '/dashboard'),
@@ -58,6 +61,7 @@ class AppShell extends StatelessWidget {
                 onTap: (i) => _goBranch(context, i),
                 onAccount: () => context.go('/account'),
                 settings: settings,
+                auth: auth,
               ),
             Expanded(
               child: Column(
@@ -93,6 +97,7 @@ class _Sidebar extends StatelessWidget {
     required this.onTap,
     required this.onAccount,
     required this.settings,
+    required this.auth,
   });
 
   final List<_NavItem> items;
@@ -100,6 +105,7 @@ class _Sidebar extends StatelessWidget {
   final ValueChanged<int> onTap;
   final VoidCallback onAccount;
   final SettingsController settings;
+  final AuthController auth;
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +161,7 @@ class _Sidebar extends StatelessWidget {
             highlight: true,
           ),
           const SizedBox(height: 6),
-          _AccountTile(onTap: onAccount, settings: settings),
+          _AccountTile(onTap: onAccount, settings: settings, auth: auth),
         ],
       ),
     );
@@ -247,15 +253,23 @@ class _SidebarItemState extends State<_SidebarItem> {
 }
 
 class _AccountTile extends StatelessWidget {
-  const _AccountTile({required this.onTap, required this.settings});
+  const _AccountTile({required this.onTap, required this.settings, required this.auth});
 
   final VoidCallback onTap;
   final SettingsController settings;
+  final AuthController auth;
+
+  String _initial(String? name) {
+    final t = (name ?? '').trim();
+    return t.isEmpty ? '?' : t.substring(0, 1).toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final l10n = AppL10n.of(context);
+    final user = auth.user;
+    final name = user?.username ?? 'Guest';
+    final subtitle = user?.role.toUpperCase() ?? AppL10n.of(context).t('account');
 
     return Material(
       color: Colors.transparent,
@@ -284,9 +298,9 @@ class _AccountTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
-                child: const Text(
-                  'M',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic),
+                child: Text(
+                  _initial(name),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic),
                 ),
               ),
               const SizedBox(width: 10),
@@ -296,12 +310,12 @@ class _AccountTile extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Marco Rossi',
+                      name,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     Text(
-                      l10n.t('account'),
+                      subtitle,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
