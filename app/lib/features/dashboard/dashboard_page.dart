@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/config/api_config.dart';
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/api/dto.dart';
 import '../../data/repositories/repositories.dart';
 import '../../shared/models/app_user.dart';
 import '../../shared/models/gate_event.dart';
@@ -13,6 +15,7 @@ import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
+import '../objects/widgets/object_form_sheet.dart';
 
 //Pagina Dashboard: vista bento con stato, salute hub, membri, oggetti, eventi live.
 //Carica tutto dal backend in parallelo; gli errori non bloccano la UI ma
@@ -55,6 +58,32 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  bool get _canManageDevices {
+    final u = AuthController.instance.user;
+    if (u == null) return false;
+    if (u.role == 'admin') return true;
+    return u.permissions[GKPermissions.canManageDevices] == true;
+  }
+
+  Future<void> _openCreateObject(BuildContext context) async {
+    final l10n = AppL10n.of(context);
+    final res = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => const ObjectFormSheet(),
+    );
+    if (res != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('objectCreated'))),
+      );
+      await _load();
+    }
+  }
+
   void _resolve(GateEvent event) {
     //Resolve è locale (UI-only) per ora: la persistenza nel backend
     //richiederebbe un endpoint dedicato events/{id}/resolve. La marcatura
@@ -95,15 +124,18 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               SectionHeader(
                 title: l10n.t('dashboard'),
-                subtitle: '${l10n.t('address')} • ${l10n.t('systemSmooth')}',
+                subtitle: AuthController.instance.hubInfo?.houseName != null
+                    ? '${AuthController.instance.hubInfo!.houseName} • ${l10n.t('systemSmooth')}'
+                    : l10n.t('systemSmooth'),
                 actions: [
                   _StatusBadge(isSecure: isSecure),
-                  GKButton(
-                    onPressed: () {},
-                    label: l10n.t('addTag'),
-                    icon: Icons.add_rounded,
-                    variant: GKButtonVariant.secondary,
-                  ),
+                  if (_canManageDevices)
+                    GKButton(
+                      onPressed: () => _openCreateObject(context),
+                      label: l10n.t('addObject'),
+                      icon: Icons.add_rounded,
+                      variant: GKButtonVariant.secondary,
+                    ),
                 ],
               ),
               //Grid bento principale.
@@ -653,7 +685,7 @@ class _LiveEventsCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: GKButton(
-              onPressed: () {},
+              onPressed: () => context.go('/events'),
               label: l10n.t('fullHistory'),
               variant: GKButtonVariant.outline,
               dense: true,

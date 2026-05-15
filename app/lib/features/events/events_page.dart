@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/api/api_exception.dart';
 import '../../data/repositories/repositories.dart';
-import '../../shared/data/mock_data.dart';
 import '../../shared/models/enums.dart';
 import '../../shared/models/gate_event.dart';
 import '../../shared/widgets/gk_button.dart';
@@ -37,8 +38,13 @@ class _EventsPageState extends State<EventsPage> {
     _load();
   }
 
+  String? _error;
+
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final remote = await EventsRepository.list();
       if (!mounted) return;
@@ -46,13 +52,49 @@ class _EventsPageState extends State<EventsPage> {
         _events = remote;
         _loading = false;
       });
-    } catch (_) {
+    } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _events = MockData.events;
+        _events = const [];
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _events = const [];
+        _error = e.toString();
         _loading = false;
       });
     }
+  }
+
+  //Export rapido in clipboard (CSV-like). Niente file I/O qui per essere
+  //compatibili con web/desktop senza permessi extra.
+  Future<void> _exportEvents(AppL10n l10n, List<GateEvent> events) async {
+    if (events.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('noEvents'))),
+      );
+      return;
+    }
+    final buf = StringBuffer('timestamp;type;severity;description\n');
+    for (final e in events) {
+      buf
+        ..write(e.timestamp.toIso8601String())
+        ..write(';')
+        ..write(e.type.name)
+        ..write(';')
+        ..write(e.severity.name)
+        ..write(';')
+        ..write(e.descriptionFor(l10n.languageCode).replaceAll(';', ','))
+        ..write('\n');
+    }
+    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.t('exportCopied'))),
+    );
   }
 
   List<GateEvent> _filtered(String langCode) {
@@ -104,13 +146,37 @@ class _EventsPageState extends State<EventsPage> {
             actions: [
               _RangeChips(value: _range, onChanged: (v) => setState(() => _range = v)),
               GKButton(
-                onPressed: () {},
+                onPressed: () => _exportEvents(l10n, events),
                 label: l10n.t('exportLabel'),
                 icon: Icons.download_rounded,
                 variant: GKButtonVariant.secondary,
               ),
             ],
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            GKCard(
+              borderRadius: 20,
+              padding: const EdgeInsets.all(14),
+              borderColor: AppColors.danger.withValues(alpha: 0.3),
+              background: AppColors.danger.withValues(alpha: 0.04),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: AppColors.danger),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(_error!)),
+                  GKButton(
+                    onPressed: _load,
+                    label: l10n.t('tryAgain'),
+                    icon: Icons.refresh_rounded,
+                    variant: GKButtonVariant.ghost,
+                    dense: true,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           //Riga filtri search + severity.
           Row(
             children: [

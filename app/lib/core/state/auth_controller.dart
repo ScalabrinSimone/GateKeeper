@@ -184,6 +184,25 @@ class AuthController extends ChangeNotifier {
     await bootstrap();
   }
 
+  //"Esci dalla casa": rimuove la configurazione hub di questo dispositivo
+  //(base URL + token + cache utente) ma NON tocca i dati lato Raspberry.
+  //Dopo questa operazione l'app torna in stato `needsPairing` e l'utente
+  //deve riscansionare un hub o inserire un URL remoto.
+  Future<void> leaveHome() async {
+    try {
+      await _api.auth.logout();
+    } catch (_) {
+      //best-effort, ignoriamo errori di rete.
+    }
+    _api.setToken(null);
+    await SecureStorage.delete(_kTokenKey);
+    await ApiConfig.reset();
+    _user = null;
+    _hubInfo = null;
+    _stage = AuthStage.needsPairing;
+    notifyListeners();
+  }
+
   //Logout: cancella token e torna a login.
   Future<void> logout() async {
     try {

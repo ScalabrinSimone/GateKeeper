@@ -307,6 +307,30 @@ class AppL10n {
       'permissionDenied': 'Permesso negato.',
       'comingSoon': 'In arrivo.',
       'unknown': 'Sconosciuto',
+      'manage': 'Gestisci',
+      'exitAction': 'Esci',
+      //Pairing / discovery extra.
+      'scanQr': 'Scansiona QR',
+      'scanPairingQr': 'Scansiona il QR di pairing',
+      'scanPairingQrHint': 'Inquadra il QR mostrato dal terminale del Raspberry. Il codice contiene URL hub e factory code.',
+      'scannerError': 'Impossibile aprire la camera.',
+      'verifyingHub': 'Verifica hub...',
+      'removeRecentHub': 'Rimuovi dall\'elenco',
+      'exitSetupTitle': 'Uscire dalla configurazione?',
+      'exitSetupBody': 'L\'admin è già stato creato sull\'hub. Puoi rifinire i passi mancanti dalle impostazioni in qualsiasi momento.',
+      //Connettività extra.
+      'reconnectHubTitle': 'Riconnetti all\'hub',
+      'reconnectHubSubtitle': 'Forza una nuova verifica di rete con la casa attuale.',
+      'reconnect': 'Riconnetti',
+      'reconnectingHub': 'Riconnessione in corso...',
+      'leaveHomeTitle': 'Esci dalla casa',
+      'leaveHomeSubtitle': 'Disconnetti questo dispositivo dall\'hub corrente.',
+      'leaveHomeBody': 'Verranno rimosse le credenziali e l\'URL dell\'hub salvato su questo dispositivo. Potrai sempre rientrare con username/password o associarti a un\'altra casa.',
+      'leaveHome': 'Esci dalla casa',
+      //Logs object.
+      'noLogsForObject': 'Nessun log per questo oggetto.',
+      //Events.
+      'exportCopied': 'Eventi copiati negli appunti (CSV).',
     },
     'en': {
       'appName': 'GateKeeper',
@@ -593,6 +617,30 @@ class AppL10n {
       'permissionDenied': 'Permission denied.',
       'comingSoon': 'Coming soon.',
       'unknown': 'Unknown',
+      'manage': 'Manage',
+      'exitAction': 'Exit',
+      //Pairing / discovery extra.
+      'scanQr': 'Scan QR',
+      'scanPairingQr': 'Scan the pairing QR',
+      'scanPairingQrHint': 'Point at the QR shown in the Raspberry terminal. It contains the hub URL and factory code.',
+      'scannerError': 'Cannot open camera.',
+      'verifyingHub': 'Verifying hub...',
+      'removeRecentHub': 'Remove from list',
+      'exitSetupTitle': 'Exit the setup?',
+      'exitSetupBody': 'The admin has already been created on the hub. You can finish the remaining steps later from settings.',
+      //Connettività extra.
+      'reconnectHubTitle': 'Reconnect to hub',
+      'reconnectHubSubtitle': 'Force a fresh network check against the current home.',
+      'reconnect': 'Reconnect',
+      'reconnectingHub': 'Reconnecting...',
+      'leaveHomeTitle': 'Leave home',
+      'leaveHomeSubtitle': 'Disconnect this device from the current hub.',
+      'leaveHomeBody': 'Credentials and saved hub URL will be removed from this device. You can always sign in again or join another home.',
+      'leaveHome': 'Leave home',
+      //Logs object.
+      'noLogsForObject': 'No logs yet for this object.',
+      //Events.
+      'exportCopied': 'Events copied to clipboard (CSV).',
     },
   };
 }

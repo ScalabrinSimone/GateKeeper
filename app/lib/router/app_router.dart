@@ -77,7 +77,11 @@ class AppRouter {
         ),
         GoRoute(
           path: '/onboarding/setup',
-          builder: (_, __) => SetupWizardPage(auth: auth),
+          builder: (_, s) => SetupWizardPage(
+            auth: auth,
+            //factory_code pre-popolato dopo scan QR / discovery.
+            prefilledFactoryCode: s.uri.queryParameters['factory_code'],
+          ),
         ),
         GoRoute(
           path: '/invite',

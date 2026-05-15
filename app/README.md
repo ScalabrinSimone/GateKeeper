@@ -219,30 +219,59 @@ Il flusso di primo avvio è disegnato come un prodotto consumer.
    _Accedi_ (hub già configurato) o _Configura Raspberry_.
    Su **web** l'opzione di pairing è disabilitata (`PlatformInfo.canPairDevice`).
 2. **Discovery** (`/onboarding/discover`, `DiscoveryPage`):
-   `DiscoveryService` invia un broadcast UDP `GATEKEEPER_DISCOVER?` sulla
-   porta 51820 e raccoglie le risposte. Ogni hub trovato è mostrato come
-   tile: tappando si salva la base URL e si passa allo step successivo.
-   È sempre disponibile una connessione manuale tramite URL.
+   - `DiscoveryService` invia un broadcast UDP `GATEKEEPER_DISCOVER?` sulla
+     porta 51820 e raccoglie le risposte. Ogni hub trovato è mostrato come
+     tile: tappando si salva la base URL e si passa allo step successivo.
+   - In alternativa è disponibile lo **scanner QR-code** (pulsante
+     _Scansiona QR_), che legge il QR stampato in console dal Raspberry
+     all'avvio (vedi sotto). Il payload è un JSON `{baseUrl, factoryCode,
+     houseName}` e popola automaticamente anche il `factory_code` del
+     wizard.
+   - L'URL manuale viene **verificato** con un ping a `/hub/info` prima
+     di essere accettato: se l'hub non risponde, l'URL non viene salvato
+     e l'utente riceve un messaggio chiaro (no più HTTP 404 silenziosi).
+   - Gli **hub recenti** (URL già usati) sono riproposti come scorciatoia.
+     Ognuno è rimovibile con swipe a sinistra o con il pulsante "×".
 3. **Setup wizard** (`/onboarding/setup`, `SetupWizardPage`):
-   - Step 0: introduzione (cosa fa GateKeeper, in 3 punti),
-   - Step 1: creazione admin (`/hub/pair` con factory_code se richiesto),
-   - Step 2: scelta tag essenziali (chiavi/portafoglio/ecc.),
-     create con `POST /devices`,
-   - Step 3: generazione inviti (`POST /invites`) per i membri,
-     condivisibili tramite copia/incolla,
+   - Step 0: introduzione,
+   - Step 1: creazione admin (`/hub/pair` con factory_code, già
+     pre-compilato se proveniente da QR-scan),
+   - Step 2: scelta tag essenziali,
+   - Step 3: generazione inviti,
    - Step 4: conferma e ingresso in app.
+   - In alto a sinistra è sempre presente il pulsante "Indietro":
+     dopo lo step 1 (admin creato) chiede conferma e porta direttamente
+     alla dashboard, prima di allora torna a `/welcome`.
 
-### 9.1 Reset/disaccoppiamento
+### 9.1 QR-code stampato dal Raspberry
 
-Esistono due modi per disaccoppiare l'hub:
+All'avvio, `backend/run_all.py`:
 
-- **Dall'app, solo admin**: Impostazioni → _Factory reset_.
-  Chiama `POST /hub/factory-reset` con `confirm=true`, che cancella tutto
-  il database e rigenera un `factory_code` (mostrato in console / dal device
-  fisico). L'app viene riportata su `/welcome`.
-- **Direttamente sul Raspberry**: lo script
-  `backend/scripts/factory_reset.py` esegue la stessa operazione localmente
-  e stampa il nuovo `factory_code`.
+1. genera un `factory_code` se non esiste (e l'hub non è ancora pairato),
+2. rileva l'IP LAN del Raspberry,
+3. stampa **nel terminale** un QR-code ASCII (libreria `qrcode`) col
+   payload di pairing,
+4. avvia uvicorn.
+
+Il payload è anche esposto via `GET /hub/qr`. Quando l'hub viene pairato,
+il QR scompare e i sensori (RFID + BLE) vengono attivati automaticamente
+da un supervisor in `endpoint.py`. Prima del pairing l'hardware resta
+spento — il Raspberry si comporta come un prodotto consumer che attiva
+i sensori solo dopo la configurazione iniziale.
+
+### 9.2 Reset/disaccoppiamento
+
+Tre operazioni distinte:
+
+- **Esci dalla casa** (Impostazioni → _Connettività → Esci dalla casa_):
+  rimuove SOLO sul dispositivo l'URL hub + token. Il Raspberry resta
+  pairato e gli altri membri continuano a usarlo. L'app torna a
+  `/welcome`.
+- **Factory reset** (Impostazioni → _Account → Factory reset_, solo
+  admin): chiama `POST /hub/factory-reset` con `confirm=true`, svuota
+  tutto il database, rigenera il `factory_code` e disaccoppia l'hub.
+- **Reset dal Raspberry**: `backend/scripts/factory_reset.py` fa lo
+  stesso localmente.
 
 ## 10. Inviti, recupero password, notifiche
 

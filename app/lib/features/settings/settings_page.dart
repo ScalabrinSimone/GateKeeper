@@ -86,6 +86,33 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  //Riconnette l'app all'hub corrente: forza un re-bootstrap di AuthController.
+  //Utile dopo un cambio di rete o per uscire dallo stato "offline".
+  Future<void> _reconnectHub(AppL10n l10n) async {
+    await widget.auth.bootstrap();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.t('reconnectingHub'))),
+    );
+  }
+
+  //"Esci dalla casa": rimuove il base URL configurato e ogni token salvato,
+  //riportando l'app alla schermata di scelta hub. NON tocca i dati sul
+  //Raspberry: serve solo a "smettere di usare quella casa" da questo
+  //dispositivo. Per cancellare l'hub usare invece il factory reset.
+  Future<void> _leaveHome(AppL10n l10n) async {
+    final ok = await _confirm(
+      title: l10n.t('leaveHomeTitle'),
+      body: l10n.t('leaveHomeBody'),
+      confirmLabel: l10n.t('leaveHome'),
+      danger: true,
+    );
+    if (!ok) return;
+    await widget.auth.leaveHome();
+    if (!mounted) return;
+    context.go('/welcome');
+  }
+
   Future<void> _togglePush(bool value, AppL10n l10n) async {
     await widget.settings.setPushEnabled(value);
     if (value) {
@@ -305,11 +332,33 @@ class _SettingsPageState extends State<SettingsPage> {
               _Tile(
                 icon: Icons.router_rounded,
                 title: l10n.t('currentHub'),
-                subtitle: '${hub?.houseName ?? l10n.t('houseLabel')} • ${ApiConfig.baseUrl}',
+                subtitle: '${hub?.houseName ?? l10n.t('houseLabel')} • ${ApiConfig.baseUrl ?? '—'}',
                 trailing: GKButton(
                   onPressed: () => context.go('/onboarding/discover'),
                   label: l10n.t('changeHub'),
                   variant: GKButtonVariant.ghost,
+                  dense: true,
+                ),
+              ),
+              _Tile(
+                icon: Icons.sync_rounded,
+                title: l10n.t('reconnectHubTitle'),
+                subtitle: l10n.t('reconnectHubSubtitle'),
+                trailing: GKButton(
+                  onPressed: () => _reconnectHub(l10n),
+                  label: l10n.t('reconnect'),
+                  variant: GKButtonVariant.secondary,
+                  dense: true,
+                ),
+              ),
+              _Tile(
+                icon: Icons.exit_to_app_rounded,
+                title: l10n.t('leaveHomeTitle'),
+                subtitle: l10n.t('leaveHomeSubtitle'),
+                trailing: GKButton(
+                  onPressed: () => _leaveHome(l10n),
+                  label: l10n.t('leaveHome'),
+                  variant: GKButtonVariant.danger,
                   dense: true,
                 ),
               ),

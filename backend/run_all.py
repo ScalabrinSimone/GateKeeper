@@ -2,30 +2,28 @@
 
 Questo script:
 1) inizializza il database NoSQL locale;
-2) avvia lo scanner BLE in un thread separato;
-3) avvia il server FastAPI/Uvicorn;
-4) lascia il lettore RFID gestito dagli hook startup/shutdown definiti in
-   `endpoint.py`.
+2) avvia il server FastAPI/Uvicorn (che a sua volta gestisce gli hook
+   startup/shutdown per supervisor RFID + BLE);
+3) se l'hub non è ancora accoppiato, stampa in console un QR-code con i
+   dati di pairing (URL LAN + factory code) — pensato come "schermo" di un
+   prodotto consumer pronto all'uso.
+
+Il supervisor in `endpoint.py` attiva/disattiva i sensori RFID e BLE in
+base allo stato di pairing dell'hub.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import socket
 import threading
 import time
 
 import uvicorn
 
-from app.ble import blescanner
+from app.db import models as gk_models
 from app.db.init_db import init_db
-
-# =========================================================
-# THREAD GLOBALI
-# =========================================================
-
-bleStopEvent = threading.Event()
-
-bleThread: threading.Thread | None = None
 
 # =========================================================
 # LOGGING
@@ -50,60 +48,93 @@ def printSection(title: str) -> None:
 
 
 # =========================================================
-# THREAD BLE
+# PAIRING QR
 # =========================================================
 
 
-def startBleThread() -> None:
-    """Avvia thread scanner BLE."""
+def _detect_lan_ip() -> str:
+    """Restituisce l'IP LAN principale del Raspberry/PC.
 
-    global bleThread
+    Trucco classico: apriamo un socket UDP "fittizio" verso un indirizzo
+    pubblico (8.8.8.8); il kernel ci dice l'IP locale scelto per uscire.
+    Non viene inviato nulla, ma è il metodo più affidabile cross-platform
+    per scoprire l'IP esposto in LAN.
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+        finally:
+            s.close()
+    except Exception:
+        return "127.0.0.1"
 
-    if bleThread is not None and bleThread.is_alive():
 
+def _ensure_factory_code() -> str:
+    """Garantisce che esista un factory_code da mostrare nel QR.
+
+    Se l'hub è già pairato, non lo tocca. Se invece il factory_code non
+    esiste ancora (primo avvio), ne genera uno con `factory_reset_all`
+    senza svuotare il database (alle prime esecuzioni il DB è già vuoto).
+    """
+    hub = gk_models.get_hub() or {}
+    if hub.get("paired"):
+        return ""  # già pairato, niente QR
+    code = hub.get("factory_code")
+    if code:
+        return str(code)
+    # Genera un nuovo codice senza distruggere dati esistenti.
+    from secrets import token_hex
+    new_code = token_hex(3).upper()
+    gk_models.set_hub({"factory_code": new_code})
+    return new_code
+
+
+def _print_pairing_qr(host: str, port: int) -> None:
+    """Stampa nel terminale il QR-code di pairing.
+
+    Il contenuto è un JSON compatto, lo stesso che l'app può ottenere via
+    `GET /hub/qr`. La libreria `qrcode` è opzionale: se non è installata
+    stampiamo comunque i dati in chiaro così l'utente può inserirli a mano.
+    """
+    code = _ensure_factory_code()
+    if not code:
+        return  # hub già pairato
+
+    hub = gk_models.get_hub() or {}
+    payload = {
+        "v": 1,
+        "kind": "gatekeeper_pair",
+        "baseUrl": f"http://{host}:{port}",
+        "factoryCode": code,
+        "houseName": hub.get("house_name"),
+    }
+    text = json.dumps(payload, separators=(",", ":"))
+
+    printSection("PAIRING QR (in attesa dell'app)")
+    log("INFO", f"URL hub:        {payload['baseUrl']}")
+    log("INFO", f"Factory code:   {code}")
+    log("INFO", "Inquadra il QR dall'app GateKeeper per configurare l'hub.")
+    log("INFO", "Oppure inserisci URL e codice manualmente in app.")
+
+    try:
+        import qrcode  # type: ignore
+        qr = qrcode.QRCode(border=1)
+        qr.add_data(text)
+        qr.make(fit=True)
+        # `print_ascii` stampa il QR usando caratteri unicode "▀" / "▄".
+        # invert=True rende il QR leggibile su terminali a sfondo scuro.
+        qr.print_ascii(invert=True)
+    except ModuleNotFoundError:
         log(
-            "INFO",
-            "Thread BLE già attivo"
+            "WARN",
+            "Pacchetto 'qrcode' non installato: pip install qrcode "
+            "per stampare il QR ASCII.",
         )
-
-        return
-
-    bleStopEvent.clear()
-
-    bleThread = threading.Thread(
-        target=blescanner.runScanner,
-        kwargs={
-            "stopEvent": bleStopEvent
-        },
-        daemon=True,
-        name="ble-scanner-thread"
-    )
-
-    bleThread.start()
-
-    log(
-        "OK",
-        "Thread BLE avviato"
-    )
-
-
-def stopBleThread() -> None:
-    """Ferma scanner BLE."""
-
-    global bleThread
-
-    bleStopEvent.set()
-
-    if bleThread is not None:
-
-        bleThread.join(timeout=5)
-
-        bleThread = None
-
-    log(
-        "INFO",
-        "Thread BLE fermato"
-    )
+        print()
+        print(text)
+        print()
 
 
 # =========================================================
@@ -175,32 +206,30 @@ def main() -> None:
     )
 
     if args.factory_reset:
-        from app.db import models as gk_models
         from app.security import tokens as gk_tokens
 
         gk_tokens.reset_secret()
         new_state = gk_models.factory_reset_all()
         log("INFO", f"Factory reset eseguito. Codice: {new_state.get('factory_code')}")
 
-    startBleThread()
+    # Mostriamo subito il QR di pairing (se l'hub non è ancora accoppiato).
+    # Su un Raspberry "consumer" questo è ciò che apparirebbe sullo
+    # schermetto del dispositivo all'avvio.
+    lan_ip = _detect_lan_ip()
+    _print_pairing_qr(lan_ip, args.port)
 
     try:
         printSection("SERVER API")
-
-        log(
-            "INFO",
-            "Avvio server FastAPI/Uvicorn"
-        )
-
+        log("INFO", "Avvio server FastAPI/Uvicorn")
+        log("INFO", f"LAN: http://{lan_ip}:{args.port}")
         uvicorn.run(
             "app.api.endpoint:app",
             host=args.host,
             port=args.port,
-            reload=False
+            reload=False,
         )
-
     finally:
-        stopBleThread()
+        log("INFO", "Backend terminato")
 
 
 # =========================================================

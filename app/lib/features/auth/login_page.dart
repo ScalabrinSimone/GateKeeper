@@ -138,10 +138,32 @@ class _LoginPageState extends State<LoginPage> {
               expanded: true,
             ),
             const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () => context.go('/welcome'),
-              icon: const Icon(Icons.arrow_back_rounded, size: 18),
-              label: Text(l10n.t('back')),
+            //Doppia uscita: o si torna alla scelta hub (riconnetti a una
+            //casa esistente) oppure si "esce dalla casa" per associare il
+            //dispositivo ad un'altra (o configurarne una nuova).
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () => context.go('/welcome'),
+                    icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                    label: Text(l10n.t('back')),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () async {
+                            await widget.auth.leaveHome();
+                            if (!context.mounted) return;
+                            context.go('/welcome');
+                          },
+                    icon: const Icon(Icons.exit_to_app_rounded, size: 18),
+                    label: Text(l10n.t('leaveHome')),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

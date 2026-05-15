@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
@@ -399,7 +400,7 @@ class _ObjectCard extends StatelessWidget {
                 ),
               ),
               GKButton(
-                onPressed: () {},
+                onPressed: () => _showLogs(context, object),
                 label: l10n.t('logShort'),
                 variant: GKButtonVariant.ghost,
                 dense: true,
@@ -409,5 +410,57 @@ class _ObjectCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _showLogs(BuildContext context, SmartObject obj) async {
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    //Carica i log dell'oggetto in modo asincrono e li mostra in un dialog.
+    try {
+      final logs = await GateKeeperApi.instance.logs.list(deviceId: int.parse(obj.id));
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) {
+          final fmt = DateFormat.yMd().add_Hm();
+          return AlertDialog(
+            title: Text('${l10n.t('logShort')} · ${obj.name}'),
+            content: SizedBox(
+              width: 360,
+              child: logs.isEmpty
+                  ? Text(l10n.t('noLogsForObject'),
+                      style: const TextStyle(fontStyle: FontStyle.italic))
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: logs.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final log = logs[i];
+                        final entry = log.action == 'ENTRATO';
+                        final at = DateTime.tryParse(log.createdAt);
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(
+                            entry ? Icons.login_rounded : Icons.logout_rounded,
+                            color: entry ? AppColors.success : AppColors.orangeGold,
+                          ),
+                          title: Text(log.action),
+                          subtitle: Text(at != null ? fmt.format(at.toLocal()) : log.createdAt),
+                        );
+                      },
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(l10n.t('close')),
+              ),
+            ],
+          );
+        },
+      );
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 }

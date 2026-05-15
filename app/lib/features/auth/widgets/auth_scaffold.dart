@@ -13,6 +13,7 @@ class AuthScaffold extends StatelessWidget {
     required this.child,
     this.maxContentWidth = 460,
     this.actionsBelow,
+    this.leading,
   });
 
   final String title;
@@ -20,6 +21,8 @@ class AuthScaffold extends StatelessWidget {
   final Widget child;
   final double maxContentWidth;
   final Widget? actionsBelow;
+  //Widget opzionale in alto a sinistra (es. tasto "Indietro").
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +73,11 @@ class AuthScaffold extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (leading != null)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: leading!,
+                        ),
                       const Center(child: GKLogo(size: 64)),
                       const SizedBox(height: 20),
                       Text(

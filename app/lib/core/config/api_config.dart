@@ -76,6 +76,17 @@ class ApiConfig {
     await prefs.setStringList(_kRecent, list);
   }
 
+  //Rimuove una singola entry dalla cronologia degli hub recenti.
+  //Usato quando l'utente fa swipe / tap su "rimuovi" nella lista.
+  static Future<void> removeRecent(String url) async {
+    final cleaned = url.trim().replaceAll(RegExp(r'/+$'), '');
+    if (cleaned.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_kRecent) ?? <String>[];
+    list.removeWhere((e) => e == cleaned);
+    await prefs.setStringList(_kRecent, list);
+  }
+
   static Future<void> clearRecent() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kRecent);

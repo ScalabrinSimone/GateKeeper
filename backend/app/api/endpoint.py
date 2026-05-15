@@ -250,16 +250,89 @@ def _stop_rfid_thread() -> None:
     print("Thread RFID fermato.")
 
 
+# Supervisor che attiva/disattiva i sensori (RFID + BLE) in base allo stato
+# dell'hub. Finché l'hub non è "paired", i sensori restano spenti: l'hub si
+# comporta come un prodotto consumer che attiva l'hardware solo dopo che
+# l'amministratore ha completato la configurazione iniziale dall'app.
+_sensors_supervisor_stop = threading.Event()
+_sensors_supervisor_thread: Optional[threading.Thread] = None
+_ble_runtime_started = False
+_ble_runtime_stop_event: Optional[threading.Event] = None
+
+
+def _start_ble_thread() -> None:
+    """Best-effort: avvia lo scanner BLE in un thread daemon."""
+    global _ble_runtime_started, _ble_runtime_stop_event
+    if _ble_runtime_started:
+        return
+    try:
+        from app.ble import blescanner
+    except Exception as exc:
+        print(f"[BLE] Modulo non disponibile, skip: {exc}")
+        return
+    _ble_runtime_stop_event = threading.Event()
+    threading.Thread(
+        target=blescanner.runScanner,
+        kwargs={"stopEvent": _ble_runtime_stop_event},
+        daemon=True,
+        name="ble-scanner-thread",
+    ).start()
+    _ble_runtime_started = True
+    print("Thread BLE avviato (post-pairing).")
+
+
+def _stop_ble_thread() -> None:
+    global _ble_runtime_started, _ble_runtime_stop_event
+    if _ble_runtime_stop_event is not None:
+        _ble_runtime_stop_event.set()
+    _ble_runtime_started = False
+
+
+def _sensors_supervisor_loop() -> None:
+    """Loop che adatta lo stato dei thread sensori a quello di pairing."""
+    while not _sensors_supervisor_stop.is_set():
+        try:
+            paired = bool(models.get_hub().get("paired"))
+        except Exception:
+            paired = False
+
+        if paired:
+            _start_rfid_thread()
+            _start_ble_thread()
+        else:
+            _stop_rfid_thread()
+            _stop_ble_thread()
+
+        if _sensors_supervisor_stop.wait(2.0):
+            break
+
+
 @app.on_event("startup")
 def on_startup() -> None:
-    """All'avvio dell'API parte anche il lettore RFID."""
-    _start_rfid_thread()
+    """All'avvio dell'API verifico lo stato hub.
+
+    - Se l'hub è già pairato, accendo subito sensori RFID/BLE.
+    - Se non è pairato, NON faccio partire l'hardware: aspetto che
+      l'amministratore completi il setup dall'app.
+    Il supervisor monitora poi il flag `paired` per attivare/disattivare
+    i sensori in tempo reale (es. dopo pairing o factory reset).
+    """
+    global _sensors_supervisor_thread
+    _sensors_supervisor_stop.clear()
+    _sensors_supervisor_thread = threading.Thread(
+        target=_sensors_supervisor_loop,
+        daemon=True,
+        name="sensors-supervisor-thread",
+    )
+    _sensors_supervisor_thread.start()
 
 
 @app.on_event("shutdown")
 def on_shutdown() -> None:
-    """Alla chiusura del server, il thread RFID viene fermato."""
+    """Alla chiusura del server, ferma supervisor + sensori."""
+    _sensors_supervisor_stop.set()
     _stop_rfid_thread()
+    _stop_ble_thread()
 
 
 @app.get("/")
@@ -658,6 +731,23 @@ class HubInfo(BaseModel):
     requires_factory_code: bool = False
 
 
+class HubQr(BaseModel):
+    """Payload "QR-friendly" che l'hub espone finché non è accoppiato.
+
+    L'app può:
+    - leggerlo direttamente (`GET /hub/qr`) dopo aver scansionato un URL
+      manuale, oppure
+    - scansionare il QR mostrato dal terminale del Raspberry: il JSON
+      contiene gli stessi campi.
+    """
+    v: int = 1
+    kind: str = "gatekeeper_pair"
+    base_url: Optional[str] = None
+    factory_code: Optional[str] = None
+    house_name: Optional[str] = None
+    paired: bool = False
+
+
 class TokenResponse(BaseModel):
     token: str
     user: UserOut
@@ -725,14 +815,65 @@ def _require_admin(user: dict = Depends(_get_current_user)) -> dict:
 # --------------------------------------------------------------------------------------
 # HUB / PAIRING (pubblici)
 # --------------------------------------------------------------------------------------
+def _ensure_factory_code_if_needed() -> Optional[str]:
+    """Garantisce che, se l'hub non è pairato, esista sempre un factory_code.
+
+    Così la prima volta che l'app contatta l'hub non-pairato può ricevere
+    direttamente un codice valido sia da `/hub/info` (flag boolean) sia
+    da `/hub/qr` (payload completo).
+    """
+    state = models.get_hub() or {}
+    if state.get("paired"):
+        return None
+    code = state.get("factory_code")
+    if code:
+        return str(code)
+    from secrets import token_hex
+    new_code = token_hex(3).upper()
+    models.set_hub({"factory_code": new_code})
+    return new_code
+
+
 @app.get("/hub/info", response_model=HubInfo)
-def hub_info():
+def hub_info(request: Request):
     """Info pubbliche dell'hub, usate dall'app per capire se va fatto pairing."""
-    state = models.get_hub()
+    state = models.get_hub() or {}
+    if not state.get("paired"):
+        _ensure_factory_code_if_needed()
+        state = models.get_hub() or {}
     return HubInfo(
         paired=bool(state.get("paired")),
         house_name=state.get("house_name"),
         requires_factory_code=bool(state.get("factory_code")) and not state.get("paired"),
+    )
+
+
+@app.get("/hub/qr", response_model=HubQr)
+def hub_qr(request: Request):
+    """Payload da incorporare in un QR di pairing.
+
+    Restituisce sempre la base URL "esterna" (ricavata dall'header Host),
+    in modo che il QR funzioni anche quando il backend è raggiungibile su
+    nomi diversi (LAN, mDNS, tunnel).
+    """
+    state = models.get_hub() or {}
+    code = None
+    if not state.get("paired"):
+        code = _ensure_factory_code_if_needed()
+        state = models.get_hub() or {}
+
+    # Ricostruzione URL base a partire dalla request originale.
+    scheme = request.url.scheme or "http"
+    host = request.headers.get("host") or f"{request.url.hostname}:{request.url.port or 8000}"
+    base_url = f"{scheme}://{host}".rstrip("/")
+
+    return HubQr(
+        v=1,
+        kind="gatekeeper_pair",
+        base_url=base_url,
+        factory_code=code if not state.get("paired") else None,
+        house_name=state.get("house_name"),
+        paired=bool(state.get("paired")),
     )
 
 

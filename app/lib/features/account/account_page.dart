@@ -383,7 +383,15 @@ class _SessionsCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                GKButton(onPressed: () {}, label: l10n.t('close'), variant: GKButtonVariant.ghost, dense: true),
+                //Pulsante che porta alla sezione "Connettività" delle impostazioni
+                //per gestire l'hub corrente (cambia / disconnetti / riconnetti).
+                GKButton(
+                  onPressed: () => context.go('/settings'),
+                  label: l10n.t('manage'),
+                  icon: Icons.tune_rounded,
+                  variant: GKButtonVariant.ghost,
+                  dense: true,
+                ),
               ],
             ),
           ),

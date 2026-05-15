@@ -224,6 +224,39 @@ class HubInfoDto {
   final String? apiVersion;
 }
 
+//Payload del QR di pairing pubblicato da GET /hub/qr.
+//Lo stesso schema viene stampato nel terminale del Raspberry all'avvio.
+class HubQrDto {
+  const HubQrDto({
+    required this.v,
+    required this.kind,
+    required this.paired,
+    this.baseUrl,
+    this.factoryCode,
+    this.houseName,
+  });
+
+  factory HubQrDto.fromJson(Map<String, dynamic> json) => HubQrDto(
+        v: (json['v'] as num?)?.toInt() ?? 1,
+        kind: (json['kind'] ?? 'gatekeeper_pair').toString(),
+        paired: json['paired'] == true,
+        baseUrl: json['base_url']?.toString() ?? json['baseUrl']?.toString(),
+        factoryCode:
+            json['factory_code']?.toString() ?? json['factoryCode']?.toString(),
+        houseName:
+            json['house_name']?.toString() ?? json['houseName']?.toString(),
+      );
+
+  final int v;
+  final String kind;
+  final bool paired;
+  final String? baseUrl;
+  final String? factoryCode;
+  final String? houseName;
+
+  bool get looksValid => kind == 'gatekeeper_pair' && (baseUrl?.isNotEmpty ?? false);
+}
+
 class AuthResultDto {
   const AuthResultDto({required this.token, required this.user});
 

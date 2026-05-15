@@ -19,8 +19,14 @@ import '../auth/widgets/gk_text_field.dart';
 //Step 3 - Invita membri: link condivisibili per ogni ruolo.
 //Step 4 - Fatto: porta in app.
 class SetupWizardPage extends StatefulWidget {
-  const SetupWizardPage({super.key, required this.auth});
+  const SetupWizardPage({
+    super.key,
+    required this.auth,
+    this.prefilledFactoryCode,
+  });
   final AuthController auth;
+  //Se ricevuto via QR / route, il wizard pre-compila il factory_code.
+  final String? prefilledFactoryCode;
 
   @override
   State<SetupWizardPage> createState() => _SetupWizardPageState();
@@ -34,7 +40,9 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
   final _usernameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final _factoryCtrl = TextEditingController();
+  late final TextEditingController _factoryCtrl = TextEditingController(
+    text: widget.prefilledFactoryCode ?? '',
+  );
   bool _busy = false;
   String? _error;
 
@@ -162,6 +170,13 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
     return AuthScaffold(
       title: l10n.t('setupTitle'),
       subtitle: '${l10n.t('step')} ${_step + 1} / ${steps.length}',
+      //Tasto "Indietro" in alto a sinistra: utile se l'utente vuole
+      //tornare alla schermata di scelta hub o annullare la configurazione.
+      leading: IconButton(
+        tooltip: l10n.t('back'),
+        onPressed: () => _exitSetup(context, l10n),
+        icon: const Icon(Icons.arrow_back_rounded),
+      ),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 280),
         switchInCurve: Curves.easeOutCubic,
@@ -170,6 +185,39 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
       ),
       actionsBelow: _StepIndicator(current: _step, total: steps.length),
     );
+  }
+
+  //Chiude il wizard riportando l'utente alla scelta hub/login.
+  //Se siamo oltre lo step di creazione admin, chiediamo conferma:
+  //l'admin è stato già creato e una nuova "fuga" non lo elimina.
+  Future<void> _exitSetup(BuildContext context, AppL10n l10n) async {
+    if (_step >= 2) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.t('exitSetupTitle')),
+          content: Text(l10n.t('exitSetupBody')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.t('exitAction')),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      if (!context.mounted) return;
+      //Andiamo direttamente in dashboard: l'admin è stato creato e siamo
+      //già autenticati.
+      context.go('/dashboard');
+      return;
+    }
+    if (!context.mounted) return;
+    context.go('/welcome');
   }
 }
 

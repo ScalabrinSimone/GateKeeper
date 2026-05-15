@@ -7,10 +7,14 @@ import '../../core/i18n/app_l10n.dart';
 import '../../core/platform/platform_info.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/api/api_exception.dart';
+import '../../data/api/dto.dart';
+import '../../data/api/hub_api.dart';
 import '../../data/services/discovery_service.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../auth/widgets/auth_scaffold.dart';
 import '../auth/widgets/gk_text_field.dart';
+import 'widgets/qr_scanner_sheet.dart';
 
 //Step 1 dell'onboarding: trova un hub GateKeeper in rete (UDP broadcast)
 //e selezionalo, oppure inserisci manualmente l'IP per i casi avanzati.
@@ -24,10 +28,14 @@ class DiscoveryPage extends StatefulWidget {
 
 class _DiscoveryPageState extends State<DiscoveryPage> {
   bool _scanning = false;
+  bool _verifying = false;
   final List<DiscoveredHub> _hubs = [];
   final _manualCtrl = TextEditingController(text: 'http://');
   List<String> _recent = const [];
   String? _error;
+  //Conserviamo l'eventuale factory-code rilevato dall'hub: lo passiamo al
+  //setup wizard come "extra" route, così l'utente non deve digitarlo.
+  String? _pendingFactoryCode;
 
   @override
   void initState() {
@@ -46,12 +54,74 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
     super.dispose();
   }
 
-  Future<void> _useUrl(BuildContext context, String url) async {
+  //Valida l'URL fornendo all'utente un feedback chiaro.
+  //Solo se il ping ha successo l'URL viene salvato come base URL ufficiale
+  //e aggiunto ai "recenti".
+  Future<void> _useUrl(BuildContext context, String url, {String? factoryCode}) async {
+    if (_verifying) return;
     HapticFeedback.selectionClick();
-    await widget.auth.useBaseUrl(url);
-    if (!context.mounted) return;
-    final paired = widget.auth.hubInfo?.paired ?? false;
-    context.go(paired ? '/login' : '/onboarding/setup');
+    setState(() {
+      _verifying = true;
+      _error = null;
+      _pendingFactoryCode = factoryCode ?? _pendingFactoryCode;
+    });
+    try {
+      //1) Ping rapido per verificare che l'URL sia un hub GateKeeper.
+      final info = await HubApi.probe(url);
+      //2) Successo: aggiorniamo lo stato di auth e navighiamo.
+      await widget.auth.useBaseUrl(url);
+      if (!context.mounted) return;
+      final paired = info.paired;
+      if (paired) {
+        context.go('/login');
+      } else {
+        final code = _pendingFactoryCode;
+        context.go(
+          code != null && code.isNotEmpty
+              ? '/onboarding/setup?factory_code=${Uri.encodeQueryComponent(code)}'
+              : '/onboarding/setup',
+        );
+      }
+    } on ApiException catch (e) {
+      //3) Errore: NON salviamo l'URL e ripuliamo i recenti se ne contengono
+      //   una versione che non risponde più.
+      await ApiConfig.removeRecent(url);
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _recent = _recent.where((u) => u != url).toList();
+      });
+    } finally {
+      if (mounted) setState(() => _verifying = false);
+    }
+  }
+
+  Future<void> _removeRecent(String url) async {
+    HapticFeedback.selectionClick();
+    await ApiConfig.removeRecent(url);
+    final list = await ApiConfig.recentHubs();
+    if (!mounted) return;
+    setState(() => _recent = list);
+  }
+
+  Future<void> _openScanner() async {
+    if (!PlatformInfo.canPairDevice) {
+      setState(() => _error = AppL10n.of(context).t('webPairHint'));
+      return;
+    }
+    final result = await showModalBottomSheet<HubQrDto>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => const QrScannerSheet(),
+    );
+    if (result == null || !mounted) return;
+    final base = result.baseUrl;
+    if (base == null || base.isEmpty) return;
+    await _useUrl(context, base, factoryCode: result.factoryCode);
   }
 
   Future<void> _scan() async {
@@ -87,27 +157,17 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
   }
 
   Future<void> _useHub(BuildContext context, DiscoveredHub hub) async {
-    HapticFeedback.mediumImpact();
-    await widget.auth.useBaseUrl(hub.baseUrl);
-    if (!context.mounted) return;
-    if (hub.paired) {
-      //L'hub è già accoppiato: l'utente passi al login.
-      context.go('/login');
-    } else {
-      context.go('/onboarding/setup');
-    }
+    await _useUrl(context, hub.baseUrl);
   }
 
   Future<void> _useManual(BuildContext context) async {
     final url = _manualCtrl.text.trim();
-    if (url.isEmpty || !url.startsWith('http')) {
-      setState(() => _error = 'URL non valido');
+    final l10n = AppL10n.of(context);
+    if (url.isEmpty || !(url.startsWith('http://') || url.startsWith('https://'))) {
+      setState(() => _error = l10n.t('invalidUrl'));
       return;
     }
-    await widget.auth.useBaseUrl(url);
-    if (!context.mounted) return;
-    final paired = widget.auth.hubInfo?.paired ?? false;
-    context.go(paired ? '/login' : '/onboarding/setup');
+    await _useUrl(context, url);
   }
 
   @override
@@ -124,6 +184,7 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (canPair) ...[
+            //Banda di azioni rapide: scan LAN + scan QR.
             Row(
               children: [
                 Expanded(
@@ -132,6 +193,14 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
                     style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
+                GKButton(
+                  onPressed: _openScanner,
+                  label: l10n.t('scanQr'),
+                  icon: Icons.qr_code_scanner_rounded,
+                  variant: GKButtonVariant.secondary,
+                  dense: true,
+                ),
+                const SizedBox(width: 6),
                 GKButton(
                   onPressed: _scanning ? null : _scan,
                   label: _scanning ? l10n.t('scanningDots') : l10n.t('rescan'),
@@ -170,6 +239,7 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
               _RecentTile(
                 url: url,
                 onTap: () => _useUrl(context, url),
+                onRemove: () => _removeRecent(url),
               ),
             const SizedBox(height: 8),
             Divider(color: theme.dividerColor),
@@ -186,8 +256,8 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
             prefixIcon: Icons.link_rounded,
           ),
           GKButton(
-            onPressed: () => _useManual(context),
-            label: l10n.t('connect'),
+            onPressed: _verifying ? null : () => _useManual(context),
+            label: _verifying ? l10n.t('verifyingHub') : l10n.t('connect'),
             icon: Icons.arrow_forward_rounded,
             expanded: true,
             variant: GKButtonVariant.outline,
@@ -209,9 +279,14 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
 }
 
 class _RecentTile extends StatelessWidget {
-  const _RecentTile({required this.url, required this.onTap});
+  const _RecentTile({
+    required this.url,
+    required this.onTap,
+    required this.onRemove,
+  });
   final String url;
   final VoidCallback onTap;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -219,43 +294,63 @@ class _RecentTile extends StatelessWidget {
     final l10n = AppL10n.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.stormyTeal.withValues(alpha: 0.04),
-              border: Border.all(color: AppColors.stormyTeal.withValues(alpha: 0.18)),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.history_rounded, color: AppColors.stormyTeal),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    url,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.w700,
+      child: Dismissible(
+        key: ValueKey('recent-$url'),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            color: AppColors.danger.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.delete_outline_rounded,
+              color: AppColors.danger),
+        ),
+        onDismissed: (_) => onRemove(),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.stormyTeal.withValues(alpha: 0.04),
+                border: Border.all(color: AppColors.stormyTeal.withValues(alpha: 0.18)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.history_rounded, color: AppColors.stormyTeal),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      url,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-                Text(
-                  l10n.t('connectToRecent'),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.stormyTeal,
+                  Text(
+                    l10n.t('connectToRecent'),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.stormyTeal,
+                    ),
                   ),
-                ),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.stormyTeal),
-              ],
+                  IconButton(
+                    onPressed: onRemove,
+                    icon: const Icon(Icons.close_rounded),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    tooltip: l10n.t('removeRecentHub'),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
