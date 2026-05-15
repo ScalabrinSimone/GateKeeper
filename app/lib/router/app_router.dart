@@ -68,7 +68,7 @@ class AppRouter {
       },
       routes: [
         GoRoute(path: '/splash', builder: (_, __) => const _SplashPage()),
-        GoRoute(path: '/welcome', builder: (_, __) => const PairChoicePage()),
+        GoRoute(path: '/welcome', builder: (_, __) => PairChoicePage(auth: auth)),
         GoRoute(path: '/login', builder: (_, __) => LoginPage(auth: auth)),
         GoRoute(path: '/recover', builder: (_, __) => RecoveryPage(auth: auth)),
         GoRoute(

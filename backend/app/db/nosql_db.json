@@ -7,7 +7,7 @@
       "user_devices": 1,
       "logs": 1,
       "events": 1,
-      "invites": 2,
+      "invites": 3,
       "password_resets": 1
     },
     "hub": {
@@ -45,19 +45,6 @@
   "user_devices": [],
   "logs": [],
   "events": [],
-  "invites": [
-    {
-      "id": 1,
-      "token": "sDfWXO2b9k40W_xRbteu9w",
-      "role": "admin",
-      "suggested_name": null,
-      "created_by": 1,
-      "created_at": "2026-05-15T15:55:35+00:00",
-      "expires_at": "2026-05-22T15:55:35+00:00",
-      "consumed": false,
-      "consumed_by": null,
-      "consumed_at": null
-    }
-  ],
+  "invites": [],
   "password_resets": []
 }

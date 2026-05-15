@@ -44,8 +44,8 @@ class InviteShareDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
+      content: Container(
+        width: 350, // Larghezza fissa per risolvere il problema di layout
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
