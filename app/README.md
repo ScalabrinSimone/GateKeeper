@@ -249,17 +249,47 @@ All'avvio, `backend/run_all.py`:
 
 1. genera un `factory_code` se non esiste (e l'hub non è ancora pairato),
 2. rileva l'IP LAN del Raspberry,
-3. stampa **nel terminale** un QR-code ASCII (libreria `qrcode`) col
-   payload di pairing,
+3. mostra il QR-code di pairing in **tre modalità** complementari:
+   - **ASCII nel terminale** (caratteri unicode "▀"/"▄"),
+   - **PNG su disco** in `backend/logs/pairing_qr.png` (utile su sistemi
+     headless o con terminali che non supportano l'ASCII unicode),
+   - **JSON pubblicato** via `GET /hub/qr` per chi vuole leggerlo da rete,
 4. avvia uvicorn.
 
-Il payload è anche esposto via `GET /hub/qr`. Quando l'hub viene pairato,
-il QR scompare e i sensori (RFID + BLE) vengono attivati automaticamente
-da un supervisor in `endpoint.py`. Prima del pairing l'hardware resta
-spento — il Raspberry si comporta come un prodotto consumer che attiva
-i sensori solo dopo la configurazione iniziale.
+Quando l'hub viene pairato, il QR scompare e i sensori (RFID + BLE)
+vengono attivati automaticamente da un supervisor in `endpoint.py`. Prima
+del pairing l'hardware resta spento — il Raspberry si comporta come un
+prodotto consumer che attiva i sensori solo dopo la configurazione
+iniziale. L'app può sempre inserire URL + factory code anche manualmente
+se il QR non funziona.
 
-### 9.2 Reset/disaccoppiamento
+### 9.2 Log multi-pannello (RFID / BLE / QR su terminali separati)
+
+`run_all.py --split-logs` (oppure `GK_SPLIT_LOGS=1`) redirige
+automaticamente i log per componente in `backend/logs/<componente>.log`:
+
+- `rfid.log`      – lettore RFID UHF,
+- `ble.log`       – scanner Bluetooth,
+- `qr.log`        – QR code di pairing,
+- `boot.log`      – avvio backend,
+- `discovery.log` – UDP discovery,
+- `api.log`       – tutto il resto (FastAPI + uvicorn).
+
+L'output continua a comparire nel terminale principale; nei file vengono
+duplicati così è facile aprirli su finestre separate con `tail` live:
+
+```bash
+# PowerShell
+Get-Content -Wait .\backend\logs\rfid.log
+# Linux / macOS
+tail -f backend/logs/rfid.log
+```
+
+Se la lettura RFID non funziona, lancia il backend con `--rfid-debug` per
+loggare anche il raw seriale: utile per riconoscere il protocollo di un
+nuovo firmware del lettore.
+
+### 9.3 Reset/disaccoppiamento
 
 Tre operazioni distinte:
 
@@ -270,8 +300,12 @@ Tre operazioni distinte:
 - **Factory reset** (Impostazioni → _Account → Factory reset_, solo
   admin): chiama `POST /hub/factory-reset` con `confirm=true`, svuota
   tutto il database, rigenera il `factory_code` e disaccoppia l'hub.
-- **Reset dal Raspberry**: `backend/scripts/factory_reset.py` fa lo
-  stesso localmente.
+- **Reset completo dal Raspberry**: `backend/scripts/factory_reset.py`
+  elimina fisicamente `nosql_db.json` + backup, cancella `backend/logs/`,
+  rigenera il segreto JWT e crea un nuovo `factory_code`. È pensato
+  per riportare il dispositivo "come nuovo".
+  Lancialo con `python scripts/factory_reset.py` (chiede conferma) o
+  `--yes` per saltarla.
 
 ## 10. Inviti, recupero password, notifiche
 

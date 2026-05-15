@@ -331,6 +331,26 @@ class AppL10n {
       'noLogsForObject': 'Nessun log per questo oggetto.',
       //Events.
       'exportCopied': 'Eventi copiati negli appunti (CSV).',
+      //Form oggetti.
+      'objectNameRequired': 'Inserisci un nome per l\'oggetto.',
+      'rfidTagRequired': 'Avvicina un tag al lettore RFID prima di salvare.',
+      'rfidTagRequiredHint': 'Avvicina un tag al lettore per assegnarlo a questo oggetto.',
+      'rescanTag': 'Riscansiona tag',
+      //Inviti QR.
+      'showInviteQr': 'Mostra QR',
+      'copyMessage': 'Copia messaggio',
+      'inviteMessageCopied': 'Messaggio di invito copiato.',
+      //PairChoice copy.
+      'welcomePrompt': 'COSA VUOI FARE?',
+      'connectExistingTitle': 'Connetti la tua casa',
+      'connectExistingDescription': 'Hai già un hub GateKeeper acceso. Lo cerchiamo in LAN o tramite URL remoto, poi accedi.',
+      'connectExistingAction': 'Trova hub',
+      'haveInviteTitle': 'Sono stato invitato',
+      'haveInviteDescription': 'Hai ricevuto un codice o un QR di invito da un membro della casa.',
+      'alreadyConfigured': 'Sono già configurato, vai al login',
+      'recommendedBadge': 'CONSIGLIATO',
+      'changeHubTitle': 'Cambia hub',
+      'changeHubSubtitle': 'Connetti l\'app a un\'altra casa o usa un URL remoto.',
     },
     'en': {
       'appName': 'GateKeeper',
@@ -641,6 +661,26 @@ class AppL10n {
       'noLogsForObject': 'No logs yet for this object.',
       //Events.
       'exportCopied': 'Events copied to clipboard (CSV).',
+      //Object form.
+      'objectNameRequired': 'Enter a name for the object.',
+      'rfidTagRequired': 'Hold a tag near the RFID reader before saving.',
+      'rfidTagRequiredHint': 'Hold an RFID tag near the reader to assign it to this object.',
+      'rescanTag': 'Rescan tag',
+      //Invite QR.
+      'showInviteQr': 'Show QR',
+      'copyMessage': 'Copy message',
+      'inviteMessageCopied': 'Invite message copied.',
+      //PairChoice copy.
+      'welcomePrompt': 'WHAT DO YOU WANT TO DO?',
+      'connectExistingTitle': 'Connect your home',
+      'connectExistingDescription': 'You already have a GateKeeper hub running. We will find it on the LAN or via a remote URL, then you sign in.',
+      'connectExistingAction': 'Find hub',
+      'haveInviteTitle': 'I was invited',
+      'haveInviteDescription': 'You received an invite code or QR from a member of the home.',
+      'alreadyConfigured': 'Already configured, go to sign in',
+      'recommendedBadge': 'RECOMMENDED',
+      'changeHubTitle': 'Change hub',
+      'changeHubSubtitle': 'Connect the app to another home or use a remote URL.',
     },
   };
 }

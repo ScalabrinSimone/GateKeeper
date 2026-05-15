@@ -8,10 +8,17 @@ import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/gk_button.dart';
 import 'widgets/auth_scaffold.dart';
 
-//Schermata mostrata quando l'hub non è (ancora) accoppiato a questa installazione.
-//Lascia all'utente due strade: Login (se già ha credenziali su un hub raggiungibile)
-//oppure Pair (configurazione iniziale di un nuovo Raspberry).
-//Sul web la voce "Pair" è disabilitata: l'onboarding fisico richiede PC/mobile.
+//Schermata di benvenuto: prima domanda chiara all'utente.
+//
+//Sono tre i percorsi possibili:
+//  1. **Connetti la mia casa** → discovery / URL hub (LAN o tunnel) +
+//     login se l'hub risulta già pairato.
+//  2. **Configura un nuovo Raspberry** → scansione QR di pairing oppure
+//     URL manuale, poi creazione admin. Disponibile solo da PC/mobile.
+//  3. **Sono stato invitato** → incolla il token di un invito.
+//
+//Su web la (2) richiede comunque il discovery (UDP), perciò viene presentata
+//come "configura via URL remoto" e l'utente può inserire la base URL.
 class PairChoicePage extends StatelessWidget {
   const PairChoicePage({super.key});
 
@@ -27,18 +34,37 @@ class PairChoicePage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ChoiceCard(
-            icon: Icons.login_rounded,
-            color: AppColors.stormyTeal,
-            title: l10n.t('signInTitle'),
-            description: l10n.t('signInDescription'),
-            actionLabel: l10n.t('signInAction'),
-            onTap: () {
-              HapticFeedback.selectionClick();
-              context.go('/login');
-            },
+          //Titolo guida: "Cosa vuoi fare?".
+          Text(
+            l10n.t('welcomePrompt'),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.3,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
           ),
           const SizedBox(height: 14),
+
+          //Scelta primaria: connettiti a una casa esistente. Va anche bene
+          //se l'utente vuole solo fare login: lo accompagniamo prima alla
+          //discovery (LAN o URL remoto) per assicurarci che la baseUrl sia
+          //valida, poi automaticamente apriamo /login se l'hub è pairato.
+          _ChoiceCard(
+            icon: Icons.home_rounded,
+            color: AppColors.stormyTeal,
+            title: l10n.t('connectExistingTitle'),
+            description: l10n.t('connectExistingDescription'),
+            actionLabel: l10n.t('connectExistingAction'),
+            recommended: true,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              context.go('/onboarding/discover');
+            },
+          ),
+          const SizedBox(height: 12),
+
+          //Configura nuovo Raspberry: stessa pagina di discovery ma il
+          //copy chiarisce che è per il primo setup.
           _ChoiceCard(
             icon: Icons.router_rounded,
             color: canPair ? AppColors.orangeGold : theme.disabledColor,
@@ -52,43 +78,42 @@ class PairChoicePage extends StatelessWidget {
                   }
                 : null,
           ),
-          if (!canPair) ...[
-            const SizedBox(height: 14),
-            //Sul web non possiamo fare discovery, ma possiamo comunque
-            //inserire un URL remoto (tunnel) per collegarci a un hub già
-            //configurato altrove.
-            _ChoiceCard(
-              icon: Icons.cloud_outlined,
-              color: AppColors.stormyTeal,
-              title: l10n.t('remoteAccessTitle'),
-              description: l10n.t('remoteAccessSubtitle'),
-              actionLabel: l10n.t('connect'),
-              onTap: () {
-                HapticFeedback.selectionClick();
-                context.go('/onboarding/discover');
-              },
-            ),
-          ],
-          const SizedBox(height: 18),
-          //CTA secondaria: accetta un invito (incolla token / apri link).
-          Center(
-            child: TextButton.icon(
-              onPressed: () => context.go('/invite'),
-              icon: const Icon(Icons.qr_code_rounded, size: 18),
-              label: Text(l10n.t('haveInvite')),
-            ),
+          const SizedBox(height: 12),
+
+          //Invito.
+          _ChoiceCard(
+            icon: Icons.mail_outline_rounded,
+            color: AppColors.charcoalBlue,
+            title: l10n.t('haveInviteTitle'),
+            description: l10n.t('haveInviteDescription'),
+            actionLabel: l10n.t('haveInvite'),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              context.go('/invite');
+            },
           ),
         ],
       ),
-      actionsBelow: Center(
-        child: Text(
-          '${l10n.t('appName')} • v0.1',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.5,
+      actionsBelow: Column(
+        children: [
+          //Scorciatoia per andare direttamente al login se l'utente è già
+          //configurato. Mostriamo questo link più piccolo perché normalmente
+          //il bootstrap automatico ci porta già al login.
+          TextButton.icon(
+            onPressed: () => context.go('/login'),
+            icon: const Icon(Icons.login_rounded, size: 18),
+            label: Text(l10n.t('alreadyConfigured')),
           ),
-        ),
+          const SizedBox(height: 6),
+          Text(
+            '${l10n.t('appName')} • v0.1',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -102,6 +127,7 @@ class _ChoiceCard extends StatelessWidget {
     required this.description,
     required this.actionLabel,
     required this.onTap,
+    this.recommended = false,
   });
 
   final IconData icon;
@@ -110,6 +136,7 @@ class _ChoiceCard extends StatelessWidget {
   final String description;
   final String actionLabel;
   final VoidCallback? onTap;
+  final bool recommended;
 
   @override
   Widget build(BuildContext context) {
@@ -144,11 +171,35 @@ class _ChoiceCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        if (recommended)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              AppL10n.of(context).t('recommendedBadge'),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: color,
+                                letterSpacing: 1.4,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(

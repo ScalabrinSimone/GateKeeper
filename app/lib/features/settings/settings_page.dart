@@ -329,10 +329,56 @@ class _SettingsPageState extends State<SettingsPage> {
           _Section(
             title: l10n.t('connectivity'),
             children: [
+              //Stato attuale: house name + URL, ben visibile in alto.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.wifi_tethering_rounded,
+                          color: AppColors.success, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            hub?.houseName ?? l10n.t('houseLabel'),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w900),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            ApiConfig.baseUrl ?? '—',
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  fontFamily: 'monospace',
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.55),
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               _Tile(
                 icon: Icons.router_rounded,
-                title: l10n.t('currentHub'),
-                subtitle: '${hub?.houseName ?? l10n.t('houseLabel')} • ${ApiConfig.baseUrl ?? '—'}',
+                title: l10n.t('changeHubTitle'),
+                subtitle: l10n.t('changeHubSubtitle'),
                 trailing: GKButton(
                   onPressed: () => context.go('/onboarding/discover'),
                   label: l10n.t('changeHub'),

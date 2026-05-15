@@ -109,10 +109,14 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
       setState(() => _error = AppL10n.of(context).t('webPairHint'));
       return;
     }
+    //Su desktop/web il bottom-sheet può occupare l'intera finestra:
+    //limitiamo la larghezza per evitare overflow del preview camera.
     final result = await showModalBottomSheet<HubQrDto>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Theme.of(context).cardColor,
+      constraints: const BoxConstraints(maxWidth: 480),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),

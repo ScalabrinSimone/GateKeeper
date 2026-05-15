@@ -73,64 +73,81 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
     final theme = Theme.of(context);
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
+      //Limite massimo per evitare overflow su finestre grandi (desktop/web).
+      //Centriamo il contenuto e lasciamo il preview in proporzione 1:1
+      //ma con un cap di 320px così resta sempre dentro la viewport.
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460, maxHeight: 620),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.qr_code_scanner_rounded,
-                    color: AppColors.stormyTeal),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    l10n.t('scanPairingQr'),
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              l10n.t('scanPairingQrHint'),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                fontStyle: FontStyle.italic,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 12),
-            AspectRatio(
-              aspectRatio: 1,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Stack(
-                  fit: StackFit.expand,
+                Row(
                   children: [
-                    MobileScanner(
-                      controller: _controller,
-                      onDetect: _onDetect,
-                      errorBuilder: (ctx, err, _) => _ScannerError(error: err),
-                    ),
-                    //Overlay decorativo: cornice angolare.
-                    IgnorePointer(
-                      child: CustomPaint(
-                        painter: _CornerFramePainter(),
+                    const Icon(Icons.qr_code_scanner_rounded,
+                        color: AppColors.stormyTeal),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        l10n.t('scanPairingQr'),
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.t('scanPairingQrHint'),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontStyle: FontStyle.italic,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: 320,
+                      maxHeight: 320,
+                    ),
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            MobileScanner(
+                              controller: _controller,
+                              onDetect: _onDetect,
+                              errorBuilder: (ctx, err, _) =>
+                                  _ScannerError(error: err),
+                            ),
+                            //Overlay decorativo: cornice angolare.
+                            IgnorePointer(
+                              child: CustomPaint(
+                                painter: _CornerFramePainter(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
-            const SizedBox(height: 8),
-          ],
+          ),
         ),
       ),
     );

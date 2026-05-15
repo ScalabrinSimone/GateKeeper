@@ -15,6 +15,7 @@ import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
+import 'widgets/invite_share_dialog.dart';
 import 'widgets/permissions_sheet.dart';
 
 //Vista membri del nucleo familiare.
@@ -177,38 +178,7 @@ class _MembersPageState extends State<MembersPage> {
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(l10n.t('inviteByCode')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${l10n.t('role')}: ${inv.role.toUpperCase()}'),
-              const SizedBox(height: 8),
-              SelectableText(inv.token,
-                  style: const TextStyle(fontFamily: 'monospace')),
-            ],
-          ),
-          actions: [
-            TextButton.icon(
-              icon: const Icon(Icons.copy_rounded, size: 18),
-              label: Text(l10n.t('copyCode')),
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: inv.token));
-                if (ctx.mounted) Navigator.of(ctx).pop();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.t('inviteCopiedBody'))),
-                  );
-                }
-              },
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(l10n.t('close')),
-            ),
-          ],
-        ),
+        builder: (_) => InviteShareDialog(invite: inv),
       );
       _refresh();
     } on ApiException catch (e) {
@@ -334,6 +304,10 @@ class _MembersPageState extends State<MembersPage> {
                 _PendingInvites(
                   invites: _invites,
                   onRevoke: _revokeInvite,
+                  onShowQr: (inv) => showDialog<void>(
+                    context: context,
+                    builder: (_) => InviteShareDialog(invite: inv),
+                  ),
                   onCopy: (inv) async {
                     await Clipboard.setData(ClipboardData(text: inv.token));
                     if (!context.mounted) return;
@@ -356,11 +330,13 @@ class _PendingInvites extends StatelessWidget {
     required this.invites,
     required this.onRevoke,
     required this.onCopy,
+    required this.onShowQr,
   });
 
   final List<InviteDto> invites;
   final Future<void> Function(InviteDto) onRevoke;
   final Future<void> Function(InviteDto) onCopy;
+  final void Function(InviteDto) onShowQr;
 
   @override
   Widget build(BuildContext context) {
@@ -416,6 +392,12 @@ class _PendingInvites extends StatelessWidget {
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    onPressed: () => onShowQr(inv),
+                    icon: const Icon(Icons.qr_code_2_rounded),
+                    tooltip: l10n.t('showInviteQr'),
+                    color: AppColors.stormyTeal,
                   ),
                   IconButton(
                     onPressed: () => onCopy(inv),

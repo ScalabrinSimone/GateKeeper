@@ -16,6 +16,8 @@ FEATURES:
 from __future__ import annotations
 
 import argparse
+import os
+import re
 import threading
 import time
 from typing import Callable, Optional
@@ -134,17 +136,69 @@ def sendCommand(
 
 
 # =========================================================
-# PARSER TAG RFID
+# PARSER TAG RFID (tollerante a più firmware)
 # =========================================================
+
+# Espressione che cattura blocchi esadecimali "lunghi" (>=12 hex char) che
+# tipicamente rappresentano l'EPC (24 char per tag UHF EPC Gen2 da 96 bit).
+# Esempi di linee accettate:
+#   "U30001234ABCD..."
+#   "EPC: 3000 1234 ABCD ..."
+#   "3000 1234 ABCD 5678 9ABC DEF0"
+#   "\x02U30001234...\x03"
+_HEX_TOKEN_RE = re.compile(r"[0-9A-Fa-f]{12,}")
+
+# Righe-echo o di handshake comuni che vogliamo ignorare.
+_IGNORE_PREFIXES = ("V", "S", "N", "W", "u", ">", "<", "OK", "ERR")
+
+# Quando GK_RFID_DEBUG=1 stampiamo tutto il raw seriale: utile per capire
+# il protocollo di un firmware nuovo senza dover modificare il codice.
+_DEBUG_MODE = os.environ.get("GK_RFID_DEBUG", "").strip() in ("1", "true", "True", "yes")
+
+
+def _normalize_hex(text: str) -> str:
+    """Rimuove spazi/separatori comuni dentro un token esadecimale."""
+    return re.sub(r"[\s\-:]", "", text).upper()
 
 
 def parseTag(line: str) -> Optional[str]:
-    """Estrae EPC dalla risposta RFID."""
+    """Estrae l'EPC dalla risposta seriale.
 
-    line = line.strip()
+    Strategia (in ordine):
+    1. il classico formato Chafon: la riga inizia con 'U' seguita dall'EPC,
+    2. estrazione di un token hex lungo (≥12 char) ovunque nella riga,
+    3. ignora righe vuote, echo dei comandi (V/S/N/W/u/...) e prompt.
 
-    if line.startswith("U") and len(line) > 5:
-        return line[1:].strip()
+    Restituisce l'EPC in maiuscolo, senza separatori, oppure None.
+    """
+    if not line:
+        return None
+    # Rimuovi byte STX/ETX e altri caratteri di controllo non stampabili.
+    cleaned = "".join(ch for ch in line if ch.isprintable() or ch in (" ", "\t"))
+    cleaned = cleaned.strip()
+    if not cleaned:
+        return None
+
+    if _DEBUG_MODE:
+        log("DBG", f"line={cleaned!r}")
+
+    # 1) Formato classico: U<hex>
+    if cleaned.startswith("U") and len(cleaned) > 5:
+        candidate = _normalize_hex(cleaned[1:])
+        if re.fullmatch(r"[0-9A-F]{12,}", candidate):
+            return candidate
+
+    # 2) Echo/handshake → ignora.
+    for prefix in _IGNORE_PREFIXES:
+        if cleaned.startswith(prefix) and not _HEX_TOKEN_RE.search(cleaned):
+            return None
+
+    # 3) Token esadecimale più lungo presente nella riga.
+    matches = _HEX_TOKEN_RE.findall(cleaned)
+    if matches:
+        # Prendiamo il match più lungo per evitare di catturare codici brevi.
+        best = max(matches, key=len)
+        return _normalize_hex(best)
 
     return None
 
@@ -315,6 +369,8 @@ def _readerInnerLoop(
 
                 if data:
                     buffer += data
+                    if _DEBUG_MODE:
+                        log("DBG", f"raw={data!r}")
 
                 while "\n" in buffer or "\r" in buffer:
                     if "\n" in buffer:

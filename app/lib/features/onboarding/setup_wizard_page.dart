@@ -11,6 +11,7 @@ import '../../data/gatekeeper_api.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../auth/widgets/auth_scaffold.dart';
 import '../auth/widgets/gk_text_field.dart';
+import '../members/widgets/invite_share_dialog.dart';
 
 //Wizard di prima configurazione, stile "prodotto consumer".
 //Step 0 - Welcome: piccola intro pop su come funziona il sistema.
@@ -642,6 +643,15 @@ class _InviteStep extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  tooltip: l10n.t('showInviteQr'),
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => InviteShareDialog(invite: inv),
+                  ),
+                  icon: const Icon(Icons.qr_code_2_rounded,
+                      color: AppColors.stormyTeal),
                 ),
                 IconButton(
                   tooltip: l10n.t('copyCode'),

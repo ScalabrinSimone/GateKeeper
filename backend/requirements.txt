@@ -38,7 +38,8 @@ bleak==0.22.3
 
 # QR-code di pairing stampato in console all'avvio del backend
 # (mostra URL hub + factory_code finché l'hub non è accoppiato).
-qrcode==7.4.2
+# L'extra [pil] abilita la generazione del PNG fallback su disco.
+qrcode[pil]==7.4.2
 
 # Dipendenze runtime usate dal codice o richieste dai pacchetti principali
 annotated-types==0.7.0
