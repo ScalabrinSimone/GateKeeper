@@ -10,6 +10,7 @@ class GKTextField extends StatelessWidget {
     required this.label,
     this.hint,
     this.prefixIcon,
+    this.suffixIcon,
     this.obscureText = false,
     this.keyboardType,
     this.textInputAction,
@@ -23,6 +24,7 @@ class GKTextField extends StatelessWidget {
   final String label;
   final String? hint;
   final IconData? prefixIcon;
+  final Widget? suffixIcon;
   final bool obscureText;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
@@ -53,6 +55,7 @@ class GKTextField extends StatelessWidget {
           prefixIcon: prefixIcon != null
               ? Icon(prefixIcon, color: AppColors.stormyTeal, size: 20)
               : null,
+          suffixIcon: suffixIcon,
         ),
       ),
     );

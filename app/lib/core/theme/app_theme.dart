@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
 //Costruisce i ThemeData per modalità chiara e scura.
 class AppTheme {
   AppTheme._();
-
-  //Famiglia di font: si usa il default Material per evitare fetch web pesanti.
-  static const String _fontFamily = 'Inter';
 
   static ThemeData get dark => _build(
         brightness: Brightness.dark,
@@ -53,10 +51,9 @@ class AppTheme {
       splashFactory: InkSparkle.splashFactory,
     );
 
-    final textTheme = base.textTheme.apply(
+    final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
       bodyColor: text,
       displayColor: text,
-      fontFamily: _fontFamily,
     );
 
     return base.copyWith(
@@ -100,6 +97,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(24),
           borderSide: const BorderSide(color: AppColors.stormyTeal, width: 1.5),
         ),
+        labelStyle: TextStyle(color: text),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: card,
@@ -126,6 +124,7 @@ class AppTheme {
         style: TextButton.styleFrom(
           foregroundColor: AppColors.stormyTeal,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: TextStyle(color: text),
         ),
       ),
       tooltipTheme: TooltipThemeData(

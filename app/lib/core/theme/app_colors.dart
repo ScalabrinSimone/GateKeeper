@@ -21,7 +21,7 @@ class AppColors {
   static const Color darkText = lavenderBlush;
 
   //Stack tema chiaro.
-  static const Color lightBg = Color(0xFFF8F9FA);
+  static const Color lightBg = lavenderBlush;
   static const Color lightCard = Colors.white;
   static const Color lightBorder = Color(0xFFE9ECEF);
   static const Color lightText = Color(0xFF1A1D23);

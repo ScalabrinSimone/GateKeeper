@@ -30,6 +30,7 @@ dependencies:
   mobile_scanner: ^5.2.3
   # Rendering QR (utile in futuro per condividere inviti come QR).
   qr_flutter: ^4.1.0
+  google_fonts: ^8.1.0
 
 dev_dependencies:
   flutter_test:

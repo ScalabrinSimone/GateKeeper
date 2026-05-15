@@ -20,7 +20,7 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _identifierCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -28,10 +28,38 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscure = true;
   String? _error;
 
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.2),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+
+    _animationController.forward();
+  }
+
+
   @override
   void dispose() {
     _identifierCtrl.dispose();
     _passwordCtrl.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -73,99 +101,99 @@ class _LoginPageState extends State<LoginPage> {
           : l10n.t('signInSubtitle'),
       child: Form(
         key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            GKTextField(
-              controller: _identifierCtrl,
-              label: l10n.t('usernameOrEmail'),
-              prefixIcon: Icons.person_rounded,
-              autofocus: true,
-              textInputAction: TextInputAction.next,
-              validator: (v) => (v == null || v.trim().isEmpty) ? l10n.t('requiredField') : null,
-            ),
-            GKTextField(
-              controller: _passwordCtrl,
-              label: l10n.t('password'),
-              prefixIcon: Icons.lock_rounded,
-              obscureText: _obscure,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
-              validator: (v) => (v == null || v.isEmpty) ? l10n.t('requiredField') : null,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextButton.icon(
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                  icon: Icon(_obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded, size: 18),
-                  label: Text(_obscure ? l10n.t('show') : l10n.t('hide')),
+                GKTextField(
+                  controller: _identifierCtrl,
+                  label: l10n.t('usernameOrEmail'),
+                  prefixIcon: Icons.person_rounded,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? l10n.t('requiredField') : null,
                 ),
-                TextButton(
-                  onPressed: () => context.go('/recover'),
-                  child: Text(l10n.t('forgotPassword')),
+                const SizedBox(height: 16),
+                GKTextField(
+                  controller: _passwordCtrl,
+                  label: l10n.t('password'),
+                  prefixIcon: Icons.lock_rounded,
+                  obscureText: _obscure,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  validator: (v) => (v == null || v.isEmpty) ? l10n.t('requiredField') : null,
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
                 ),
-              ],
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => context.go('/recover'),
+                    child: Text(l10n.t('forgotPassword')),
+                  ),
                 ),
-                child: Row(
+                if (_error != null) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _error!,
+                            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                GKButton(
+                  onPressed: _busy ? null : _submit,
+                  label: _busy ? l10n.t('loadingDots') : l10n.t('signInAction'),
+                  icon: Icons.login_rounded,
+                  expanded: true,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _error!,
-                        style: theme.textTheme.bodySmall?.copyWith(color: AppColors.danger, fontWeight: FontWeight.w600),
-                      ),
+                    TextButton.icon(
+                      onPressed: () => context.go('/welcome'),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                      label: Text(l10n.t('back')),
+                    ),
+                    const SizedBox(width: 16),
+                    TextButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              await widget.auth.leaveHome();
+                              if (!context.mounted) return;
+                              context.go('/welcome');
+                            },
+                      icon: const Icon(Icons.exit_to_app_rounded, size: 18),
+                      label: Text(l10n.t('leaveHome')),
                     ),
                   ],
                 ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            GKButton(
-              onPressed: _busy ? null : _submit,
-              label: _busy ? l10n.t('loadingDots') : l10n.t('signInAction'),
-              icon: Icons.login_rounded,
-              expanded: true,
-            ),
-            const SizedBox(height: 8),
-            //Doppia uscita: o si torna alla scelta hub (riconnetti a una
-            //casa esistente) oppure si "esce dalla casa" per associare il
-            //dispositivo ad un'altra (o configurarne una nuova).
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: () => context.go('/welcome'),
-                    icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                    label: Text(l10n.t('back')),
-                  ),
-                ),
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: _busy
-                        ? null
-                        : () async {
-                            await widget.auth.leaveHome();
-                            if (!context.mounted) return;
-                            context.go('/welcome');
-                          },
-                    icon: const Icon(Icons.exit_to_app_rounded, size: 18),
-                    label: Text(l10n.t('leaveHome')),
-                  ),
-                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

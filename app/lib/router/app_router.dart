@@ -97,34 +97,93 @@ class AppRouter {
               AppShell(navigationShell: navigationShell, settings: settings, auth: auth),
           branches: [
             StatefulShellBranch(routes: [
-              GoRoute(path: '/dashboard', builder: (_, __) => const DashboardPage()),
+              GoRoute(
+                path: '/dashboard',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const DashboardPage(),
+                ),
+              ),
             ]),
             StatefulShellBranch(routes: [
-              GoRoute(path: '/objects', builder: (_, __) => const ObjectsPage()),
+              GoRoute(
+                path: '/objects',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const ObjectsPage(),
+                ),
+              ),
             ]),
             StatefulShellBranch(routes: [
-              GoRoute(path: '/events', builder: (_, __) => const EventsPage()),
+              GoRoute(
+                path: '/events',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const EventsPage(),
+                ),
+              ),
             ]),
             StatefulShellBranch(routes: [
-              GoRoute(path: '/members', builder: (_, __) => const MembersPage()),
+              GoRoute(
+                path: '/members',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const MembersPage(),
+                ),
+              ),
             ]),
             StatefulShellBranch(routes: [
-              GoRoute(path: '/notifications', builder: (_, __) => const NotificationsPage()),
+              GoRoute(
+                path: '/notifications',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const NotificationsPage(),
+                ),
+              ),
             ]),
             StatefulShellBranch(routes: [
               GoRoute(
                 path: '/settings',
-                builder: (_, __) => SettingsPage(settings: settings, auth: auth),
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: SettingsPage(settings: settings, auth: auth),
+                ),
               ),
             ]),
             StatefulShellBranch(routes: [
-              GoRoute(path: '/account', builder: (_, __) => AccountPage(auth: auth)),
+              GoRoute(
+                path: '/account',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: AccountPage(auth: auth),
+                ),
+              ),
             ]),
           ],
         ),
       ],
     );
   }
+}
+
+CustomTransitionPage _buildPageWithFadeTransition<T>({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+        FadeTransition(opacity: animation, child: child),
+  );
 }
 
 //Splash + bootstrap. Si vede solo qualche istante.

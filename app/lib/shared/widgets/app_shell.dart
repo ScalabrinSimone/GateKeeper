@@ -187,8 +187,45 @@ class _SidebarItem extends StatefulWidget {
   State<_SidebarItem> createState() => _SidebarItemState();
 }
 
-class _SidebarItemState extends State<_SidebarItem> {
+class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderStateMixin {
   bool _hover = false;
+  late AnimationController _animationController;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
+    _glowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+
+    if (widget.selected) {
+      _animationController.forward();
+    } else {
+      _animationController.reverse();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _SidebarItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected) {
+      _animationController.forward();
+    } else {
+      _animationController.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -196,10 +233,10 @@ class _SidebarItemState extends State<_SidebarItem> {
     final accent = widget.highlight ? AppColors.orangeGold : AppColors.stormyTeal;
 
     final bg = widget.selected
-        ? accent.withValues(alpha: 0.18)
-        : (_hover ? scheme.onSurface.withValues(alpha: 0.06) : Colors.transparent);
+        ? accent.withOpacity(0.18)
+        : (_hover ? scheme.onSurface.withOpacity(0.06) : Colors.transparent);
 
-    final fg = widget.selected ? accent : scheme.onSurface.withValues(alpha: 0.85);
+    final fg = widget.selected ? accent : scheme.onSurface.withOpacity(0.85);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -216,6 +253,14 @@ class _SidebarItemState extends State<_SidebarItem> {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              if (widget.selected)
+                BoxShadow(
+                  color: accent.withOpacity(_glowAnimation.value * 0.3),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+            ],
           ),
           child: Row(
             children: [
@@ -227,7 +272,11 @@ class _SidebarItemState extends State<_SidebarItem> {
                 height: 20,
                 margin: EdgeInsets.only(right: widget.selected ? 10 : 0),
                 decoration: BoxDecoration(
-                  color: accent,
+                  gradient: LinearGradient(
+                    colors: [accent, accent.withOpacity(0.6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
