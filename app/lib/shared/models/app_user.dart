@@ -12,6 +12,8 @@ class AppUser {
     this.avatarUrl,
     this.isActive = true,
     this.currentLocation,
+    this.email,
+    this.permissions = const <String, bool>{},
   });
 
   final String id;
@@ -22,6 +24,14 @@ class AppUser {
   final String? avatarUrl;
   final bool isActive;
   final String? currentLocation;
+  final String? email;
+  //Permessi granulari. Per admin sono tutti true.
+  final Map<String, bool> permissions;
+
+  bool can(String key) {
+    if (role == UserRole.admin) return true;
+    return permissions[key] == true;
+  }
 
   String get initials {
     final parts = name.trim().split(RegExp(r'\s+'));

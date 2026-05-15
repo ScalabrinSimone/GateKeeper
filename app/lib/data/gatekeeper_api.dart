@@ -5,6 +5,7 @@ import 'api/events_api.dart';
 import 'api/hub_api.dart';
 import 'api/invites_api.dart';
 import 'api/logs_api.dart';
+import 'api/rfid_api.dart';
 import 'api/users_api.dart';
 
 //Facade che espone tutti gli API client. Singleton per semplicità.
@@ -19,6 +20,7 @@ class GateKeeperApi {
     events = EventsApi(_client);
     logs = LogsApi(_client);
     invites = InvitesApi(_client);
+    rfid = RfidApi(_client);
   }
 
   static final GateKeeperApi instance = GateKeeperApi._();
@@ -31,6 +33,7 @@ class GateKeeperApi {
   late final EventsApi events;
   late final LogsApi logs;
   late final InvitesApi invites;
+  late final RfidApi rfid;
 
   void setToken(String? token) => _client.setToken(token);
   String? get token => _client.token;

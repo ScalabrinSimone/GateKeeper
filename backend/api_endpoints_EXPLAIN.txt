@@ -200,7 +200,10 @@ python run_all.py
 Opzioni utili:
   --reset-db           cancella e ricrea il database all'avvio
   --factory-reset      esegue un factory reset (rigenera factory_code)
-  --seed-test          popola un account di test (utente "test" / pwd "test1234")
+
+Nota: in passato esisteva l'opzione --seed-test (utente di prova). È stata
+rimossa: il primo utente deve sempre essere creato via app facendo il
+pairing dell'hub.
 
 ================================================================
 NUOVI ENDPOINT (auth, pairing, invites, recovery, factory reset)
@@ -254,3 +257,22 @@ NUOVI ENDPOINT (auth, pairing, invites, recovery, factory reset)
       broadcast sulla porta 51820.
     - L'app manda "GATEKEEPER_DISCOVER?" in broadcast e l'hub risponde con
       un JSON che include api_port, paired e house_name.
+
+11) PERMESSI MEMBRI
+   a) PUT /users/{user_id}/permissions
+      - Solo admin. Aggiorna i permessi granulari del membro.
+      - Chiavi: can_manage_devices, can_manage_users, can_view_events,
+        can_manage_invites, can_acknowledge_alerts, can_configure_hub.
+
+12) RFID SCAN (registrazione tag)
+   a) GET /rfid/scan/latest  -> ultimo tag sconosciuto rilevato (o null).
+   b) GET /rfid/scan         -> lista degli ultimi tag sconosciuti.
+   c) DELETE /rfid/scan/{tag}-> rimuove un tag dal buffer (consumato).
+   - Richiede ruolo admin oppure permesso can_manage_devices.
+
+13) PUSH TOKENS (FCM/APNs)
+   a) POST /users/me/push-token { token, platform }
+      - Registra il token push del dispositivo per l'utente loggato.
+   b) DELETE /users/me/push-token?token=...
+      - Rimuove un token (logout di quel dispositivo).
+

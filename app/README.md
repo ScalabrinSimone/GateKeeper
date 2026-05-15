@@ -171,11 +171,16 @@ lib/data/
 
 ### 8.2 Configurazione URL
 
-`core/config/api_config.dart` mantiene la base URL persistita. All'avvio:
+`core/config/api_config.dart` mantiene la base URL persistita. **Non c'è
+più un valore di default funzionante**: l'app parte solo dopo che l'utente
+ha trovato un hub via discovery (`DiscoveryService`) oppure ha inserito un
+URL manuale (LAN o tunnel remoto).
 
-1. `ApiConfig.load()` legge l'ultima base URL salvata,
-2. l'utente può cambiarla manualmente o, meglio, scoprirla via
-   `DiscoveryService.discover()` durante il pairing.
+1. `ApiConfig.load()` legge l'ultima base URL salvata (o `null`).
+2. Se `null`, l'app forza il flow di pairing.
+3. Una volta configurata, viene anche aggiunta agli "hub recenti"
+   (`ApiConfig.recentHubs()`), così la schermata di discovery propone in
+   testa l'URL precedente per riconnettersi con un tap.
 
 ### 8.3 Sessione e auth
 
@@ -264,25 +269,122 @@ L'app gira su Windows, macOS, Linux, Android, iOS, Web. Restrizioni:
 - **Storage sicuro del token**: nativo via `flutter_secure_storage`, su
   web fallback a `shared_preferences`.
 
-## 12. Account di test
+## 12. Accesso remoto (Cloudflare Tunnel)
 
-In sviluppo, è disponibile un seed per saltare il pairing:
+L'app è progettata per essere usata anche fuori casa, **senza port-forwarding
+e senza app aggiuntive sul telefono**. La soluzione consigliata è un tunnel
+HTTPS in uscita dal Raspberry (Cloudflare Tunnel, gratuito per uso
+personale).
 
-```powershell
-cd backend
-python run_all.py --seed-test
-```
+Configurazione lato Raspberry (una tantum):
 
-Lo script crea automaticamente:
+1. Installa `cloudflared` sul Raspberry:
+   ```bash
+   sudo apt-get install -y curl
+   curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb
+   sudo dpkg -i cloudflared.deb
+   ```
+2. Autenticati al tuo account Cloudflare (basta un dominio gestito su
+   Cloudflare, anche gratuito):
+   ```bash
+   cloudflared tunnel login
+   ```
+3. Crea il tunnel e prendine nota dell'UUID:
+   ```bash
+   cloudflared tunnel create gatekeeper-home
+   ```
+4. Mappa l'API locale del Pi (`http://127.0.0.1:8000`) su un sottodominio:
+   ```bash
+   cloudflared tunnel route dns gatekeeper-home gatekeeper.example.com
+   ```
+5. Crea il file di configurazione `~/.cloudflared/config.yml`:
+   ```yaml
+   tunnel: <UUID-DEL-TUNNEL>
+   credentials-file: /home/pi/.cloudflared/<UUID>.json
+   ingress:
+     - hostname: gatekeeper.example.com
+       service: http://127.0.0.1:8000
+     - service: http_status:404
+   ```
+6. Avvialo come servizio:
+   ```bash
+   sudo cloudflared service install
+   sudo systemctl enable --now cloudflared
+   ```
 
-- admin di test: `test` / `test1234` (email `test@local.test`),
-- casa "Casa Demo", dispositivi e log demo,
-- un invito attivo (token stampato in console).
+A questo punto il backend è raggiungibile su
+`https://gatekeeper.example.com`.
 
-Una volta partito il backend, in app basta scegliere _Accedi_ e usare
-queste credenziali.
+### Lato app
 
-## 9. Setup e avvio
+- Impostazioni → _Accesso remoto_ → incolla l'URL `https://...` e tocca
+  **Usa questo URL**: l'app userà subito il tunnel come hub (oppure salva
+  l'URL per averlo a portata di mano).
+- Quando torni in LAN, basta riaprire la sezione _Connettività_ → _Cambia
+  hub_ per tornare alla scansione locale.
+- L'URL viene anche memorizzato negli "hub recenti" della schermata di
+  discovery: un tap basta per ricollegarsi.
+
+### Sicurezza minima consigliata
+
+- Usa una password forte e MFA sull'account Cloudflare.
+- Aggiungi una policy _Cloudflare Access_ sul sottodominio (es. login con
+  email magica) per evitare che il backend sia pubblicamente esposto.
+- Il backend continua a richiedere il bearer token JWT: il tunnel è solo
+  trasporto.
+
+## 13. Notifiche push remote (FCM/APNs)
+
+L'app gestisce già notifiche **locali** (con `flutter_local_notifications`)
+e, per la consegna remota anche con app chiusa, ha tutta l'infrastruttura
+necessaria lato backend e lato client:
+
+- `users` ha un campo `push_tokens` con le voci `{token, platform,
+  registered_at}`,
+- gli endpoint `POST /users/me/push-token` e
+  `DELETE /users/me/push-token?token=...` registrano/rimuovono i token,
+- la sezione _Impostazioni → Notifiche push_ ha un toggle che inizializza
+  `PushNotificationsService` e invia il token al backend.
+
+Per **attivare davvero** le push servono pochi passi che devi fornirmi
+tu (ti basta passare i file di config):
+
+1. Crea un progetto su Firebase Console.
+2. Aggiungi un'app **Android** (package `com.example.gatekeeper_app` o quello
+   reale) e/o **iOS**:
+   - Android: scarica `google-services.json` e mettilo in
+     `app/android/app/`.
+   - iOS: scarica `GoogleService-Info.plist` e mettilo in
+     `app/ios/Runner/`.
+3. Aggiungi alle dipendenze (apri `app/pubspec.yaml`):
+   ```yaml
+   firebase_core: ^3.6.0
+   firebase_messaging: ^15.1.3
+   ```
+4. Esegui `flutterfire configure` (CLI di FlutterFire) per generare
+   `firebase_options.dart`.
+5. In `app/lib/data/services/push_notifications_service.dart` sostituisci
+   il TODO nel metodo `_tryGetFcmToken()` con:
+   ```dart
+   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+   final messaging = FirebaseMessaging.instance;
+   await messaging.requestPermission();
+   return await messaging.getToken();
+   ```
+6. Lato backend, per inviare effettivamente le notifiche, basta aggiungere
+   un worker (in `backend/app/services/`) che usa la _Server Key_ FCM
+   (o le credenziali APNs) per fare `POST` a
+   `https://fcm.googleapis.com/v1/projects/<project_id>/messages:send`
+   verso i `push_tokens` dei membri interessati. Quel worker non è ancora
+   incluso perché dipende dai segreti che fornirai.
+
+In sintesi, per attivare le push push:
+- mi servono **`google-services.json`** (Android) e/o
+  **`GoogleService-Info.plist`** (iOS) e la **Server Key FCM**;
+- li metto nei posti giusti e completo il `_tryGetFcmToken` + invio dal
+  backend.
+
+## 14. Setup e avvio
 
 Requisiti: Flutter stable >= 3.41.
 
@@ -296,7 +398,7 @@ flutter test             # test
 
 Il primo avvio web genera anche le risorse in `web/` (già committate).
 
-## 10. Test
+## 15. Test
 
 `test/widget_test.dart` esegue un piccolo smoke test:
 
@@ -304,7 +406,7 @@ Il primo avvio web genera anche le risorse in `web/` (già committate).
 - crea il `SettingsController`,
 - monta la `GateKeeperApp` e verifica la presenza di "Dashboard" nella UI.
 
-## 11. Note didattiche (per imparare Flutter da questa app)
+## 16. Note didattiche (per imparare Flutter da questa app)
 
 - `StatefulShellRoute.indexedStack` mantiene un widget per ogni branch così
   lo stato (es. scroll, filtri) non si resetta cambiando tab.
@@ -317,17 +419,17 @@ Il primo avvio web genera anche le risorse in `web/` (già committate).
 - `ChangeNotifier` + `addListener` è il pattern più leggero per uno stato
   globale "tipo Provider", senza dipendere da librerie esterne.
 
-## 13. TODO noti
+## 17. TODO noti
 
 - Refresh token e revoca server-side dei token (oggi il token è solo verificato
   via HMAC + TTL).
-- Push remoto vero (FCM/APNs) per notifiche con app chiusa.
-- Sostituire del tutto `MockData` quando il backend è raggiungibile
-  (attualmente è usato come fallback se l'API non risponde).
-- Cloudflare Tunnel/Zero Trust per l'accesso remoto al Raspberry.
-- Test widget per il wizard di onboarding.
+- Worker backend per consegna effettiva delle push (richiede Server Key FCM).
+- Endpoint `/events/{id}/resolve` per persistere la risoluzione di un alert
+  (oggi è solo locale al client).
+- Test widget per il wizard di onboarding e per il flusso di registrazione
+  invitato.
 
-## 14. Convenzioni commenti
+## 18. Convenzioni commenti
 
 Tutti i commenti seguono la regola del progetto: iniziano con `//` senza
 spazio, terminano con un punto, sono in italiano. Esempi:

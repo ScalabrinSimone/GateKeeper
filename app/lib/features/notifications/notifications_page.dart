@@ -3,24 +3,71 @@ import 'package:intl/intl.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/theme/app_colors.dart';
-import '../../shared/data/mock_data.dart';
+import '../../data/repositories/repositories.dart';
 import '../../shared/models/enums.dart';
 import '../../shared/models/gate_event.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
 import '../../shared/widgets/section_header.dart';
 
-//Centro notifiche: filtra gli eventi critici e li mostra come avvisi.
-class NotificationsPage extends StatelessWidget {
+//Centro notifiche: filtra gli eventi critici (alert) provenienti dal
+//backend e li mostra come avvisi.
+class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
+
+  @override
+  State<NotificationsPage> createState() => _NotificationsPageState();
+}
+
+class _NotificationsPageState extends State<NotificationsPage> {
+  List<GateEvent> _items = const [];
+  bool _loading = true;
+  //Set di id "letti" lato app: la persistenza completa richiederebbe un
+  //endpoint dedicato. Per ora è solo UI feedback.
+  final Set<String> _read = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final events = await EventsRepository.list();
+      if (!mounted) return;
+      setState(() {
+        _items = events
+            .where((e) => e.severity == EventSeverity.critical)
+            .toList(growable: false);
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _items = const [];
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
-    final items = MockData.events.where((e) => e.severity == EventSeverity.critical).toList(growable: false);
+    final items = _items;
 
-    return SingleChildScrollView(
+    if (_loading) {
+      return const Center(
+          child: CircularProgressIndicator(color: AppColors.stormyTeal));
+    }
+
+    return RefreshIndicator(
+      color: AppColors.stormyTeal,
+      onRefresh: _load,
+      child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -30,7 +77,13 @@ class NotificationsPage extends StatelessWidget {
             subtitle: l10n.t('stayUpdated'),
             actions: [
               GKButton(
-                onPressed: () {},
+                onPressed: items.isEmpty
+                    ? null
+                    : () => setState(() {
+                          for (final e in items) {
+                            _read.add(e.id);
+                          }
+                        }),
                 label: l10n.t('markAsRead'),
                 icon: Icons.done_all_rounded,
                 variant: GKButtonVariant.ghost,
@@ -63,18 +116,20 @@ class NotificationsPage extends StatelessWidget {
             )
           else
             for (final n in items) ...[
-              _NotificationCard(event: n),
+              _NotificationCard(event: n, read: _read.contains(n.id)),
               const SizedBox(height: 12),
             ],
         ],
       ),
+    ),
     );
   }
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({required this.event});
+  const _NotificationCard({required this.event, this.read = false});
   final GateEvent event;
+  final bool read;
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +138,9 @@ class _NotificationCard extends StatelessWidget {
     final critical = event.severity == EventSeverity.critical;
     final color = critical ? AppColors.orangeGold : AppColors.stormyTeal;
 
-    return GKCard(
+    return Opacity(
+      opacity: read ? 0.6 : 1,
+      child: GKCard(
       borderRadius: 32,
       padding: const EdgeInsets.all(20),
       background: critical ? AppColors.orangeGold.withValues(alpha: 0.06) : null,
@@ -136,13 +193,12 @@ class _NotificationCard extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_horiz_rounded),
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-          ),
+          if (read)
+            Icon(Icons.check_circle_rounded,
+                color: AppColors.success.withValues(alpha: 0.7), size: 18),
         ],
       ),
+    ),
     );
   }
 }

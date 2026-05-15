@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../data/api/api_exception.dart';
 import '../../data/api/dto.dart';
 import '../../data/gatekeeper_api.dart';
+import '../../data/services/push_notifications_service.dart';
 import '../config/api_config.dart';
 import '../storage/secure_storage.dart';
 
@@ -23,8 +26,23 @@ enum AuthStage {
 //Controller di autenticazione + pairing.
 //Esegue il bootstrap (carica config, valida token, verifica hub) e notifica
 //i cambi di stato al router via ChangeNotifier.
+//Esposto anche come `AuthController.instance` per evitare prop drilling
+//nelle pagine "deep" (es. objects/members) che hanno bisogno solo dello
+//user corrente per controlli di permesso. Le pagine entry-point (auth/onboarding)
+//continuano a riceverlo via costruttore.
 class AuthController extends ChangeNotifier {
-  AuthController({GateKeeperApi? api}) : _api = api ?? GateKeeperApi.instance;
+  AuthController({GateKeeperApi? api}) : _api = api ?? GateKeeperApi.instance {
+    _instance = this;
+  }
+
+  static AuthController? _instance;
+  static AuthController get instance {
+    final v = _instance;
+    if (v == null) {
+      throw StateError('AuthController non inizializzato.');
+    }
+    return v;
+  }
 
   static const _kTokenKey = 'gk.auth.token';
 
@@ -49,6 +67,17 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     await ApiConfig.load();
+
+    //Se non c'è un hub configurato vado direttamente al flow di pairing.
+    if (!ApiConfig.isConfigured) {
+      _user = null;
+      _hubInfo = null;
+      _api.setToken(null);
+      await SecureStorage.delete(_kTokenKey);
+      _stage = AuthStage.needsPairing;
+      notifyListeners();
+      return;
+    }
 
     //Recupero un eventuale token salvato.
     final saved = await SecureStorage.read(_kTokenKey);
@@ -89,6 +118,9 @@ class AuthController extends ChangeNotifier {
         final me = await _api.auth.me();
         _user = me;
         _stage = AuthStage.authenticated;
+        //Inizializzazione best-effort delle push: se Firebase non è
+        //configurato il servizio ritorna false senza errori.
+        unawaited(PushNotificationsService.instance.initialize());
         notifyListeners();
         return;
       } on ApiException catch (e) {
@@ -113,6 +145,7 @@ class AuthController extends ChangeNotifier {
     await SecureStorage.write(_kTokenKey, res.token);
     _user = res.user;
     _stage = AuthStage.authenticated;
+    unawaited(PushNotificationsService.instance.initialize());
     notifyListeners();
   }
 
@@ -171,7 +204,7 @@ class AuthController extends ChangeNotifier {
     _api.setToken(null);
     await SecureStorage.delete(_kTokenKey);
     _user = null;
-    _hubInfo = HubInfoDto(paired: false, requiresFactoryCode: true);
+    _hubInfo = const HubInfoDto(paired: false, requiresFactoryCode: true);
     _stage = AuthStage.needsPairing;
     notifyListeners();
   }

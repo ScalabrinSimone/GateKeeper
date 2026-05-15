@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/config/api_config.dart';
 import '../../core/i18n/app_l10n.dart';
+import '../../core/state/auth_controller.dart';
 import '../../core/theme/app_colors.dart';
-import '../../shared/data/mock_data.dart';
+import '../../data/repositories/repositories.dart';
 import '../../shared/models/app_user.dart';
 import '../../shared/models/gate_event.dart';
+import '../../shared/models/smart_object.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
 
 //Pagina Dashboard: vista bento con stato, salute hub, membri, oggetti, eventi live.
+//Carica tutto dal backend in parallelo; gli errori non bloccano la UI ma
+//mostrano sezioni vuote con CTA "Riprova" implicito (refresh pull-to-refresh).
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -20,9 +25,40 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  late final List<GateEvent> _events = List<GateEvent>.from(MockData.events);
+  List<GateEvent> _events = const [];
+  List<AppUser> _users = const [];
+  List<SmartObject> _objects = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    //Carico in parallelo: usiamo `Future.wait` per ridurre la latenza.
+    //Ogni fonte è già protetta da `catchError`, quindi non serve un
+    //try/catch esterno.
+    final results = await Future.wait([
+      EventsRepository.list().catchError((_) => <GateEvent>[]),
+      UsersRepository.list().catchError((_) => <AppUser>[]),
+      DevicesRepository.list().catchError((_) => <SmartObject>[]),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _events = List<GateEvent>.from(results[0] as List<GateEvent>);
+      _users = results[1] as List<AppUser>;
+      _objects = results[2] as List<SmartObject>;
+      _loading = false;
+    });
+  }
 
   void _resolve(GateEvent event) {
+    //Resolve è locale (UI-only) per ora: la persistenza nel backend
+    //richiederebbe un endpoint dedicato events/{id}/resolve. La marcatura
+    //rimane fino al prossimo refresh.
     setState(() {
       event.resolved = true;
     });
@@ -31,8 +67,14 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    final users = MockData.users;
-    final objects = MockData.objects;
+
+    if (_loading) {
+      return const Center(
+          child: CircularProgressIndicator(color: AppColors.stormyTeal));
+    }
+
+    final users = _users;
+    final objects = _objects;
 
     final unresolved = _events.where((e) => e.isUnresolved).toList(growable: false);
     final isSecure = unresolved.isEmpty;
@@ -42,7 +84,11 @@ class _DashboardPageState extends State<DashboardPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 1100;
-        return SingleChildScrollView(
+        return RefreshIndicator(
+          color: AppColors.stormyTeal,
+          onRefresh: _load,
+          child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,6 +173,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
             ],
           ),
+        ),
         );
       },
     );
@@ -232,7 +279,10 @@ class _HubCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppL10n.of(context);
-    const cpu = 0.42;
+    final hub = AuthController.instance.hubInfo;
+    final houseName = hub?.houseName ?? l10n.t('raspberryHub');
+    final apiVersion = hub?.apiVersion;
+    final baseUrl = ApiConfig.baseUrl;
 
     return GKCard(
       borderRadius: 28,
@@ -244,7 +294,7 @@ class _HubCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  l10n.t('raspberryHub'),
+                  houseName,
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -252,52 +302,50 @@ class _HubCard extends StatelessWidget {
               const Icon(Icons.memory_rounded, color: AppColors.stormyTeal),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Row(
             children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppColors.success,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  l10n.t('cpuTemp'),
+                  baseUrl ?? '—',
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    letterSpacing: 1.4,
+                    letterSpacing: 0.8,
                     fontWeight: FontWeight.w800,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontFamily: 'monospace',
                   ),
                 ),
               ),
-              Text(
-                '42°C',
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
             ],
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: cpu,
-              minHeight: 6,
-              backgroundColor: AppColors.stormyTeal.withValues(alpha: 0.12),
-              valueColor: const AlwaysStoppedAnimation(AppColors.stormyTeal),
+          if (apiVersion != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'API v$apiVersion',
+              style: theme.textTheme.labelSmall?.copyWith(
+                letterSpacing: 1.4,
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+              ),
             ),
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: GKButton(
-              onPressed: () {},
-              label: l10n.t('logs'),
-              icon: Icons.terminal_rounded,
-              variant: GKButtonVariant.ghost,
-              dense: true,
-              expanded: true,
-            ),
-          ),
+          ],
         ],
       ),
     );
   }
 }
+
+
 
 class _MembersStrip extends StatelessWidget {
   const _MembersStrip({required this.users});
