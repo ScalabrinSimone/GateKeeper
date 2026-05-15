@@ -148,7 +148,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           child: Column(
                             children: [
                               Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
                                     flex: 2,
@@ -165,7 +165,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               ),
                               const SizedBox(height: 16),
                               Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(child: _MembersStrip(users: users)),
                                   const SizedBox(width: 16),
