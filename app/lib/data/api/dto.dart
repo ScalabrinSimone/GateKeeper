@@ -12,19 +12,37 @@ class UserDto {
     this.lastSeenAt,
     this.currentLocation,
     this.createdAt,
+    this.permissions = const <String, bool>{},
+    this.pushTokens = const <Map<String, dynamic>>[],
   });
 
-  factory UserDto.fromJson(Map<String, dynamic> json) => UserDto(
-        id: (json['id'] as num).toInt(),
-        email: (json['email'] ?? '').toString(),
-        username: (json['username'] ?? '').toString(),
-        role: (json['role'] ?? 'adult').toString(),
-        uuid: json['uuid']?.toString(),
-        isActive: json['is_active'] != false,
-        lastSeenAt: json['last_seen_at']?.toString(),
-        currentLocation: json['current_location']?.toString(),
-        createdAt: json['created_at']?.toString(),
-      );
+  factory UserDto.fromJson(Map<String, dynamic> json) {
+    final rawPerms = json['permissions'];
+    final perms = <String, bool>{};
+    if (rawPerms is Map) {
+      rawPerms.forEach((k, v) => perms[k.toString()] = v == true);
+    }
+    final rawTokens = json['push_tokens'];
+    final tokens = <Map<String, dynamic>>[];
+    if (rawTokens is List) {
+      for (final t in rawTokens) {
+        if (t is Map) tokens.add(Map<String, dynamic>.from(t));
+      }
+    }
+    return UserDto(
+      id: (json['id'] as num).toInt(),
+      email: (json['email'] ?? '').toString(),
+      username: (json['username'] ?? '').toString(),
+      role: (json['role'] ?? 'adult').toString(),
+      uuid: json['uuid']?.toString(),
+      isActive: json['is_active'] != false,
+      lastSeenAt: json['last_seen_at']?.toString(),
+      currentLocation: json['current_location']?.toString(),
+      createdAt: json['created_at']?.toString(),
+      permissions: perms,
+      pushTokens: tokens,
+    );
+  }
 
   final int id;
   final String email;
@@ -35,6 +53,67 @@ class UserDto {
   final String? lastSeenAt;
   final String? currentLocation;
   final String? createdAt;
+  //Permessi granulari. Per gli admin sono tutti True (forzati dal backend).
+  final Map<String, bool> permissions;
+  //Token push registrati (FCM/APNs). Solo lettura.
+  final List<Map<String, dynamic>> pushTokens;
+
+  bool get isAdmin => role == 'admin';
+
+  bool can(String key) {
+    if (isAdmin) return true;
+    return permissions[key] == true;
+  }
+
+  UserDto copyWith({
+    Map<String, bool>? permissions,
+  }) {
+    return UserDto(
+      id: id,
+      email: email,
+      username: username,
+      role: role,
+      uuid: uuid,
+      isActive: isActive,
+      lastSeenAt: lastSeenAt,
+      currentLocation: currentLocation,
+      createdAt: createdAt,
+      permissions: permissions ?? this.permissions,
+      pushTokens: pushTokens,
+    );
+  }
+}
+
+//Permessi granulari noti all'app.
+//Tenuti come costanti centralizzate per evitare stringhe sparse nel codice.
+class GKPermissions {
+  GKPermissions._();
+  static const canManageDevices = 'can_manage_devices';
+  static const canManageUsers = 'can_manage_users';
+  static const canViewEvents = 'can_view_events';
+  static const canManageInvites = 'can_manage_invites';
+  static const canAcknowledgeAlerts = 'can_acknowledge_alerts';
+  static const canConfigureHub = 'can_configure_hub';
+
+  static const all = <String>[
+    canManageDevices,
+    canManageUsers,
+    canViewEvents,
+    canManageInvites,
+    canAcknowledgeAlerts,
+    canConfigureHub,
+  ];
+}
+
+//Tag RFID rilevato dall'hub ma non ancora associato a un device.
+class ScannedTagDto {
+  const ScannedTagDto({required this.tag, required this.seenAt});
+  factory ScannedTagDto.fromJson(Map<String, dynamic> json) => ScannedTagDto(
+        tag: (json['tag'] ?? '').toString(),
+        seenAt: (json['seen_at'] ?? '').toString(),
+      );
+  final String tag;
+  final String seenAt;
 }
 
 class DeviceDto {

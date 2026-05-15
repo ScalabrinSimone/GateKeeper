@@ -10,14 +10,23 @@ class SettingsController extends ChangeNotifier {
 
   static const _kThemeKey = 'gk.theme';
   static const _kLocaleKey = 'gk.locale';
+  static const _kPushKey = 'gk.notifications.push_enabled';
+  static const _kRemoteUrlKey = 'gk.remote.tunnel_url';
 
   ThemeMode _themeMode;
   Locale _locale;
+  bool _pushEnabled = true;
+  String? _remoteTunnelUrl;
   SharedPreferences? _prefs;
 
   ThemeMode get themeMode => _themeMode;
   Locale get locale => _locale;
   bool get isDark => _themeMode == ThemeMode.dark;
+  bool get pushEnabled => _pushEnabled;
+  //URL del tunnel remoto memorizzato (es. Cloudflare Tunnel). Non è
+  //applicato automaticamente: è una scorciatoia che l'utente conferma
+  //esplicitamente per cambiare hub.
+  String? get remoteTunnelUrl => _remoteTunnelUrl;
 
   //Carica le preferenze persistite.
   Future<void> load() async {
@@ -33,6 +42,8 @@ class SettingsController extends ChangeNotifier {
     if (lang == 'it' || lang == 'en') {
       _locale = Locale(lang!);
     }
+    _pushEnabled = _prefs!.getBool(_kPushKey) ?? true;
+    _remoteTunnelUrl = _prefs!.getString(_kRemoteUrlKey);
     notifyListeners();
   }
 
@@ -47,5 +58,22 @@ class SettingsController extends ChangeNotifier {
     _locale = locale;
     notifyListeners();
     await _prefs?.setString(_kLocaleKey, locale.languageCode);
+  }
+
+  Future<void> setPushEnabled(bool value) async {
+    _pushEnabled = value;
+    notifyListeners();
+    await _prefs?.setBool(_kPushKey, value);
+  }
+
+  Future<void> setRemoteTunnelUrl(String? url) async {
+    final cleaned = (url ?? '').trim();
+    _remoteTunnelUrl = cleaned.isEmpty ? null : cleaned;
+    notifyListeners();
+    if (_remoteTunnelUrl == null) {
+      await _prefs?.remove(_kRemoteUrlKey);
+    } else {
+      await _prefs?.setString(_kRemoteUrlKey, _remoteTunnelUrl!);
+    }
   }
 }

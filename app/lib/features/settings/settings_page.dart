@@ -8,11 +8,12 @@ import '../../core/state/auth_controller.dart';
 import '../../core/state/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/api_exception.dart';
-import '../../data/api/dto.dart';
 import '../../data/gatekeeper_api.dart';
+import '../../data/services/push_notifications_service.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
 import '../../shared/widgets/section_header.dart';
+import '../auth/widgets/gk_text_field.dart';
 
 //Vista impostazioni con sezioni: preferenze, connettività, notifiche, account, sistema.
 //Le azioni reali (logout, factory reset, generazione inviti) sono cablate
@@ -28,8 +29,81 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _pushOn = true;
   bool _resetting = false;
+  bool _applyingRemote = false;
+  late final TextEditingController _remoteCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _remoteCtrl = TextEditingController(text: widget.settings.remoteTunnelUrl ?? '');
+  }
+
+  @override
+  void dispose() {
+    _remoteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _applyRemote(AppL10n l10n) async {
+    final url = _remoteCtrl.text.trim();
+    if (url.isEmpty || !(url.startsWith('http://') || url.startsWith('https://'))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('invalidUrl'))),
+      );
+      return;
+    }
+    setState(() => _applyingRemote = true);
+    try {
+      await widget.settings.setRemoteTunnelUrl(url);
+      await widget.auth.useBaseUrl(url);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('remoteApplied'))),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _applyingRemote = false);
+    }
+  }
+
+  Future<void> _saveRemote(AppL10n l10n) async {
+    await widget.settings.setRemoteTunnelUrl(_remoteCtrl.text.trim());
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.t('remoteSave'))),
+    );
+  }
+
+  Future<void> _clearRemote(AppL10n l10n) async {
+    await widget.settings.setRemoteTunnelUrl(null);
+    setState(() => _remoteCtrl.clear());
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.t('remoteCleared'))),
+    );
+  }
+
+  Future<void> _togglePush(bool value, AppL10n l10n) async {
+    await widget.settings.setPushEnabled(value);
+    if (value) {
+      final ok = await PushNotificationsService.instance.initialize();
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.t('pushUnsupported'))),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.t('pushRegistered'))),
+        );
+      }
+    } else {
+      await PushNotificationsService.instance.revoke();
+    }
+  }
 
   Future<void> _doLogout(AppL10n l10n) async {
     final ok = await _confirm(
@@ -246,12 +320,71 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               _Tile(
                 icon: Icons.notifications_active_rounded,
-                title: l10n.t('pushNotifications'),
-                subtitle: l10n.t('activeNotifications'),
+                title: l10n.t('pushTitle'),
+                subtitle: l10n.t('pushSubtitle'),
                 trailing: Switch.adaptive(
-                  value: _pushOn,
+                  value: widget.settings.pushEnabled,
                   activeThumbColor: AppColors.stormyTeal,
-                  onChanged: (v) => setState(() => _pushOn = v),
+                  onChanged: (v) => _togglePush(v, l10n),
+                ),
+              ),
+            ],
+          ),
+          //Sezione Accesso remoto: l'utente può salvare l'URL di un tunnel
+          //(es. Cloudflare Tunnel) per accedere all'hub anche fuori casa.
+          _Section(
+            title: l10n.t('remoteAccessTitle'),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+                child: Text(
+                  l10n.t('remoteAccessExplain'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
+                        height: 1.4,
+                      ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                child: GKTextField(
+                  controller: _remoteCtrl,
+                  label: l10n.t('remoteUrlLabel'),
+                  prefixIcon: Icons.cloud_rounded,
+                  keyboardType: TextInputType.url,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    GKButton(
+                      onPressed: _applyingRemote ? null : () => _applyRemote(l10n),
+                      label: _applyingRemote ? l10n.t('loadingDots') : l10n.t('remoteApply'),
+                      icon: Icons.bolt_rounded,
+                      variant: GKButtonVariant.secondary,
+                      dense: true,
+                    ),
+                    GKButton(
+                      onPressed: () => _saveRemote(l10n),
+                      label: l10n.t('remoteSave'),
+                      icon: Icons.save_rounded,
+                      variant: GKButtonVariant.outline,
+                      dense: true,
+                    ),
+                    GKButton(
+                      onPressed: () => _clearRemote(l10n),
+                      label: l10n.t('remoteClear'),
+                      icon: Icons.delete_outline_rounded,
+                      variant: GKButtonVariant.ghost,
+                      dense: true,
+                    ),
+                  ],
                 ),
               ),
             ],

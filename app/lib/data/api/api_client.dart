@@ -35,6 +35,13 @@ class ApiClient {
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
     final base = ApiConfig.baseUrl;
+    if (base == null || base.isEmpty) {
+      //L'app non è ancora stata accoppiata a un hub: blocca subito.
+      throw ApiException(
+        'Hub non configurato: completa il pairing o imposta un URL remoto.',
+        code: 'no_hub_configured',
+      );
+    }
     final url = '$base$path';
     final uri = Uri.parse(url);
     if (query == null || query.isEmpty) return uri;

@@ -52,6 +52,23 @@ class PairChoicePage extends StatelessWidget {
                   }
                 : null,
           ),
+          if (!canPair) ...[
+            const SizedBox(height: 14),
+            //Sul web non possiamo fare discovery, ma possiamo comunque
+            //inserire un URL remoto (tunnel) per collegarci a un hub già
+            //configurato altrove.
+            _ChoiceCard(
+              icon: Icons.cloud_outlined,
+              color: AppColors.stormyTeal,
+              title: l10n.t('remoteAccessTitle'),
+              description: l10n.t('remoteAccessSubtitle'),
+              actionLabel: l10n.t('connect'),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                context.go('/onboarding/discover');
+              },
+            ),
+          ],
           const SizedBox(height: 18),
           //CTA secondaria: accetta un invito (incolla token / apri link).
           Center(

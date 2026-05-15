@@ -26,8 +26,13 @@ class UsersRepository {
       lastSeenAt: u.lastSeenAt == null ? null : DateTime.tryParse(u.lastSeenAt!),
       isActive: u.isActive,
       currentLocation: u.currentLocation,
+      email: u.email,
+      permissions: u.permissions,
     );
   }
+
+  //Helper esposto: mappa esplicita per UI che già parte da DTO.
+  static AppUser fromDto(UserDto u) => _map(u);
 
   static UserRole _roleFrom(String role) {
     switch (role.toLowerCase()) {

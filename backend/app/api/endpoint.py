@@ -77,6 +77,10 @@ class UserOut(BaseModel):
     last_seen_at: Optional[str] = None
     current_location: str
     created_at: str
+    # Permessi granulari (override per ruolo). L'admin ha tutto True.
+    permissions: dict[str, bool] = Field(default_factory=dict)
+    # Token push registrati dai dispositivi dell'utente (FCM/APNs).
+    push_tokens: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class DeviceCreate(BaseModel):
@@ -189,9 +193,18 @@ _rfid_seen_lock = threading.Lock()
 def _rfid_tag_callback(tag: str) -> None:
     """Callback eseguita quando il lettore RFID intercetta un tag valido.
 
-    Per rendere il sistema coeso, ogni tag nuovo nel corso della sessione
-    viene registrato come evento di sistema nel database.
+    - Memorizza i tag sconosciuti in un buffer in-memory così che l'app
+      possa offrire una UX "avvicina il tag" durante la registrazione di un
+      nuovo oggetto.
+    - Per rendere il sistema coeso, ogni tag nuovo nel corso della sessione
+      viene registrato come evento di sistema nel database.
     """
+    # Sempre aggiornato il buffer: gestisce internamente i duplicati.
+    try:
+        models.remember_unknown_tag(tag)
+    except Exception as exc:
+        print("Impossibile memorizzare tag sconosciuto:", exc)
+
     with _rfid_seen_lock:
         if tag in _rfid_seen_tags:
             return
@@ -922,6 +935,105 @@ def invite_delete(invite_id: int, _admin: dict = Depends(_require_admin)):
     if not ok:
         raise HTTPException(status_code=404, detail="invite not found")
     return {"deleted": True}
+
+
+# --------------------------------------------------------------------------------------
+# PERMISSIONS (gestiti dall'admin sui membri non-admin)
+# --------------------------------------------------------------------------------------
+class PermissionsUpdate(BaseModel):
+    """Patch dei permessi granulari di un utente."""
+    permissions: dict[str, bool]
+
+
+@app.put("/users/{user_id}/permissions", response_model=UserOut)
+def update_user_permissions_endpoint(
+    user_id: int,
+    req: PermissionsUpdate,
+    _admin: dict = Depends(_require_admin),
+):
+    """Aggiorna i permessi granulari di un membro. Solo admin."""
+    ok = models.update_user_permissions(user_id, req.permissions)
+    if not ok:
+        raise HTTPException(status_code=404, detail="user not found")
+    user = models.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=500, detail="user updated but not found")
+    return user
+
+
+# --------------------------------------------------------------------------------------
+# RFID SCAN (per registrazione tag)
+# --------------------------------------------------------------------------------------
+class ScannedTagOut(BaseModel):
+    tag: str
+    seen_at: str
+
+
+def _require_devices_perm(user: dict = Depends(_get_current_user)) -> dict:
+    """Permette accesso a chi ha can_manage_devices (o è admin)."""
+    if user.get("role") == "admin":
+        return user
+    perms = user.get("permissions") or {}
+    if not perms.get("can_manage_devices"):
+        raise HTTPException(status_code=403, detail="permission denied: can_manage_devices")
+    return user
+
+
+@app.get("/rfid/scan/latest", response_model=Optional[ScannedTagOut])
+def rfid_scan_latest(_user: dict = Depends(_require_devices_perm)):
+    """Ritorna l'ultimo tag RFID sconosciuto rilevato (o null)."""
+    latest = models.latest_unknown_tag()
+    return latest
+
+
+@app.get("/rfid/scan", response_model=List[ScannedTagOut])
+def rfid_scan_list(_user: dict = Depends(_require_devices_perm)):
+    """Lista degli ultimi tag sconosciuti rilevati."""
+    return models.list_unknown_tags()
+
+
+@app.delete("/rfid/scan/{tag}")
+def rfid_scan_consume(tag: str, _user: dict = Depends(_require_devices_perm)):
+    """Rimuove un tag dal buffer (lo abbiamo appena associato a un device)."""
+    models.consume_unknown_tag(tag)
+    return {"consumed": True, "tag": tag}
+
+
+# --------------------------------------------------------------------------------------
+# PUSH TOKENS
+# --------------------------------------------------------------------------------------
+class PushTokenRegister(BaseModel):
+    """Registrazione di un token push (FCM/APNs)."""
+    token: str
+    platform: Optional[str] = "unknown"
+
+
+@app.post("/users/me/push-token")
+def register_push_token(
+    req: PushTokenRegister,
+    user: dict = Depends(_get_current_user),
+):
+    """Registra un push token per l'utente loggato.
+
+    Il token va ottenuto lato app dal SDK FCM/APNs ed inviato qui all'avvio
+    e ad ogni rotazione. La consegna remota effettiva delle notifiche viene
+    poi fatta dal servizio di delivery (vedi `docs/backend.md`).
+    """
+    try:
+        models.add_push_token(user["id"], req.token, platform=req.platform or "unknown")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"registered": True}
+
+
+@app.delete("/users/me/push-token")
+def unregister_push_token(
+    token: str,
+    user: dict = Depends(_get_current_user),
+):
+    """Rimuove un push token (es. logout di quel dispositivo)."""
+    ok = models.remove_push_token(user["id"], token)
+    return {"removed": ok}
 
 
 # --------------------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/platform/platform_info.dart';
 import '../core/state/auth_controller.dart';
 import '../core/state/settings_controller.dart';
 import '../core/theme/app_colors.dart';
@@ -46,8 +47,16 @@ class AppRouter {
         if (stage == AuthStage.loading) {
           return loc == '/splash' ? null : '/splash';
         }
-        if (stage == AuthStage.offline || stage == AuthStage.needsPairing) {
-          return isPublicRoute ? null : '/welcome';
+        if (stage == AuthStage.needsPairing) {
+          //Hub non ancora configurato su questo dispositivo: invito al pairing.
+          //Su Web l'utente non può fare il pairing (no UDP): lo lasciamo su
+          ///welcome perché lì può inserire l'URL del tunnel manualmente.
+          if (isPublicRoute) return null;
+          return PlatformInfo.canPairDevice ? '/welcome' : '/welcome';
+        }
+        if (stage == AuthStage.offline) {
+          if (isPublicRoute) return null;
+          return '/welcome';
         }
         if (stage == AuthStage.needsLogin) {
           if (isPublicRoute) return null;

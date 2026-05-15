@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/config/api_config.dart';
 import '../../core/i18n/app_l10n.dart';
+import '../../core/platform/platform_info.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/discovery_service.dart';
@@ -24,13 +26,18 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
   bool _scanning = false;
   final List<DiscoveredHub> _hubs = [];
   final _manualCtrl = TextEditingController(text: 'http://');
+  List<String> _recent = const [];
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    //Avvio una prima scansione automatica appena entriamo.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scan());
+    //Carico gli hub recenti e poi avvio la prima scansione (solo se posso).
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _recent = await ApiConfig.recentHubs();
+      if (mounted) setState(() {});
+      if (PlatformInfo.canPairDevice) await _scan();
+    });
   }
 
   @override
@@ -39,7 +46,19 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
     super.dispose();
   }
 
+  Future<void> _useUrl(BuildContext context, String url) async {
+    HapticFeedback.selectionClick();
+    await widget.auth.useBaseUrl(url);
+    if (!context.mounted) return;
+    final paired = widget.auth.hubInfo?.paired ?? false;
+    context.go(paired ? '/login' : '/onboarding/setup');
+  }
+
   Future<void> _scan() async {
+    if (!PlatformInfo.canPairDevice) {
+      setState(() => _error = AppL10n.of(context).t('webPairHint'));
+      return;
+    }
     setState(() {
       _scanning = true;
       _hubs.clear();
@@ -96,53 +115,74 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
     final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
 
+    final canPair = PlatformInfo.canPairDevice;
+
     return AuthScaffold(
       title: l10n.t('discoverTitle'),
-      subtitle: l10n.t('discoverSubtitle'),
+      subtitle: canPair ? l10n.t('discoverSubtitle') : l10n.t('webPairHint'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${l10n.t('hubFound')}: ${_hubs.length}',
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+          if (canPair) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${l10n.t('hubFound')}: ${_hubs.length}',
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                  ),
                 ),
-              ),
-              GKButton(
-                onPressed: _scanning ? null : _scan,
-                label: _scanning ? l10n.t('scanningDots') : l10n.t('rescan'),
-                icon: Icons.radar_rounded,
-                variant: GKButtonVariant.ghost,
-                dense: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (_scanning)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
-              child: Center(child: CircularProgressIndicator(color: AppColors.stormyTeal)),
+                GKButton(
+                  onPressed: _scanning ? null : _scan,
+                  label: _scanning ? l10n.t('scanningDots') : l10n.t('rescan'),
+                  icon: Icons.radar_rounded,
+                  variant: GKButtonVariant.ghost,
+                  dense: true,
+                ),
+              ],
             ),
-          if (_hubs.isEmpty && !_scanning)
-            _EmptyState(text: l10n.t('noHubFound')),
-          for (final hub in _hubs)
-            _HubTile(
-              hub: hub,
-              onTap: () => _useHub(context, hub),
+            const SizedBox(height: 8),
+            if (_scanning)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
+                child: Center(child: CircularProgressIndicator(color: AppColors.stormyTeal)),
+              ),
+            if (_hubs.isEmpty && !_scanning)
+              _EmptyState(text: l10n.t('noHubFound')),
+            for (final hub in _hubs)
+              _HubTile(
+                hub: hub,
+                onTap: () => _useHub(context, hub),
+              ),
+            const SizedBox(height: 14),
+            Divider(color: theme.dividerColor),
+          ],
+          //Hub recenti (persistiti dopo l'ultimo uso): scorciatoia per
+          //riconnettersi senza ripetere la scansione.
+          if (_recent.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              l10n.t('recentHubs'),
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
-          const SizedBox(height: 14),
-          Divider(color: theme.dividerColor),
+            const SizedBox(height: 8),
+            for (final url in _recent)
+              _RecentTile(
+                url: url,
+                onTap: () => _useUrl(context, url),
+              ),
+            const SizedBox(height: 8),
+            Divider(color: theme.dividerColor),
+          ],
           const SizedBox(height: 10),
           Text(
-            l10n.t('manualConnection'),
+            canPair ? l10n.t('manualConnection') : l10n.t('remoteAccessTitle'),
             style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           GKTextField(
             controller: _manualCtrl,
-            label: 'http://192.168.x.y:8000',
+            label: canPair ? 'http://192.168.x.y:8000' : l10n.t('remoteUrlLabel'),
             prefixIcon: Icons.link_rounded,
           ),
           GKButton(
@@ -163,6 +203,62 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
             label: Text(l10n.t('back')),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RecentTile extends StatelessWidget {
+  const _RecentTile({required this.url, required this.onTap});
+  final String url;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppL10n.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.stormyTeal.withValues(alpha: 0.04),
+              border: Border.all(color: AppColors.stormyTeal.withValues(alpha: 0.18)),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.history_rounded, color: AppColors.stormyTeal),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    url,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Text(
+                  l10n.t('connectToRecent'),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.4,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.stormyTeal,
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.stormyTeal),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
