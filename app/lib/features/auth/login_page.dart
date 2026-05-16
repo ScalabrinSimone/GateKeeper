@@ -93,12 +93,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
     final houseName = widget.auth.hubInfo?.houseName;
+    //Se la casa ha un nome lo mostriamo come titolo principale: l'utente
+    //vede subito a quale casa si sta connettendo. Il sottotitolo invita
+    //ad accedere. Se manca il nome ricadiamo sul vecchio "Accedi".
+    final hasHouseName = houseName != null && houseName.trim().isNotEmpty;
 
     return AuthScaffold(
-      title: l10n.t('signInTitle'),
-      subtitle: houseName != null
-          ? '${l10n.t('signInWelcome')} $houseName'
-          : l10n.t('signInSubtitle'),
+      title: hasHouseName ? houseName : l10n.t('signInTitle'),
+      subtitle: hasHouseName ? l10n.t('signInSubtitle') : l10n.t('signInDescription'),
       child: Form(
         key: _formKey,
         child: FadeTransition(

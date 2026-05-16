@@ -5,32 +5,62 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/i18n/app_l10n.dart';
+import '../../../core/platform/platform_info.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/api/dto.dart';
 
-//Sheet che mostra la camera per scansionare un QR-code di pairing.
-//Quando rileva un payload valido (`HubQrDto.looksValid`) lo restituisce
-//via Navigator.pop. Funziona su Android/iOS; su Windows/Linux/macOS la
-//camera viene tipicamente esposta dal sistema (best-effort).
+//Modalità della sheet: pairing dell'hub oppure accettazione invito.
+//In `invite` accettiamo solo payload `gatekeeper-invite://<token>`
+//oppure token grezzi (>= 8 caratteri); ritorniamo il token come String.
+enum QrScannerMode { pair, invite }
+
+//Sheet che mostra la camera per scansionare un QR-code.
+//Modalità default: `pair` (legge `HubQrDto`). In modalità `invite` ritorna
+//il token dell'invito come String. Funziona su Android/iOS/macOS/Web;
+//su Windows/Linux ritorna un pannello di errore con suggerimento di
+//inserire manualmente il codice.
 class QrScannerSheet extends StatefulWidget {
-  const QrScannerSheet({super.key});
+  const QrScannerSheet({
+    super.key,
+    this.mode = QrScannerMode.pair,
+  });
+
+  final QrScannerMode mode;
 
   @override
   State<QrScannerSheet> createState() => _QrScannerSheetState();
 }
 
 class _QrScannerSheetState extends State<QrScannerSheet> {
-  final MobileScannerController _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
-    facing: CameraFacing.back,
-    formats: const [BarcodeFormat.qrCode],
-  );
+  //Sui device che non supportano mobile_scanner evitiamo proprio di creare
+  //il controller (eviterebbe la MissingPluginException all'avvio).
+  late final MobileScannerController? _controller = PlatformInfo.canScanQr
+      ? MobileScannerController(
+          detectionSpeed: DetectionSpeed.noDuplicates,
+          facing: CameraFacing.back,
+          formats: const [BarcodeFormat.qrCode],
+        )
+      : null;
   bool _handled = false;
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
+  }
+
+  //Estrae un token "pulito" dal payload QR di un invito.
+  //Accetta `gatekeeper-invite://<token>` o token grezzo.
+  String? _extractInviteToken(String raw) {
+    final trimmed = raw.trim();
+    const scheme = 'gatekeeper-invite://';
+    if (trimmed.toLowerCase().startsWith(scheme)) {
+      final tok = trimmed.substring(scheme.length).trim();
+      return tok.isEmpty ? null : tok;
+    }
+    //Token grezzo: accettiamo solo se sembra ragionevole.
+    if (trimmed.length >= 8 && !trimmed.contains(' ')) return trimmed;
+    return null;
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -38,7 +68,17 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
     for (final b in capture.barcodes) {
       final raw = b.rawValue;
       if (raw == null || raw.isEmpty) continue;
-      //Provo a interpretare il payload come JSON con kind=gatekeeper_pair.
+      if (widget.mode == QrScannerMode.invite) {
+        final tok = _extractInviteToken(raw);
+        if (tok != null) {
+          _handled = true;
+          HapticFeedback.mediumImpact();
+          Navigator.of(context).pop(tok);
+          return;
+        }
+        continue;
+      }
+      //Modalità pair: provo JSON poi URL.
       try {
         final decoded = jsonDecode(raw);
         if (decoded is Map) {
@@ -71,6 +111,9 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
+    final isInvite = widget.mode == QrScannerMode.invite;
+    final title = isInvite ? l10n.t('scanInviteQr') : l10n.t('scanPairingQr');
+    final hint = isInvite ? l10n.t('scanInviteQrHint') : l10n.t('scanPairingQrHint');
 
     return SafeArea(
       //Limite massimo per evitare overflow su finestre grandi (desktop/web).
@@ -92,7 +135,7 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        l10n.t('scanPairingQr'),
+                        title,
                         style: theme.textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
@@ -105,7 +148,7 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  l10n.t('scanPairingQrHint'),
+                  hint,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     fontStyle: FontStyle.italic,
@@ -123,23 +166,27 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
                       aspectRatio: 1,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            MobileScanner(
-                              controller: _controller,
-                              onDetect: _onDetect,
-                              errorBuilder: (ctx, err, _) =>
-                                  _ScannerError(error: err),
-                            ),
-                            //Overlay decorativo: cornice angolare.
-                            IgnorePointer(
-                              child: CustomPaint(
-                                painter: _CornerFramePainter(),
+                        child: _controller == null
+                            //Su Windows/Linux il plugin non è disponibile:
+                            //mostriamo un placeholder con suggerimento.
+                            ? const _ScannerUnavailable()
+                            : Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  MobileScanner(
+                                    controller: _controller,
+                                    onDetect: _onDetect,
+                                    errorBuilder: (ctx, err, _) =>
+                                        _ScannerError(error: err),
+                                  ),
+                                  //Overlay decorativo: cornice angolare.
+                                  IgnorePointer(
+                                    child: CustomPaint(
+                                      painter: _CornerFramePainter(),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                   ),
@@ -149,6 +196,47 @@ class _QrScannerSheetState extends State<QrScannerSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+//Placeholder mostrato quando il plugin scanner non è disponibile sulla
+//piattaforma corrente (tipicamente Windows o Linux desktop).
+class _ScannerUnavailable extends StatelessWidget {
+  const _ScannerUnavailable();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    return Container(
+      color: Colors.black,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.desktop_access_disabled_rounded,
+              color: AppColors.orangeGold, size: 38),
+          const SizedBox(height: 12),
+          Text(
+            l10n.t('scannerUnavailable'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            l10n.t('scannerUnavailableHint'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 12,
+              height: 1.3,
+            ),
+          ),
+        ],
       ),
     );
   }

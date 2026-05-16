@@ -109,6 +109,11 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
       setState(() => _error = AppL10n.of(context).t('webPairHint'));
       return;
     }
+    if (!PlatformInfo.canScanQr) {
+      //Doppia barriera per piattaforme senza plugin scanner.
+      setState(() => _error = AppL10n.of(context).t('scannerUnavailableHint'));
+      return;
+    }
     //Su desktop/web il bottom-sheet può occupare l'intera finestra:
     //limitiamo la larghezza per evitare overflow del preview camera.
     final result = await showModalBottomSheet<HubQrDto>(
@@ -197,14 +202,19 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
                     style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
-                GKButton(
-                  onPressed: _openScanner,
-                  label: l10n.t('scanQr'),
-                  icon: Icons.qr_code_scanner_rounded,
-                  variant: GKButtonVariant.secondary,
-                  dense: true,
-                ),
-                const SizedBox(width: 6),
+                //Lo scan QR è disponibile solo dove esiste mobile_scanner.
+                //Su Windows/Linux il bottone resta nascosto: l'utente userà
+                //la discovery LAN o l'inserimento manuale dell'URL.
+                if (PlatformInfo.canScanQr) ...[
+                  GKButton(
+                    onPressed: _openScanner,
+                    label: l10n.t('scanQr'),
+                    icon: Icons.qr_code_scanner_rounded,
+                    variant: GKButtonVariant.secondary,
+                    dense: true,
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 GKButton(
                   onPressed: _scanning ? null : _scan,
                   label: _scanning ? l10n.t('scanningDots') : l10n.t('rescan'),

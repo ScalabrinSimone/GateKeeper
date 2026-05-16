@@ -189,6 +189,7 @@ class _SidebarItem extends StatefulWidget {
 
 class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderStateMixin {
   bool _hover = false;
+  bool _pressed = false;
   late AnimationController _animationController;
   late Animation<double> _glowAnimation;
 
@@ -232,39 +233,48 @@ class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderSta
     final scheme = Theme.of(context).colorScheme;
     final accent = widget.highlight ? AppColors.orangeGold : AppColors.stormyTeal;
 
-    final bg = widget.selected
+    //Il background si illumina al click (pressed/selected), non all'hover.
+    //L'hover mostra solo una lieve tonalità come feedback desktop.
+    final bg = (widget.selected || _pressed)
         ? accent.withOpacity(0.18)
-        : (_hover ? scheme.onSurface.withOpacity(0.06) : Colors.transparent);
+        : (_hover ? scheme.onSurface.withOpacity(0.05) : Colors.transparent);
 
-    final fg = widget.selected ? accent : scheme.onSurface.withOpacity(0.85);
+    final fg = (widget.selected || _pressed) ? accent : scheme.onSurface.withOpacity(0.85);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
           HapticFeedback.selectionClick();
           widget.onTap();
         },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              if (widget.selected)
-                BoxShadow(
-                  color: accent.withOpacity(_glowAnimation.value * 0.3),
-                  blurRadius: 12,
-                  spreadRadius: 2,
-                ),
-            ],
+        child: AnimatedBuilder(
+          animation: _glowAnimation,
+          builder: (context, child) => AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                if (widget.selected)
+                  BoxShadow(
+                    color: accent.withOpacity(_glowAnimation.value * 0.28),
+                    blurRadius: 14,
+                    spreadRadius: 1,
+                  ),
+              ],
+            ),
+            child: child,
           ),
           child: Row(
             children: [
-              //Indicatore animato dell'item selezionato.
+              //Indicatore animato (barretta laterale) dell'item selezionato.
               AnimatedContainer(
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
@@ -587,12 +597,21 @@ class _ThemeButton extends StatelessWidget {
   }
 }
 
-class _BottomBar extends StatelessWidget {
+//Bottom bar con feedback immediato al tap (pressed state + haptic).
+class _BottomBar extends StatefulWidget {
   const _BottomBar({required this.items, required this.currentIndex, required this.onTap});
 
   final List<_NavItem> items;
   final int currentIndex;
   final ValueChanged<int> onTap;
+
+  @override
+  State<_BottomBar> createState() => _BottomBarState();
+}
+
+class _BottomBarState extends State<_BottomBar> {
+  //Indice dell'item attualmente premuto (-1 = nessuno).
+  int _pressedIndex = -1;
 
   @override
   Widget build(BuildContext context) {
@@ -616,45 +635,66 @@ class _BottomBar extends StatelessWidget {
             ],
           ),
           child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(items.length, (i) {
-                final selected = i == currentIndex;
-                return Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onTap(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: selected ? AppColors.stormyTeal.withValues(alpha: 0.18) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(items[i].icon, size: 20, color: selected ? AppColors.stormyTeal : null),
-                          const SizedBox(height: 2),
-                          Text(
-                            l10n.t(items[i].labelKey),
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.6,
-                              color: selected
-                                  ? AppColors.stormyTeal
-                                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
-                            ),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(widget.items.length, (i) {
+              final selected = i == widget.currentIndex;
+              final pressed = i == _pressedIndex;
+              //Il colore si illumina immediatamente al touchDown.
+              final active = selected || pressed;
+              return Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (_) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _pressedIndex = i);
+                  },
+                  onTapUp: (_) => setState(() => _pressedIndex = -1),
+                  onTapCancel: () => setState(() => _pressedIndex = -1),
+                  onTap: () => widget.onTap(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? AppColors.stormyTeal.withValues(alpha: pressed ? 0.28 : 0.18)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedScale(
+                          duration: const Duration(milliseconds: 120),
+                          scale: pressed ? 0.88 : 1.0,
+                          child: Icon(
+                            widget.items[i].icon,
+                            size: 20,
+                            color: active
+                                ? AppColors.stormyTeal
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.t(widget.items[i].labelKey),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.6,
+                            color: active
+                                ? AppColors.stormyTeal
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              }),
-            ),
+                ),
+              );
+            }),
+          ),
         ),
       ),
     );

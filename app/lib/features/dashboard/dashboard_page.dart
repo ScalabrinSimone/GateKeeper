@@ -107,7 +107,13 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final unresolved = _events.where((e) => e.isUnresolved).toList(growable: false);
     final isSecure = unresolved.isEmpty;
-    final peopleInside = users.where((u) => u.isInside).length;
+    //Conta l'utente loggato come "dentro" finché BLE/RFID non lo aggiorna,
+    //così il riepilogo header è coerente con il contatore "online" sotto.
+    final currentUserId = AuthController.instance.user?.id.toString();
+    final peopleInside = users.where((u) {
+      if (u.isInside) return true;
+      return currentUserId != null && u.id == currentUserId;
+    }).length;
     final outsideObjects = objects.where((o) => !o.isInside).length;
 
     return LayoutBuilder(
@@ -388,30 +394,88 @@ class _MembersStrip extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppL10n.of(context);
 
+    //Online significa "loggato/connesso": fintanto che il sistema BLE non
+    //popola `current_location`, consideriamo online l'utente attualmente
+    //loggato in questo dispositivo. È un'approssimazione utile lato UI,
+    //e verrà rimpiazzata dal segnale BLE non appena disponibile.
+    final currentUserId = AuthController.instance.user?.id.toString();
+    final augmented = users.map((u) {
+      final isMe = currentUserId != null && u.id == currentUserId;
+      if (u.isInside || !isMe) return u;
+      return AppUser(
+        id: u.id,
+        name: u.name,
+        role: u.role,
+        isInside: true,
+        lastSeenAt: u.lastSeenAt,
+        avatarUrl: u.avatarUrl,
+        isActive: u.isActive,
+        currentLocation: u.currentLocation,
+        email: u.email,
+        permissions: u.permissions,
+      );
+    }).toList(growable: false);
+
+    //Ordina: online prima (da sinistra), offline dopo in grigio.
+    final sorted = [...augmented]..sort((a, b) {
+        if (a.isInside == b.isInside) return 0;
+        return a.isInside ? -1 : 1;
+      });
+
     return GKCard(
       borderRadius: 28,
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            l10n.t('members').toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              letterSpacing: 2,
-              fontStyle: FontStyle.italic,
-              fontWeight: FontWeight.w900,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
-            ),
+          Row(
+            children: [
+              Text(
+                l10n.t('members').toUpperCase(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  letterSpacing: 2,
+                  fontStyle: FontStyle.italic,
+                  fontWeight: FontWeight.w900,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                ),
+              ),
+              const SizedBox(width: 8),
+              //Contatore utenti online.
+              if (sorted.any((u) => u.isInside))
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.stormyTeal.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${sorted.where((u) => u.isInside).length} online',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppColors.stormyTeal,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
           SizedBox(
             height: 96,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: users.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 14),
-              itemBuilder: (context, i) => _MemberAvatar(user: users[i]),
-            ),
+            child: sorted.isEmpty
+                ? Center(
+                    child: Text(
+                      l10n.t('noMembers'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: sorted.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 14),
+                    itemBuilder: (context, i) => _MemberAvatar(user: sorted[i]),
+                  ),
           ),
         ],
       ),
@@ -432,25 +496,43 @@ class _MemberAvatar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              color: AppColors.stormyTeal.withValues(alpha: isInside ? 0.12 : 0.05),
-              border: Border.all(
-                color: isInside ? AppColors.stormyTeal : Colors.transparent,
-                width: 2,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  color: isInside
+                      ? AppColors.stormyTeal.withValues(alpha: 0.12)
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                  border: Border.all(
+                    color: isInside
+                        ? AppColors.stormyTeal.withValues(alpha: 0.7)
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.1),
+                    width: isInside ? 2 : 1,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  user.initials,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    color: isInside
+                        ? AppColors.stormyTeal
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                  ),
+                ),
               ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              user.initials,
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                color: isInside ? AppColors.stormyTeal : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              //Pallino verde luminoso per utenti online, grigio per offline.
+              Positioned(
+                bottom: -2,
+                right: -2,
+                child: _OnlineDot(isOnline: isInside),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 6),
           Text(
@@ -459,6 +541,104 @@ class _MemberAvatar extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w700,
               fontStyle: FontStyle.italic,
+              color: isInside
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+//Pallino di stato con alone luminoso per utenti online.
+class _OnlineDot extends StatefulWidget {
+  const _OnlineDot({required this.isOnline});
+  final bool isOnline;
+  @override
+  State<_OnlineDot> createState() => _OnlineDotState();
+}
+
+class _OnlineDotState extends State<_OnlineDot> with SingleTickerProviderStateMixin {
+  late AnimationController _pulseCtrl;
+  late Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    );
+    _pulse = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
+    if (widget.isOnline) _pulseCtrl.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _OnlineDot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isOnline) {
+      _pulseCtrl.repeat(reverse: true);
+    } else {
+      _pulseCtrl.stop();
+      _pulseCtrl.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.isOnline ? AppColors.success : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2);
+    if (!widget.isOnline) {
+      //Pallino grigio statico per offline.
+      return Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Theme.of(context).cardColor, width: 2),
+        ),
+      );
+    }
+    //Pallino verde con alone pulsante per online.
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (_, __) => Stack(
+        alignment: Alignment.center,
+        children: [
+          //Alone esterno pulsante.
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.3 * _pulse.value),
+              shape: BoxShape.circle,
+            ),
+          ),
+          //Pallino centrale.
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: AppColors.success,
+              shape: BoxShape.circle,
+              border: Border.all(color: Theme.of(context).cardColor, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.success.withValues(alpha: 0.6 * _pulse.value),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
           ),
         ],
@@ -491,11 +671,34 @@ class _ObjectsMini extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          for (final o in objects)
+          //Empty state: niente box vuoto, mostro un'unica riga di hint.
+          if (objects.isEmpty)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _ObjectRow(name: o.name, tag: o.rfidTag, icon: o.icon, isInside: o.isInside),
-            ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: 18,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.t('noObjects'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            for (final o in objects)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _ObjectRow(name: o.name, tag: o.rfidTag, icon: o.icon, isInside: o.isInside),
+              ),
         ],
       ),
     );
@@ -594,6 +797,31 @@ class _LiveEventsCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
+          //Empty state: niente lista scrollabile vuota.
+          if (events.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.history_toggle_off_rounded,
+                    size: 22,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      l10n.t('noEvents'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
           Expanded(
             child: ListView.separated(
               padding: EdgeInsets.zero,

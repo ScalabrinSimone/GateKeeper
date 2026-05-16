@@ -26,6 +26,17 @@ class PlatformInfo {
   //Sul web mostriamo solo la schermata di login.
   static bool get canPairDevice => !kIsWeb;
 
+  //La scansione QR via camera è supportata solo dove esiste l'implementazione
+  //nativa del plugin `mobile_scanner`: Android, iOS, macOS e Web (limitato).
+  //Su Windows/Linux il plugin lancia MissingPluginException, quindi nascondiamo
+  //il bottone e mostriamo solo l'inserimento manuale del codice/URL.
+  static bool get canScanQr {
+    if (kIsWeb) return true;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+  }
+
   //Le notifiche persistenti (con app spenta) sono pratiche solo su mobile.
   //Su desktop le useremo come notifiche di sistema mentre l'app è aperta.
   static bool get supportsPushWhenClosed => isMobile;

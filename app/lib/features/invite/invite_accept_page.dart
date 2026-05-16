@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/i18n/app_l10n.dart';
+import '../../core/platform/platform_info.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/theme/app_colors.dart';
@@ -11,6 +12,7 @@ import '../../data/gatekeeper_api.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../auth/widgets/auth_scaffold.dart';
 import '../auth/widgets/gk_text_field.dart';
+import '../onboarding/widgets/qr_scanner_sheet.dart';
 
 //Pagina di accettazione invito.
 //Può ricevere il token via path param (/invite/:token) oppure essere usata vuota
@@ -72,6 +74,29 @@ class _InviteAcceptPageState extends State<InviteAcceptPage> {
     }
   }
 
+  //Apre lo scanner camera in modalità invito. Il token estratto viene
+  //inserito nel campo e poi verificato automaticamente.
+  Future<void> _scanInviteQr() async {
+    if (!PlatformInfo.canScanQr) {
+      setState(() => _error = AppL10n.of(context).t('scannerUnavailableHint'));
+      return;
+    }
+    final tok = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).cardColor,
+      constraints: const BoxConstraints(maxWidth: 480),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => const QrScannerSheet(mode: QrScannerMode.invite),
+    );
+    if (tok == null || !mounted) return;
+    _tokenCtrl.text = tok;
+    await _verifyToken();
+  }
+
   Future<void> _accept(AppL10n l10n) async {
     if (_invite == null) {
       setState(() => _error = l10n.t('verifyInviteFirst'));
@@ -123,6 +148,18 @@ class _InviteAcceptPageState extends State<InviteAcceptPage> {
             label: l10n.t('inviteCode'),
             prefixIcon: Icons.qr_code_rounded,
           ),
+          //Pulsante per scansionare il QR dall'app di chi ha generato
+          //l'invito. Solo dove c'è una camera supportata.
+          if (PlatformInfo.canScanQr) ...[
+            GKButton(
+              onPressed: _busy ? null : _scanInviteQr,
+              label: l10n.t('scanInviteCta'),
+              icon: Icons.qr_code_scanner_rounded,
+              variant: GKButtonVariant.secondary,
+              expanded: true,
+            ),
+            const SizedBox(height: 6),
+          ],
           GKButton(
             onPressed: _busy ? null : _verifyToken,
             label: _invite != null ? l10n.t('codeVerified') : l10n.t('verifyCode'),
