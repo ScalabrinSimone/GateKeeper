@@ -37,4 +37,22 @@ class AuthApi {
       'new_password': newPassword,
     }, withAuth: false);
   }
+
+  /// Invia un codice di verifica a 6 cifre all'email dell'utente autenticato.
+  Future<void> sendEmailCode() async {
+    await _client.post('/auth/send-email-code', body: {'email': ''});
+  }
+
+  /// Verifica il codice email. Lancia eccezione se il codice è errato/scaduto.
+  Future<void> verifyEmail(String code) async {
+    await _client.post('/auth/verify-email', body: {'code': code});
+  }
+
+  /// Elimina il proprio account ('lascia la casa').
+  /// Restituisce [true] se è stato eseguito un factory reset (ultimo admin).
+  Future<bool> deleteMe() async {
+    final res = await _client.delete('/auth/me');
+    final map = res as Map<String, dynamic>? ?? {};
+    return map['factory_reset'] == true;
+  }
 }

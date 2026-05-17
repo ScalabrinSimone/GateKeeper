@@ -330,8 +330,20 @@ class AppL10n {
       'reconnectingHub': 'Riconnessione in corso...',
       'leaveHomeTitle': 'Esci dalla casa',
       'leaveHomeSubtitle': 'Disconnetti questo dispositivo dall\'hub corrente.',
-      'leaveHomeBody': 'Verranno rimosse le credenziali e l\'URL dell\'hub salvato su questo dispositivo. Potrai sempre rientrare con username/password o associarti a un\'altra casa.',
+      'leaveHomeBody': 'Il tuo account verrà eliminato dal server. Potrai sempre rientrare con un nuovo invito o associarti a un\'altra casa.',
+      'leaveHomeBodyAdmin': 'Sei l\'unico admin. Eliminando il tuo account verrà eseguito un factory reset completo dell\'hub: tutti gli utenti e i dati verranno cancellati. Sei sicuro?',
       'leaveHome': 'Esci dalla casa',
+      //Email verification.
+      'verifyEmail': 'Verifica email',
+      'verifyEmailSubtitle': 'Inserisci il codice a 6 cifre inviato alla tua email.',
+      'verifyEmailSend': 'Invia codice',
+      'verifyEmailSending': 'Invio in corso...',
+      'verifyEmailCodeHint': 'Codice a 6 cifre',
+      'verifyEmailConfirm': 'Verifica',
+      'verifyEmailSuccess': 'Email verificata con successo.',
+      'verifyEmailError': 'Codice non valido o scaduto.',
+      'emailVerified': 'Email verificata',
+      'emailNotVerified': 'Email non verificata',
       //Logs object.
       'noLogsForObject': 'Nessun log per questo oggetto.',
       //Events.
@@ -665,8 +677,20 @@ class AppL10n {
       'reconnectingHub': 'Reconnecting...',
       'leaveHomeTitle': 'Leave home',
       'leaveHomeSubtitle': 'Disconnect this device from the current hub.',
-      'leaveHomeBody': 'Credentials and saved hub URL will be removed from this device. You can always sign in again or join another home.',
+      'leaveHomeBody': 'Your account will be deleted from the server. You can always rejoin with a new invite or connect to another home.',
+      'leaveHomeBodyAdmin': 'You are the only admin. Deleting your account will trigger a full factory reset of the hub: all users and data will be erased. Are you sure?',
       'leaveHome': 'Leave home',
+      //Email verification.
+      'verifyEmail': 'Verify email',
+      'verifyEmailSubtitle': 'Enter the 6-digit code sent to your email.',
+      'verifyEmailSend': 'Send code',
+      'verifyEmailSending': 'Sending...',
+      'verifyEmailCodeHint': '6-digit code',
+      'verifyEmailConfirm': 'Verify',
+      'verifyEmailSuccess': 'Email verified successfully.',
+      'verifyEmailError': 'Invalid or expired code.',
+      'emailVerified': 'Email verified',
+      'emailNotVerified': 'Email not verified',
       //Logs object.
       'noLogsForObject': 'No logs yet for this object.',
       //Events.

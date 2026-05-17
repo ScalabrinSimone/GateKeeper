@@ -292,13 +292,6 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
           ),
         ],
       ),
-      trailing: AuthQuickActions(
-        onQuickAction: (action) {
-          if (action == 'settings') {
-            context.go('/settings');
-          }
-        },
-      ),
     );
   }
 }

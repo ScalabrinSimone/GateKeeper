@@ -7,6 +7,7 @@ import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/dto.dart';
+import '../../data/gatekeeper_api.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
 import '../../shared/widgets/section_header.dart';
@@ -67,6 +68,8 @@ class AccountPage extends StatelessWidget {
               final info = Column(
                 children: [
                   _ProfileInfo(user: user, email: email),
+                  const SizedBox(height: 16),
+                  _EmailVerificationCard(auth: auth),
                   const SizedBox(height: 16),
                   _SessionsCard(),
                 ],
@@ -395,6 +398,200 @@ class _SessionsCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Email Verification Card
+// ─────────────────────────────────────────────────────────────────────────────
+class _EmailVerificationCard extends StatefulWidget {
+  const _EmailVerificationCard({required this.auth});
+  final AuthController auth;
+
+  @override
+  State<_EmailVerificationCard> createState() => _EmailVerificationCardState();
+}
+
+class _EmailVerificationCardState extends State<_EmailVerificationCard> {
+  bool _sending = false;
+  bool _codeSent = false;
+  bool _verifying = false;
+  String? _error;
+  final _codeCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _codeCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendCode() async {
+    setState(() { _sending = true; _error = null; });
+    try {
+      await GateKeeperApi.instance.auth.sendEmailCode();
+      setState(() { _codeSent = true; });
+    } catch (e) {
+      setState(() { _error = e.toString(); });
+    } finally {
+      setState(() { _sending = false; });
+    }
+  }
+
+  Future<void> _verify() async {
+    final code = _codeCtrl.text.trim();
+    if (code.length != 6) return;
+    setState(() { _verifying = true; _error = null; });
+    try {
+      await GateKeeperApi.instance.auth.verifyEmail(code);
+      // Ricarica l'utente per aggiornare lo stato.
+      await widget.auth.refreshUser();
+      if (mounted) {
+        final l10n = AppL10n.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.t('verifyEmailSuccess'))),
+        );
+        setState(() { _codeSent = false; _codeCtrl.clear(); });
+      }
+    } catch (e) {
+      setState(() { _error = AppL10n.of(context).t('verifyEmailError'); });
+    } finally {
+      setState(() { _verifying = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    final theme = Theme.of(context);
+    final user = widget.auth.user;
+    // Considera verificata se il campo non esiste (utenti pre-feature).
+    final verified = user == null || (user.emailVerified ?? true);
+
+    if (verified) {
+      return GKCard(
+        borderRadius: 32,
+        padding: const EdgeInsets.all(24),
+        background: AppColors.success.withValues(alpha: 0.06),
+        borderColor: AppColors.success.withValues(alpha: 0.18),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.verified_rounded, color: AppColors.success),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                l10n.t('emailVerified').toUpperCase(),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GKCard(
+      borderRadius: 32,
+      padding: const EdgeInsets.all(24),
+      background: AppColors.orangeGold.withValues(alpha: 0.06),
+      borderColor: AppColors.orangeGold.withValues(alpha: 0.22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.orangeGold.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.mark_email_unread_rounded, color: AppColors.orangeGold),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.t('verifyEmail').toUpperCase(),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: AppColors.orangeGold,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                    Text(
+                      l10n.t('verifyEmailSubtitle'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(_error!, style: TextStyle(color: AppColors.danger, fontSize: 13)),
+          ],
+          const SizedBox(height: 16),
+          if (!_codeSent)
+            GKButton(
+              onPressed: _sending ? null : _sendCode,
+              icon: Icons.send_rounded,
+              label: _sending ? l10n.t('verifyEmailSending') : l10n.t('verifyEmailSend'),
+              variant: GKButtonVariant.primary,
+              expanded: true,
+            )
+          else ...[
+            TextField(
+              controller: _codeCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: InputDecoration(
+                hintText: l10n.t('verifyEmailCodeHint'),
+                counterText: '',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              onSubmitted: (_) => _verify(),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: GKButton(
+                    onPressed: _verifying ? null : _verify,
+                    icon: Icons.check_circle_rounded,
+                    label: l10n.t('verifyEmailConfirm'),
+                    variant: GKButtonVariant.primary,
+                    expanded: true,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                GKButton(
+                  onPressed: _sending ? null : _sendCode,
+                  icon: Icons.refresh_rounded,
+                  label: '',
+                  variant: GKButtonVariant.ghost,
+                  dense: true,
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

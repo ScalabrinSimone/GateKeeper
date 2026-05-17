@@ -45,6 +45,7 @@ TABLES = (
     "events",
     "invites",
     "password_resets",
+    "email_verifications",
 )
 
 DB_LOCK = threading.RLock()

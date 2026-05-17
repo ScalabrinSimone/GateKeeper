@@ -144,6 +144,7 @@ def _user_public(record: Dict[str, Any]) -> Dict[str, Any]:
         "created_at": record.get("created_at"),
         "permissions": permissions,
         "push_tokens": list(record.get("push_tokens") or []),
+        "email_verified": record.get("email_verified"),
     }
 
 
@@ -1292,3 +1293,73 @@ def factory_reset_all() -> Dict[str, Any]:
     from .storage import factory_reset as storage_reset
     new_code = token_hex(3).upper()  # es. "9F2A1C"
     return storage_reset(factory_code=new_code)
+
+
+# --------------------------------------------------------------------------------------
+# EMAIL VERIFICATION
+# --------------------------------------------------------------------------------------
+def create_email_verification(user_id: int, ttl_minutes: int = 15) -> Dict[str, Any]:
+    """Crea un codice di verifica email a 6 cifre per l'utente."""
+    from secrets import randbelow
+    from datetime import timedelta
+
+    code = f"{randbelow(1_000_000):06d}"
+    expires = datetime.now(timezone.utc) + timedelta(minutes=max(5, int(ttl_minutes)))
+
+    with DB_LOCK:
+        db = load_db()
+        # Invalida eventuali codici precedenti per lo stesso utente.
+        for rec in db.get("email_verifications", []):
+            if rec.get("user_id") == user_id and not rec.get("used"):
+                rec["used"] = True
+        verify_id = next_id(db, "email_verifications")
+        record = {
+            "id": verify_id,
+            "user_id": user_id,
+            "code": code,
+            "created_at": _now_iso(),
+            "expires_at": expires.replace(microsecond=0).isoformat(),
+            "used": False,
+        }
+        db["email_verifications"].append(record)
+        save_db(db)
+        return record
+
+
+def consume_email_verification(user_id: int, code: str) -> bool:
+    """Verifica il codice e marca l'utente come email_verified."""
+    with DB_LOCK:
+        db = load_db()
+        target = None
+        for rec in db.get("email_verifications", []):
+            if rec.get("user_id") == user_id and rec.get("code") == code and not rec.get("used"):
+                target = rec
+                break
+        if target is None:
+            return False
+        try:
+            expires = datetime.fromisoformat(target["expires_at"])
+        except Exception:
+            return False
+        if expires < datetime.now(timezone.utc):
+            return False
+        target["used"] = True
+        target["used_at"] = _now_iso()
+        # Marca l'utente come verificato.
+        users = db["users"]
+        for u in users:
+            if u.get("id") == user_id:
+                u["email_verified"] = True
+                break
+        save_db(db)
+        return True
+
+
+def count_admins() -> int:
+    """Conta gli admin attivi nel sistema."""
+    with DB_LOCK:
+        db = load_db()
+        return sum(
+            1 for u in db["users"]
+            if u.get("role") == "admin" and u.get("is_active", True)
+        )

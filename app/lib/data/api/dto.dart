@@ -14,6 +14,7 @@ class UserDto {
     this.createdAt,
     this.permissions = const <String, bool>{},
     this.pushTokens = const <Map<String, dynamic>>[],
+    this.emailVerified,
   });
 
   factory UserDto.fromJson(Map<String, dynamic> json) {
@@ -41,6 +42,7 @@ class UserDto {
       createdAt: json['created_at']?.toString(),
       permissions: perms,
       pushTokens: tokens,
+      emailVerified: json['email_verified'] as bool?,
     );
   }
 
@@ -57,6 +59,8 @@ class UserDto {
   final Map<String, bool> permissions;
   //Token push registrati (FCM/APNs). Solo lettura.
   final List<Map<String, dynamic>> pushTokens;
+  //Null = campo non presente (utenti pre-feature, considerati verificati).
+  final bool? emailVerified;
 
   bool get isAdmin => role == 'admin';
 
@@ -80,6 +84,7 @@ class UserDto {
       createdAt: createdAt,
       permissions: permissions ?? this.permissions,
       pushTokens: pushTokens,
+      emailVerified: emailVerified,
     );
   }
 }

@@ -96,19 +96,26 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  //"Esci dalla casa": rimuove il base URL configurato e ogni token salvato,
-  //riportando l'app alla schermata di scelta hub. NON tocca i dati sul
-  //Raspberry: serve solo a "smettere di usare quella casa" da questo
-  //dispositivo. Per cancellare l'hub usare invece il factory reset.
+  //\"Esci dalla casa\": elimina l'account dal server e rimuove le credenziali
+  //locali. Se l'utente è l'ultimo admin, il backend esegue un factory reset.
   Future<void> _leaveHome(AppL10n l10n) async {
+    final isAdmin = widget.auth.isAdmin;
+    final body = isAdmin
+        ? l10n.t('leaveHomeBodyAdmin')
+        : l10n.t('leaveHomeBody');
     final ok = await _confirm(
       title: l10n.t('leaveHomeTitle'),
-      body: l10n.t('leaveHomeBody'),
+      body: body,
       confirmLabel: l10n.t('leaveHome'),
       danger: true,
     );
     if (!ok) return;
-    await widget.auth.leaveHome();
+    try {
+      await widget.auth.deleteAccount();
+    } catch (_) {
+      // Fallback: se la chiamata API fallisce, esci comunque localmente.
+      await widget.auth.leaveHome();
+    }
     if (!mounted) return;
     context.go('/welcome');
   }

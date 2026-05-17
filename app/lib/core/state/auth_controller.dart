@@ -184,6 +184,17 @@ class AuthController extends ChangeNotifier {
     await bootstrap();
   }
 
+  /// Ricarica i dati dell'utente corrente dal server e notifica i listener.
+  Future<void> refreshUser() async {
+    try {
+      final updated = await _api.auth.me();
+      _user = updated;
+      notifyListeners();
+    } catch (_) {
+      // Ignora errori di rete: i dati locali restano invariati.
+    }
+  }
+
   //"Esci dalla casa": rimuove la configurazione hub di questo dispositivo
   //(base URL + token + cache utente) ma NON tocca i dati lato Raspberry.
   //Dopo questa operazione l'app torna in stato `needsPairing` e l'utente
@@ -202,7 +213,25 @@ class AuthController extends ChangeNotifier {
     _stage = AuthStage.needsPairing;
     notifyListeners();
   }
-
+  /// Elimina il proprio account dal server ("lascia la casa" con cancellazione).
+  /// Se l'utente è l'ultimo admin, il backend esegue un factory reset completo.
+  /// Restituisce [true] se è stato eseguito un factory reset.
+  Future<bool> deleteAccount() async {
+    bool factoryReset = false;
+    try {
+      factoryReset = await _api.auth.deleteMe();
+    } catch (_) {
+      rethrow;
+    }
+    _api.setToken(null);
+    await SecureStorage.delete(_kTokenKey);
+    await ApiConfig.reset();
+    _user = null;
+    _hubInfo = factoryReset ? const HubInfoDto(paired: false, requiresFactoryCode: true) : null;
+    _stage = AuthStage.needsPairing;
+    notifyListeners();
+    return factoryReset;
+  }
   //Logout: cancella token e torna a login.
   Future<void> logout() async {
     try {

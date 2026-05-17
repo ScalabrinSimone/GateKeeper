@@ -81,6 +81,8 @@ class UserOut(BaseModel):
     permissions: dict[str, bool] = Field(default_factory=dict)
     # Token push registrati dai dispositivi dell'utente (FCM/APNs).
     push_tokens: list[dict[str, Any]] = Field(default_factory=list)
+    # Verifica email (None = campo non presente, considerato verificato).
+    email_verified: Optional[bool] = None
 
 
 class DeviceCreate(BaseModel):
@@ -790,6 +792,16 @@ class FactoryResetRequest(BaseModel):
     confirm: bool = False
 
 
+class SendEmailCodeRequest(BaseModel):
+    """Richiesta di invio codice di verifica email."""
+    email: str
+
+
+class VerifyEmailRequest(BaseModel):
+    """Verifica del codice email."""
+    code: str
+
+
 def _get_current_user(authorization: Optional[str] = Header(default=None)) -> dict:
     """Dependency: estrae l'utente corrente dal token Bearer."""
     if not authorization or not authorization.lower().startswith("bearer "):
@@ -1015,6 +1027,81 @@ def auth_reset_password(req: ResetPasswordRequest):
     if not ok:
         raise HTTPException(status_code=400, detail="invalid or expired token")
     return {"reset": True}
+
+
+# --------------------------------------------------------------------------------------
+# EMAIL VERIFICATION
+# --------------------------------------------------------------------------------------
+@app.post("/auth/send-email-code")
+def auth_send_email_code(req: SendEmailCodeRequest, user: dict = Depends(_get_current_user)):
+    """Invia un codice di verifica a 6 cifre all'email dell'utente autenticato.
+
+    L'email nel body deve corrispondere a quella dell'account (o essere vuota
+    per usare quella già registrata). Risponde sempre con {"sent": true} per
+    non rivelare se l'email esiste.
+    """
+    # Usa l'email dell'account se il client non ne passa una diversa.
+    target_email = req.email.strip().lower() if req.email.strip() else user.get("email", "")
+    if target_email and target_email != user.get("email", "").lower():
+        raise HTTPException(status_code=400, detail="email does not match account")
+
+    record = models.create_email_verification(user["id"])
+    try:
+        send_mail(
+            to=user["email"],
+            subject="GateKeeper · Codice di verifica",
+            body=(
+                "Ciao,\n\n"
+                "Il tuo codice di verifica GateKeeper è:\n\n"
+                f"    {record['code']}\n\n"
+                "Il codice è valido per 15 minuti.\n"
+                "Se non hai richiesto la verifica, ignora questa email.\n"
+            ),
+        )
+    except Exception as exc:
+        print(f"[AUTH] send-email-code mail error: {exc}")
+    return {"sent": True}
+
+
+@app.post("/auth/verify-email")
+def auth_verify_email(req: VerifyEmailRequest, user: dict = Depends(_get_current_user)):
+    """Verifica il codice email e marca l'account come verificato."""
+    ok = models.consume_email_verification(user["id"], req.code.strip())
+    if not ok:
+        raise HTTPException(status_code=400, detail="invalid or expired code")
+    return {"verified": True}
+
+
+# --------------------------------------------------------------------------------------
+# DELETE OWN ACCOUNT (leave home)
+# --------------------------------------------------------------------------------------
+@app.delete("/auth/me")
+def auth_delete_me(user: dict = Depends(_get_current_user)):
+    """L'utente elimina il proprio account ('lascia la casa').
+
+    Se l'utente è l'unico admin rimasto, viene eseguito un factory reset
+    completo dell'hub (tutti i dati vengono cancellati).
+    """
+    user_id = user["id"]
+    is_admin = user.get("role") == "admin"
+
+    if is_admin:
+        remaining_admins = models.count_admins()
+        if remaining_admins <= 1:
+            # Ultimo admin: factory reset completo.
+            gk_tokens.reset_secret()
+            new_state = models.factory_reset_all()
+            return {
+                "deleted": True,
+                "factory_reset": True,
+                "factory_code": new_state.get("factory_code"),
+            }
+
+    # Non è l'ultimo admin (o non è admin): elimina solo il proprio account.
+    ok = models.delete_user(user_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="user not found")
+    return {"deleted": True, "factory_reset": False}
 
 
 # --------------------------------------------------------------------------------------
