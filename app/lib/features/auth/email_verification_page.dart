@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -27,11 +29,17 @@ class EmailVerificationPage extends StatefulWidget {
 }
 
 class _EmailVerificationPageState extends State<EmailVerificationPage> {
+  static const _cooldownSeconds = 60;
+
   final _codeCtrl = TextEditingController();
   bool _sending = false;
   bool _verifying = false;
   bool _codeSent = false;
   String? _error;
+
+  // Timer cooldown reinvio.
+  int _cooldown = 0;
+  Timer? _cooldownTimer;
 
   @override
   void initState() {
@@ -43,21 +51,41 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
   @override
   void dispose() {
     _codeCtrl.dispose();
+    _cooldownTimer?.cancel();
     super.dispose();
   }
 
+  void _startCooldown() {
+    _cooldownTimer?.cancel();
+    setState(() => _cooldown = _cooldownSeconds);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        _cooldown--;
+        if (_cooldown <= 0) t.cancel();
+      });
+    });
+  }
+
   Future<void> _sendCode() async {
+    if (_cooldown > 0) return;
     setState(() {
       _sending = true;
       _error = null;
     });
     try {
       await GateKeeperApi.instance.auth.sendEmailCode();
-      setState(() => _codeSent = true);
+      if (mounted) {
+        setState(() => _codeSent = true);
+        _startCooldown();
+      }
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString());
     } finally {
-      setState(() => _sending = false);
+      if (mounted) setState(() => _sending = false);
     }
   }
 
@@ -90,6 +118,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final email = widget.auth.user?.email ?? '';
+    final canResend = _codeSent && !_sending && _cooldown <= 0;
 
     return AuthScaffold(
       title: l10n.t('verifyEmail'),
@@ -119,7 +148,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
             Center(
               child: Text(
                 email,
-                style: TextStyle(
+                style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   color: AppColors.stormyTeal,
                   fontSize: 14,
@@ -175,12 +204,16 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
             ),
           ],
           const SizedBox(height: 16),
-          // Reinvia codice
-          if (_codeSent && !_sending)
+          // Reinvia codice con cooldown.
+          if (_codeSent)
             TextButton.icon(
-              onPressed: _sendCode,
+              onPressed: canResend ? _sendCode : null,
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: Text(l10n.t('verifyEmailSend')),
+              label: Text(
+                _cooldown > 0
+                    ? '${l10n.t('verifyEmailSend')} ($_cooldown s)'
+                    : l10n.t('verifyEmailSend'),
+              ),
             ),
           const SizedBox(height: 8),
           // Logout

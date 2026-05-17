@@ -55,4 +55,22 @@ class AuthApi {
     final map = res as Map<String, dynamic>? ?? {};
     return map['factory_reset'] == true;
   }
+
+  /// Aggiorna username, email e/o password dell'utente autenticato.
+  /// Per cambiare la password occorre passare [currentPassword].
+  /// Restituisce il [UserDto] aggiornato.
+  Future<UserDto> patchMe({
+    String? username,
+    String? email,
+    String? currentPassword,
+    String? newPassword,
+  }) async {
+    final body = <String, dynamic>{};
+    if (username != null) body['username'] = username;
+    if (email != null) body['email'] = email;
+    if (currentPassword != null) body['current_password'] = currentPassword;
+    if (newPassword != null) body['new_password'] = newPassword;
+    final res = await _client.patch('/auth/me', body: body);
+    return UserDto.fromJson(Map<String, dynamic>.from(res as Map));
+  }
 }

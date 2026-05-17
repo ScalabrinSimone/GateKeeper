@@ -262,6 +262,134 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Modifica profilo
+  // ---------------------------------------------------------------------------
+
+  Future<void> _editUsername(AppL10n l10n) async {
+    final ctrl = TextEditingController(text: widget.auth.user?.username ?? '');
+    final saved = await _profileDialog(
+      l10n: l10n,
+      title: l10n.t('changeUsername'),
+      fields: [
+        _DialogField(ctrl: ctrl, label: l10n.t('newUsernameLabel'), icon: Icons.badge_rounded),
+      ],
+    );
+    if (!saved || ctrl.text.trim().isEmpty) return;
+    await _patchMe(l10n, username: ctrl.text.trim());
+  }
+
+  Future<void> _editEmail(AppL10n l10n) async {
+    final ctrl = TextEditingController(text: widget.auth.user?.email ?? '');
+    final saved = await _profileDialog(
+      l10n: l10n,
+      title: l10n.t('changeEmail'),
+      fields: [
+        _DialogField(ctrl: ctrl, label: l10n.t('newEmailLabel'), icon: Icons.alternate_email_rounded,
+            keyboardType: TextInputType.emailAddress),
+      ],
+    );
+    if (!saved || ctrl.text.trim().isEmpty) return;
+    await _patchMe(l10n, email: ctrl.text.trim());
+  }
+
+  Future<void> _editPassword(AppL10n l10n) async {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final saved = await _profileDialog(
+      l10n: l10n,
+      title: l10n.t('changePassword'),
+      fields: [
+        _DialogField(ctrl: currentCtrl, label: l10n.t('currentPassword'),
+            icon: Icons.lock_outline_rounded, obscure: true),
+        _DialogField(ctrl: newCtrl, label: l10n.t('newPasswordLabel'),
+            icon: Icons.lock_rounded, obscure: true,
+            hint: l10n.t('newPasswordMin')),
+      ],
+    );
+    if (!saved || currentCtrl.text.isEmpty || newCtrl.text.isEmpty) return;
+    await _patchMe(l10n, currentPassword: currentCtrl.text, newPassword: newCtrl.text);
+  }
+
+  Future<void> _patchMe(AppL10n l10n, {
+    String? username,
+    String? email,
+    String? currentPassword,
+    String? newPassword,
+  }) async {
+    try {
+      final updated = await GateKeeperApi.instance.auth.patchMe(
+        username: username,
+        email: email,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      widget.auth.setUser(updated);
+      if (!mounted) return;
+      final msg = (email != null && email != widget.auth.user?.email)
+          ? l10n.t('emailChangedVerify')
+          : l10n.t('profileUpdated');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final msg = e.message.contains('incorrect') || e.message.contains('password')
+          ? l10n.t('wrongCurrentPassword')
+          : e.message;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.t('profileUpdateError'))),
+      );
+    }
+  }
+
+  /// Mostra un dialog con uno o più campi di testo.
+  /// Restituisce [true] se l'utente ha premuto Salva.
+  Future<bool> _profileDialog({
+    required AppL10n l10n,
+    required String title,
+    required List<_DialogField> fields,
+  }) async {
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final f in fields)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GKTextField(
+                    controller: f.ctrl,
+                    label: f.label,
+                    prefixIcon: f.icon,
+                    obscureText: f.obscure,
+                    keyboardType: f.keyboardType,
+                    hint: f.hint,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.t('cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.stormyTeal),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.t('saveChanges')),
+          ),
+        ],
+      ),
+    );
+    return res ?? false;
+  }
+
   Future<bool> _confirm({
     required String title,
     required String body,
@@ -481,6 +609,44 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           _Section(
+            title: l10n.t('profileSectionTitle'),
+            children: [
+              _Tile(
+                icon: Icons.badge_rounded,
+                title: l10n.t('changeUsername'),
+                subtitle: widget.auth.user?.username ?? '',
+                trailing: GKButton(
+                  onPressed: () => _editUsername(l10n),
+                  label: l10n.t('edit'),
+                  variant: GKButtonVariant.secondary,
+                  dense: true,
+                ),
+              ),
+              _Tile(
+                icon: Icons.alternate_email_rounded,
+                title: l10n.t('changeEmail'),
+                subtitle: widget.auth.user?.email ?? '',
+                trailing: GKButton(
+                  onPressed: () => _editEmail(l10n),
+                  label: l10n.t('edit'),
+                  variant: GKButtonVariant.secondary,
+                  dense: true,
+                ),
+              ),
+              _Tile(
+                icon: Icons.lock_rounded,
+                title: l10n.t('changePassword'),
+                subtitle: l10n.t('changePasswordSubtitle'),
+                trailing: GKButton(
+                  onPressed: () => _editPassword(l10n),
+                  label: l10n.t('edit'),
+                  variant: GKButtonVariant.secondary,
+                  dense: true,
+                ),
+              ),
+            ],
+          ),
+          _Section(
             title: l10n.t('account'),
             children: [
               _Tile(
@@ -610,6 +776,24 @@ class _Tile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Dati di un campo nel dialog di modifica profilo.
+class _DialogField {
+  _DialogField({
+    required this.ctrl,
+    required this.label,
+    required this.icon,
+    this.obscure = false,
+    this.keyboardType,
+    this.hint,
+  });
+  final TextEditingController ctrl;
+  final String label;
+  final IconData icon;
+  final bool obscure;
+  final TextInputType? keyboardType;
+  final String? hint;
 }
 
 class _ToggleChips extends StatelessWidget {

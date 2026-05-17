@@ -1000,6 +1000,7 @@ def auth_forgot_password(req: ForgotPasswordRequest):
     record = models.create_password_reset(req.email)
     # Risposta sempre uguale per non rivelare se l'email esiste.
     if record is not None:
+        print(f"[RESET-PWD] Token reset per {record['email']}: {record['token']}")
         try:
             send_mail(
                 to=record["email"],
@@ -1046,6 +1047,8 @@ def auth_send_email_code(req: SendEmailCodeRequest, user: dict = Depends(_get_cu
         raise HTTPException(status_code=400, detail="email does not match account")
 
     record = models.create_email_verification(user["id"])
+    # Stampa sempre il codice nel terminale (utile in locale senza SMTP).
+    print(f"[EMAIL-CODE] Codice per {user['email']}: {record['code']}")
     try:
         send_mail(
             to=user["email"],
@@ -1070,6 +1073,88 @@ def auth_verify_email(req: VerifyEmailRequest, user: dict = Depends(_get_current
     if not ok:
         raise HTTPException(status_code=400, detail="invalid or expired code")
     return {"verified": True}
+
+
+class PatchMeRequest(BaseModel):
+    """Aggiornamento parziale del profilo dell'utente autenticato."""
+    username: Optional[str] = None
+    email: Optional[str] = None
+    current_password: Optional[str] = None  # richiesta per cambio password
+    new_password: Optional[str] = None
+
+
+# --------------------------------------------------------------------------------------
+# PATCH OWN PROFILE
+# --------------------------------------------------------------------------------------
+@app.patch("/auth/me", response_model=UserOut)
+def auth_patch_me(req: PatchMeRequest, user: dict = Depends(_get_current_user)):
+    """Aggiorna username, email e/o password dell'utente autenticato.
+
+    - Per cambiare la password è obbligatorio fornire `current_password`.
+    - Se si cambia l'email, `email_verified` viene resettato a False e viene
+      inviato automaticamente un nuovo codice di verifica.
+    """
+    from werkzeug.security import check_password_hash
+
+    user_id = user["id"]
+    email_changed = False
+
+    # Validazione password corrente se si vuole cambiare la password.
+    if req.new_password is not None:
+        if not req.current_password:
+            raise HTTPException(status_code=400, detail="current_password required to change password")
+        if not check_password_hash(user.get("hash_psw", ""), req.current_password):
+            raise HTTPException(status_code=403, detail="current password is incorrect")
+        if len(req.new_password) < 6:
+            raise HTTPException(status_code=400, detail="new password must be at least 6 characters")
+
+    # Rileva cambio email.
+    if req.email is not None and req.email.strip().lower() != user.get("email", "").lower():
+        email_changed = True
+
+    try:
+        ok = models.update_user(
+            user_id,
+            username=req.username,
+            email=req.email,
+            password=req.new_password,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if not ok:
+        raise HTTPException(status_code=404, detail="user not found")
+
+    # Se l'email è cambiata: resetta email_verified e invia nuovo codice.
+    if email_changed:
+        with models.DB_LOCK:
+            db = models.load_db()
+            for u in db["users"]:
+                if u["id"] == user_id:
+                    u["email_verified"] = False
+                    break
+            models.save_db(db)
+        updated_user = models.get_user_by_id(user_id)
+        record = models.create_email_verification(user_id)
+        print(f"[EMAIL-CODE] Codice verifica nuova email per {updated_user['email']}: {record['code']}")
+        try:
+            send_mail(
+                to=updated_user["email"],
+                subject="GateKeeper · Verifica nuova email",
+                body=(
+                    "Ciao,\n\n"
+                    "Hai cambiato l'email del tuo account GateKeeper.\n"
+                    "Il tuo codice di verifica è:\n\n"
+                    f"    {record['code']}\n\n"
+                    "Il codice è valido per 15 minuti.\n"
+                    "Se non sei stato tu, contatta l'amministratore.\n"
+                ),
+            )
+        except Exception as exc:
+            print(f"[AUTH] patch-me email-code mail error: {exc}")
+
+    updated = models.get_user_by_id(user_id)
+    return updated
 
 
 # --------------------------------------------------------------------------------------

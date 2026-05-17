@@ -71,6 +71,8 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
 
   bool get _needsFactoryCode => widget.auth.hubInfo?.requiresFactoryCode ?? false;
 
+  static final _emailRegex = RegExp(r'^[\w.+\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
+
   Future<void> _submitAdmin(AppL10n l10n) async {
     if (_busy) return;
     if (_houseCtrl.text.trim().isEmpty ||
@@ -78,6 +80,10 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
         _emailCtrl.text.trim().isEmpty ||
         _passwordCtrl.text.length < 6) {
       setState(() => _error = l10n.t('fillAllFields'));
+      return;
+    }
+    if (!_emailRegex.hasMatch(_emailCtrl.text.trim())) {
+      setState(() => _error = l10n.t('invalidEmail'));
       return;
     }
     setState(() {
@@ -93,6 +99,9 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
         email: _emailCtrl.text.trim(),
         factoryCode: _factoryCtrl.text.trim().isEmpty ? null : _factoryCtrl.text.trim(),
       );
+      // Se l'email non è verificata il router reindirizzerà a /verify-email;
+      // altrimenti avanziamo normalmente agli step successivi del wizard.
+      if (widget.auth.stage == AuthStage.needsEmailVerification) return;
       setState(() => _step = 2);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -197,6 +206,11 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
   //Se siamo oltre lo step di creazione admin, chiediamo conferma:
   //l'admin è stato già creato e una nuova "fuga" non lo elimina.
   Future<void> _exitSetup(BuildContext context, AppL10n l10n) async {
+    // Step 1: torna allo step 0 senza uscire dal wizard.
+    if (_step == 1) {
+      setState(() => _step = 0);
+      return;
+    }
     if (_step >= 2) {
       final ok = await showDialog<bool>(
         context: context,

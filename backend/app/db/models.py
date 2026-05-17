@@ -216,6 +216,7 @@ def create_user(
                 "created_at": _now_iso(),
                 "permissions": perms,
                 "push_tokens": [],
+                "email_verified": False,
             }
         )
         save_db(db)

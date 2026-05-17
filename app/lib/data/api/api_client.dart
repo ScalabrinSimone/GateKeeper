@@ -116,6 +116,14 @@ class ApiClient {
         ));
   }
 
+  Future<dynamic> patch(String path, {Map<String, dynamic>? body, bool withAuth = true}) {
+    return _send(() => _http.patch(
+          _uri(path),
+          headers: _headers(withAuth: withAuth, jsonBody: true),
+          body: body == null ? null : jsonEncode(body),
+        ));
+  }
+
   Future<dynamic> delete(String path, {bool withAuth = true}) {
     return _send(() => _http.delete(_uri(path), headers: _headers(withAuth: withAuth)));
   }

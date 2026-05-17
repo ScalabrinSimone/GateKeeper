@@ -186,7 +186,12 @@ class AuthController extends ChangeNotifier {
       requiresFactoryCode: false,
       houseName: houseName,
     );
-    _stage = AuthStage.authenticated;
+    if (res.user.emailVerified == false) {
+      _stage = AuthStage.needsEmailVerification;
+    } else {
+      _stage = AuthStage.authenticated;
+      unawaited(PushNotificationsService.instance.initialize());
+    }
     notifyListeners();
   }
 

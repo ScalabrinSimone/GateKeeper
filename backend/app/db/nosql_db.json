@@ -8,29 +8,29 @@
       "logs": 1,
       "events": 1,
       "invites": 1,
-      "password_resets": 1,
-      "email_verifications": 1
+      "password_resets": 2,
+      "email_verifications": 5
     },
     "hub": {
       "paired": true,
       "house_name": "Test",
       "admin_user_id": 1,
-      "paired_at": "2026-05-17T21:11:11+00:00",
+      "paired_at": "2026-05-17T21:38:30+00:00",
       "factory_code": null
     }
   },
   "users": [
     {
       "id": 1,
-      "email": "sdasdsa",
-      "hash_psw": "scrypt:32768:8:1$LCdtgpfThNEVpuxc$1ddce83977397ef9bb88dfd453328a129afbb05fbd31ec39827cd9a7b73934b6fadf1307cabeba3fa886b562ac5803cd0512f9a336a3637b53ba6bd5ec342ce4",
-      "username": "testA",
+      "email": "amontaa.jordany@forliion.com",
+      "hash_psw": "scrypt:32768:8:1$Yx4jkf1MZmsFiAxz$ba83798a396d15485431741bf322f968eaf7f24270c6c8a3a1c5ecbb1668bd3d5e96ed0fc603f6b94732bcb841e353a189459b2369ff8e157ee1b7ad0130f712",
+      "username": "testB",
       "role": "admin",
-      "uuid": "96de8eed-0dd9-4e7f-93ef-a53852a638ed",
+      "uuid": "14c2ad10-9711-4458-a381-6cc0ed98204d",
       "is_active": true,
       "last_seen_at": null,
       "current_location": "unknown",
-      "created_at": "2026-05-17T21:11:11+00:00",
+      "created_at": "2026-05-17T21:38:30+00:00",
       "permissions": {
         "can_manage_devices": true,
         "can_manage_users": true,
@@ -39,7 +39,8 @@
         "can_acknowledge_alerts": true,
         "can_configure_hub": true
       },
-      "push_tokens": []
+      "push_tokens": [],
+      "email_verified": true
     }
   ],
   "devices": [],
@@ -47,6 +48,52 @@
   "logs": [],
   "events": [],
   "invites": [],
-  "password_resets": [],
-  "email_verifications": []
+  "password_resets": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "email": "amontae.jordany@forliion.com",
+      "token": "p_y8nBgrOs_xC6dDjmcyDaXyGvs",
+      "created_at": "2026-05-17T21:39:34+00:00",
+      "expires_at": "2026-05-17T22:09:34+00:00",
+      "used": true,
+      "used_at": "2026-05-17T21:40:09+00:00"
+    }
+  ],
+  "email_verifications": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "code": "679499",
+      "created_at": "2026-05-17T21:38:30+00:00",
+      "expires_at": "2026-05-17T21:53:30+00:00",
+      "used": true,
+      "used_at": "2026-05-17T21:38:42+00:00"
+    },
+    {
+      "id": 2,
+      "user_id": 1,
+      "code": "840816",
+      "created_at": "2026-05-17T21:40:32+00:00",
+      "expires_at": "2026-05-17T21:55:32+00:00",
+      "used": true
+    },
+    {
+      "id": 3,
+      "user_id": 1,
+      "code": "338473",
+      "created_at": "2026-05-17T21:40:36+00:00",
+      "expires_at": "2026-05-17T21:55:36+00:00",
+      "used": true
+    },
+    {
+      "id": 4,
+      "user_id": 1,
+      "code": "985500",
+      "created_at": "2026-05-17T21:41:36+00:00",
+      "expires_at": "2026-05-17T21:56:36+00:00",
+      "used": true,
+      "used_at": "2026-05-17T21:41:53+00:00"
+    }
+  ]
 }
