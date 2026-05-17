@@ -6,6 +6,7 @@ import '../core/state/auth_controller.dart';
 import '../core/state/settings_controller.dart';
 import '../core/theme/app_colors.dart';
 import '../features/account/account_page.dart';
+import '../features/auth/email_verification_page.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/pair_choice_page.dart';
 import '../features/auth/recovery_page.dart';
@@ -41,6 +42,7 @@ class AppRouter {
         final isPublicRoute = loc == '/welcome' ||
             loc == '/login' ||
             loc == '/recover' ||
+            loc == '/verify-email' ||
             loc.startsWith('/onboarding') ||
             loc.startsWith('/invite');
 
@@ -62,6 +64,10 @@ class AppRouter {
           if (isPublicRoute) return null;
           return '/login';
         }
+        if (stage == AuthStage.needsEmailVerification) {
+          if (loc == '/verify-email') return null;
+          return '/verify-email';
+        }
         //authenticated.
         if (loc == '/splash' || isPublicRoute) return '/dashboard';
         return null;
@@ -71,6 +77,10 @@ class AppRouter {
         GoRoute(path: '/welcome', builder: (_, __) => PairChoicePage(auth: auth, settings: settings)),
         GoRoute(path: '/login', builder: (_, __) => LoginPage(auth: auth, settings: settings)),
         GoRoute(path: '/recover', builder: (_, __) => RecoveryPage(auth: auth, settings: settings)),
+        GoRoute(
+          path: '/verify-email',
+          builder: (_, __) => EmailVerificationPage(auth: auth, settings: settings),
+        ),
         GoRoute(
           path: '/onboarding/discover',
           builder: (_, __) => DiscoveryPage(auth: auth, settings: settings),

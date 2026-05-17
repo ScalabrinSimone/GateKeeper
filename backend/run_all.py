@@ -279,6 +279,32 @@ def main() -> None:
     lan_ip = _detect_lan_ip()
     _print_pairing_qr(lan_ip, args.port)
 
+    # Thread che monitora il flag `paired` e ristampa il QR ogni volta che
+    # l'hub torna non-pairato (es. dopo factory reset via app o DELETE /auth/me).
+    _qr_monitor_stop = threading.Event()
+
+    def _qr_monitor_loop() -> None:
+        was_paired = bool((gk_models.get_hub() or {}).get("paired"))
+        while not _qr_monitor_stop.is_set():
+            if _qr_monitor_stop.wait(3.0):
+                break
+            try:
+                is_paired = bool((gk_models.get_hub() or {}).get("paired"))
+            except Exception:
+                is_paired = was_paired
+            if was_paired and not is_paired:
+                # L'hub è appena tornato non-pairato: ristampa il QR.
+                log("INFO", "Hub non più pairato: ristampa QR di pairing.")
+                _print_pairing_qr(lan_ip, args.port)
+            was_paired = is_paired
+
+    qr_monitor_thread = threading.Thread(
+        target=_qr_monitor_loop,
+        daemon=True,
+        name="qr-monitor-thread",
+    )
+    qr_monitor_thread.start()
+
     try:
         printSection("SERVER API")
         log("INFO", "Avvio server FastAPI/Uvicorn")
@@ -290,6 +316,7 @@ def main() -> None:
             reload=False,
         )
     finally:
+        _qr_monitor_stop.set()
         log("INFO", "Backend terminato")
 
 

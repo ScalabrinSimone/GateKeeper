@@ -197,18 +197,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       icon: const Icon(Icons.arrow_back_rounded, size: 18),
                       label: Text(l10n.t('back')),
                     ),
-                    const SizedBox(width: 16),
-                    TextButton.icon(
-                      onPressed: _busy
-                          ? null
-                          : () async {
-                              await widget.auth.leaveHome();
-                              if (!context.mounted) return;
-                              context.go('/welcome');
-                            },
-                      icon: const Icon(Icons.exit_to_app_rounded, size: 18),
-                      label: Text(l10n.t('leaveHome')),
-                    ),
                   ],
                 ),
               ],

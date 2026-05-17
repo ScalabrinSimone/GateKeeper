@@ -17,6 +17,8 @@ enum AuthStage {
   needsPairing,
   //Hub accoppiato ma utente non loggato.
   needsLogin,
+  //Utente loggato ma email non ancora verificata.
+  needsEmailVerification,
   //Utente loggato, app pronta.
   authenticated,
   //Hub non raggiungibile: offline / errore di rete.
@@ -117,10 +119,15 @@ class AuthController extends ChangeNotifier {
       try {
         final me = await _api.auth.me();
         _user = me;
-        _stage = AuthStage.authenticated;
-        //Inizializzazione best-effort delle push: se Firebase non è
-        //configurato il servizio ritorna false senza errori.
-        unawaited(PushNotificationsService.instance.initialize());
+        // Se email_verified è esplicitamente false, blocca prima della dashboard.
+        if (me.emailVerified == false) {
+          _stage = AuthStage.needsEmailVerification;
+        } else {
+          _stage = AuthStage.authenticated;
+          //Inizializzazione best-effort delle push: se Firebase non è
+          //configurato il servizio ritorna false senza errori.
+          unawaited(PushNotificationsService.instance.initialize());
+        }
         notifyListeners();
         return;
       } on ApiException catch (e) {
@@ -137,15 +144,20 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  //Tenta un login. In caso di successo, persiste token e passa a authenticated.
+  //Tenta un login. In caso di successo, persiste token e passa a authenticated
+  //oppure a needsEmailVerification se l'email non è ancora verificata.
   Future<void> login({required String identifier, required String password}) async {
     _lastError = null;
     final res = await _api.auth.login(identifier: identifier, password: password);
     _api.setToken(res.token);
     await SecureStorage.write(_kTokenKey, res.token);
     _user = res.user;
-    _stage = AuthStage.authenticated;
-    unawaited(PushNotificationsService.instance.initialize());
+    if (res.user.emailVerified == false) {
+      _stage = AuthStage.needsEmailVerification;
+    } else {
+      _stage = AuthStage.authenticated;
+      unawaited(PushNotificationsService.instance.initialize());
+    }
     notifyListeners();
   }
 
@@ -185,10 +197,15 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Ricarica i dati dell'utente corrente dal server e notifica i listener.
+  /// Se l'email risulta verificata, avanza lo stage ad [authenticated].
   Future<void> refreshUser() async {
     try {
       final updated = await _api.auth.me();
       _user = updated;
+      if (_stage == AuthStage.needsEmailVerification && updated.emailVerified != false) {
+        _stage = AuthStage.authenticated;
+        unawaited(PushNotificationsService.instance.initialize());
+      }
       notifyListeners();
     } catch (_) {
       // Ignora errori di rete: i dati locali restano invariati.

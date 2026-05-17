@@ -383,17 +383,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               _Tile(
-                icon: Icons.router_rounded,
-                title: l10n.t('changeHubTitle'),
-                subtitle: l10n.t('changeHubSubtitle'),
-                trailing: GKButton(
-                  onPressed: () => context.go('/onboarding/discover'),
-                  label: l10n.t('changeHub'),
-                  variant: GKButtonVariant.ghost,
-                  dense: true,
-                ),
-              ),
-              _Tile(
                 icon: Icons.sync_rounded,
                 title: l10n.t('reconnectHubTitle'),
                 subtitle: l10n.t('reconnectHubSubtitle'),
@@ -491,23 +480,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          if (widget.auth.isAdmin)
-            _Section(
-              title: l10n.t('invites'),
-              children: [
-                _Tile(
-                  icon: Icons.person_add_alt_rounded,
-                  title: l10n.t('inviteMember'),
-                  subtitle: l10n.t('manageInvites'),
-                  trailing: GKButton(
-                    onPressed: () => _generateInvite(l10n),
-                    label: l10n.t('generateInvite'),
-                    variant: GKButtonVariant.secondary,
-                    dense: true,
-                  ),
-                ),
-              ],
-            ),
           _Section(
             title: l10n.t('account'),
             children: [
