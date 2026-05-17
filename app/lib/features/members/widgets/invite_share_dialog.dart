@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/i18n/app_l10n.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/api/dto.dart';
+import '../../../shared/widgets/gk_branded_qr.dart';
 import '../../../shared/widgets/gk_button.dart';
 
 //Dialog di condivisione di un invito appena generato.
@@ -70,29 +70,8 @@ class InviteShareDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            //QR code (su sfondo bianco anche in dark mode per leggibilità).
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: QrImageView(
-                  data: _deepLink,
-                  size: 220,
-                  backgroundColor: Colors.white,
-                  eyeStyle: const QrEyeStyle(
-                    eyeShape: QrEyeShape.square,
-                    color: AppColors.inkBlack,
-                  ),
-                  dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.square,
-                    color: AppColors.inkBlack,
-                  ),
-                ),
-              ),
-            ),
+            //QR code "branded": colori GateKeeper + logo al centro.
+            Center(child: GKBrandedQr(data: _deepLink, size: 220)),
             const SizedBox(height: 12),
             //Codice testuale (sempre disponibile come fallback).
             Container(

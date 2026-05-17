@@ -14,6 +14,7 @@ class AuthScaffold extends StatelessWidget {
     this.maxContentWidth = 460,
     this.actionsBelow,
     this.leading,
+    this.trailing,
   });
 
   final String title;
@@ -23,6 +24,8 @@ class AuthScaffold extends StatelessWidget {
   final Widget? actionsBelow;
   //Widget opzionale in alto a sinistra (es. tasto "Indietro").
   final Widget? leading;
+  //Widget opzionale in alto a destra (es. switch lingua/tema).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -73,12 +76,19 @@ class AuthScaffold extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (leading != null)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: leading!,
+                      //Toolbar superiore: leading a sinistra + trailing a destra.
+                      if (leading != null || trailing != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              if (leading != null) leading!,
+                              const Spacer(),
+                              if (trailing != null) trailing!,
+                            ],
+                          ),
                         ),
-                      const Center(child: GKLogo(size: 64)),
+                      const Center(child: GKLogo(size: 72)),
                       const SizedBox(height: 20),
                       Text(
                         title,

@@ -6,12 +6,14 @@ import '../../core/config/api_config.dart';
 import '../../core/i18n/app_l10n.dart';
 import '../../core/platform/platform_info.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/api/dto.dart';
 import '../../data/api/hub_api.dart';
 import '../../data/services/discovery_service.dart';
 import '../../shared/widgets/gk_button.dart';
+import '../auth/widgets/auth_quick_actions.dart';
 import '../auth/widgets/auth_scaffold.dart';
 import '../auth/widgets/gk_text_field.dart';
 import 'widgets/qr_scanner_sheet.dart';
@@ -19,8 +21,9 @@ import 'widgets/qr_scanner_sheet.dart';
 //Step 1 dell'onboarding: trova un hub GateKeeper in rete (UDP broadcast)
 //e selezionalo, oppure inserisci manualmente l'IP per i casi avanzati.
 class DiscoveryPage extends StatefulWidget {
-  const DiscoveryPage({super.key, required this.auth});
+  const DiscoveryPage({super.key, required this.auth, required this.settings});
   final AuthController auth;
+  final SettingsController settings;
 
   @override
   State<DiscoveryPage> createState() => _DiscoveryPageState();
@@ -189,6 +192,7 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
     return AuthScaffold(
       title: l10n.t('discoverTitle'),
       subtitle: canPair ? l10n.t('discoverSubtitle') : l10n.t('webPairHint'),
+      trailing: AuthQuickActions(settings: widget.settings),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -287,6 +291,13 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
             label: Text(l10n.t('back')),
           ),
         ],
+      ),
+      trailing: AuthQuickActions(
+        onQuickAction: (action) {
+          if (action == 'settings') {
+            context.go('/settings');
+          }
+        },
       ),
     );
   }

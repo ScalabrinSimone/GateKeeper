@@ -68,28 +68,33 @@ class AppRouter {
       },
       routes: [
         GoRoute(path: '/splash', builder: (_, __) => const _SplashPage()),
-        GoRoute(path: '/welcome', builder: (_, __) => PairChoicePage(auth: auth)),
-        GoRoute(path: '/login', builder: (_, __) => LoginPage(auth: auth)),
-        GoRoute(path: '/recover', builder: (_, __) => RecoveryPage(auth: auth)),
+        GoRoute(path: '/welcome', builder: (_, __) => PairChoicePage(auth: auth, settings: settings)),
+        GoRoute(path: '/login', builder: (_, __) => LoginPage(auth: auth, settings: settings)),
+        GoRoute(path: '/recover', builder: (_, __) => RecoveryPage(auth: auth, settings: settings)),
         GoRoute(
           path: '/onboarding/discover',
-          builder: (_, __) => DiscoveryPage(auth: auth),
+          builder: (_, __) => DiscoveryPage(auth: auth, settings: settings),
         ),
         GoRoute(
           path: '/onboarding/setup',
           builder: (_, s) => SetupWizardPage(
             auth: auth,
+            settings: settings,
             //factory_code pre-popolato dopo scan QR / discovery.
             prefilledFactoryCode: s.uri.queryParameters['factory_code'],
           ),
         ),
         GoRoute(
           path: '/invite',
-          builder: (_, __) => InviteAcceptPage(auth: auth),
+          builder: (_, __) => InviteAcceptPage(auth: auth, settings: settings),
         ),
         GoRoute(
           path: '/invite/:token',
-          builder: (_, s) => InviteAcceptPage(auth: auth, token: s.pathParameters['token']),
+          builder: (_, s) => InviteAcceptPage(
+            auth: auth,
+            settings: settings,
+            token: s.pathParameters['token'],
+          ),
         ),
 
         StatefulShellRoute.indexedStack(

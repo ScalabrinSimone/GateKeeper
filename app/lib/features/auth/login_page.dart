@@ -4,17 +4,20 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/api_exception.dart';
 import '../../shared/widgets/gk_button.dart';
+import 'widgets/auth_quick_actions.dart';
 import 'widgets/auth_scaffold.dart';
 import 'widgets/gk_text_field.dart';
 
 //Schermata di login: identifier (username o email) + password.
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, required this.auth});
+  const LoginPage({super.key, required this.auth, required this.settings});
 
   final AuthController auth;
+  final SettingsController settings;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -101,6 +104,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     return AuthScaffold(
       title: hasHouseName ? houseName : l10n.t('signInTitle'),
       subtitle: hasHouseName ? l10n.t('signInSubtitle') : l10n.t('signInDescription'),
+      trailing: AuthQuickActions(settings: widget.settings),
       child: Form(
         key: _formKey,
         child: FadeTransition(
@@ -170,7 +174,21 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   icon: Icons.login_rounded,
                   expanded: true,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                //Scorciatoia per chi è stato invitato: porta direttamente
+                //alla pagina di accettazione invito (token o QR scan).
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => context.go('/invite'),
+                  icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                  label: Text(l10n.t('haveInvite')),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.stormyTeal,
+                    side: BorderSide(color: AppColors.stormyTeal.withValues(alpha: 0.3)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

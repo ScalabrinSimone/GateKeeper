@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../../core/i18n/app_l10n.dart';
 import '../../core/platform/platform_info.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/settings_controller.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/api/dto.dart';
 import '../../data/gatekeeper_api.dart';
 import '../../shared/widgets/gk_button.dart';
+import '../auth/widgets/auth_quick_actions.dart';
 import '../auth/widgets/auth_scaffold.dart';
 import '../auth/widgets/gk_text_field.dart';
 import '../onboarding/widgets/qr_scanner_sheet.dart';
@@ -18,9 +20,10 @@ import '../onboarding/widgets/qr_scanner_sheet.dart';
 //Può ricevere il token via path param (/invite/:token) oppure essere usata vuota
 //e incollare il token a mano.
 class InviteAcceptPage extends StatefulWidget {
-  const InviteAcceptPage({super.key, required this.auth, this.token});
+  const InviteAcceptPage({super.key, required this.auth, required this.settings, this.token});
 
   final AuthController auth;
+  final SettingsController settings;
   final String? token;
 
   @override
@@ -140,6 +143,7 @@ class _InviteAcceptPageState extends State<InviteAcceptPage> {
     return AuthScaffold(
       title: l10n.t('inviteAcceptTitle'),
       subtitle: l10n.t('inviteAcceptSubtitle'),
+      trailing: AuthQuickActions(settings: widget.settings),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

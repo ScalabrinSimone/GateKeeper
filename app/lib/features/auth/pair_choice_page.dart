@@ -4,13 +4,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/settings_controller.dart';
 import '../../shared/widgets/gk_button.dart';
+import 'widgets/auth_quick_actions.dart';
 import 'widgets/auth_scaffold.dart';
 
 class PairChoicePage extends StatelessWidget {
-  const PairChoicePage({super.key, required this.auth});
+  const PairChoicePage({super.key, required this.auth, required this.settings});
 
   final AuthController auth;
+  final SettingsController settings;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +24,7 @@ class PairChoicePage extends StatelessWidget {
     return AuthScaffold(
       title: l10n.t('welcomeTitle'),
       subtitle: l10n.t('welcomeSubtitle'),
+      trailing: AuthQuickActions(settings: settings),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisAlignment: MainAxisAlignment.center,

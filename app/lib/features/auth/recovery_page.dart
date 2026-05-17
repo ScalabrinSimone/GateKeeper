@@ -3,10 +3,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/gatekeeper_api.dart';
 import '../../shared/widgets/gk_button.dart';
+import 'widgets/auth_quick_actions.dart';
 import 'widgets/auth_scaffold.dart';
 import 'widgets/gk_text_field.dart';
 
@@ -14,8 +16,9 @@ import 'widgets/gk_text_field.dart';
 //1. l'utente inserisce la mail e riceve un codice (via SMTP o outbox.log),
 //2. inserisce codice + nuova password.
 class RecoveryPage extends StatefulWidget {
-  const RecoveryPage({super.key, required this.auth});
+  const RecoveryPage({super.key, required this.auth, required this.settings});
   final AuthController auth;
+  final SettingsController settings;
 
   @override
   State<RecoveryPage> createState() => _RecoveryPageState();
@@ -90,6 +93,7 @@ class _RecoveryPageState extends State<RecoveryPage> {
     return AuthScaffold(
       title: l10n.t('recoverTitle'),
       subtitle: l10n.t('recoverSubtitle'),
+      trailing: AuthQuickActions(settings: widget.settings),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -4,11 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/api/dto.dart';
 import '../../data/gatekeeper_api.dart';
 import '../../shared/widgets/gk_button.dart';
+import '../auth/widgets/auth_quick_actions.dart';
 import '../auth/widgets/auth_scaffold.dart';
 import '../auth/widgets/gk_text_field.dart';
 import '../members/widgets/invite_share_dialog.dart';
@@ -23,9 +25,11 @@ class SetupWizardPage extends StatefulWidget {
   const SetupWizardPage({
     super.key,
     required this.auth,
+    required this.settings,
     this.prefilledFactoryCode,
   });
   final AuthController auth;
+  final SettingsController settings;
   //Se ricevuto via QR / route, il wizard pre-compila il factory_code.
   final String? prefilledFactoryCode;
 
@@ -171,6 +175,7 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
     return AuthScaffold(
       title: l10n.t('setupTitle'),
       subtitle: '${l10n.t('step')} ${_step + 1} / ${steps.length}',
+      trailing: AuthQuickActions(settings: widget.settings),
       //Tasto "Indietro" in alto a sinistra: utile se l'utente vuole
       //tornare alla schermata di scelta hub o annullare la configurazione.
       leading: IconButton(
