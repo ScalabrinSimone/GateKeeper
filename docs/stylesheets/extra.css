@@ -29,8 +29,3 @@ a {
   border-radius: 8px;
   padding: 0.4em 0.8em;
 }
-
-.mermaid .node {
-  rx: 8px !important; /* Raggio orizzontale */
-  ry: 8px !important; /* Raggio verticale */
-}

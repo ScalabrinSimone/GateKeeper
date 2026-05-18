@@ -2,6 +2,22 @@ site_name: GateKeeper Docs
 
 theme:
   name: material
+  palette:
+    - scheme: slate
+      primary: black
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: switch to light mode
+    - scheme: default
+      primary: custom
+      accent: orange
+      toggle:
+        icon: material/brightness-7
+        name: switch to dark mode
+  
+  logo: assets/logo.png
+
   features:
     - navigation.instant
     - navigation.sections
@@ -13,13 +29,15 @@ theme:
     - search.highlight
     - search.suggest
 
-  palette:
-    - scheme: slate
-      primary: black
-      accent: cyan
-
 extra_css:
   - stylesheets/extra.css
+
+# Repository
+repo_name: GateKeeper
+repo_url: https://github.com/ScalabrinSimone/GateKeeper.git
+
+# Copyright
+copyright: Copyright &copy; 2026 IoTeam
 
 markdown_extensions:
   - admonition
@@ -68,8 +86,6 @@ extra:
     - icon: fontawesome/brands/discord
       link: https://discord.gg/jARTvAt8Kh
 
-extra_javascript:
-  - https://unpkg.com/mermaid/dist/mermaid.min.js
 
 # extra_javascript:
 #   - https://unpkg.com/aos@2.3.1/dist/aos.js
