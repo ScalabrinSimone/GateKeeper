@@ -44,4 +44,20 @@ class UsersApi {
   Future<void> unregisterPushToken(String token) async {
     await _client.delete('/users/me/push-token?token=${Uri.encodeQueryComponent(token)}');
   }
+
+  //Registra l'indirizzo BLE del telefono dell'utente.
+  Future<void> registerBle(String bleAddress) async {
+    await _client.post('/users/me/ble', body: {'ble_address': bleAddress});
+  }
+
+  //Recupera info BLE registrata per l'utente.
+  Future<Map<String, dynamic>> getBleInfo() async {
+    final res = await _client.get('/users/me/ble');
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  //Rimuove l'associazione BLE dell'utente.
+  Future<void> unregisterBle() async {
+    await _client.delete('/users/me/ble');
+  }
 }

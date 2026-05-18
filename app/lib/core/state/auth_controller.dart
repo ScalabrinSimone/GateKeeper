@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/api/dto.dart';
 import '../../data/gatekeeper_api.dart';
+import '../../data/services/event_polling_service.dart';
 import '../../data/services/push_notifications_service.dart';
 import '../config/api_config.dart';
 import '../storage/secure_storage.dart';
@@ -127,6 +128,7 @@ class AuthController extends ChangeNotifier {
           //Inizializzazione best-effort delle push: se Firebase non è
           //configurato il servizio ritorna false senza errori.
           unawaited(PushNotificationsService.instance.initialize());
+          EventPollingService.instance.start();
         }
         notifyListeners();
         return;
@@ -157,6 +159,7 @@ class AuthController extends ChangeNotifier {
     } else {
       _stage = AuthStage.authenticated;
       unawaited(PushNotificationsService.instance.initialize());
+      EventPollingService.instance.start();
     }
     notifyListeners();
   }
@@ -191,6 +194,7 @@ class AuthController extends ChangeNotifier {
     } else {
       _stage = AuthStage.authenticated;
       unawaited(PushNotificationsService.instance.initialize());
+      EventPollingService.instance.start();
     }
     notifyListeners();
   }
@@ -210,6 +214,7 @@ class AuthController extends ChangeNotifier {
       if (_stage == AuthStage.needsEmailVerification && updated.emailVerified != false) {
         _stage = AuthStage.authenticated;
         unawaited(PushNotificationsService.instance.initialize());
+        EventPollingService.instance.start();
       }
       notifyListeners();
     } catch (_) {
@@ -222,6 +227,7 @@ class AuthController extends ChangeNotifier {
   //Dopo questa operazione l'app torna in stato `needsPairing` e l'utente
   //deve riscansionare un hub o inserire un URL remoto.
   Future<void> leaveHome() async {
+    EventPollingService.instance.stop();
     try {
       await _api.auth.logout();
     } catch (_) {
@@ -256,6 +262,7 @@ class AuthController extends ChangeNotifier {
   }
   //Logout: cancella token e torna a login.
   Future<void> logout() async {
+    EventPollingService.instance.stop();
     try {
       await _api.auth.logout();
     } catch (_) {}

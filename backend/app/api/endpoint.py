@@ -188,41 +188,27 @@ class EventOut(BaseModel):
 # --------------------------------------------------------------------------------------
 _rfid_stop_event = threading.Event()
 _rfid_thread: Optional[threading.Thread] = None
-_rfid_seen_tags: set[str] = set()
-_rfid_seen_lock = threading.Lock()
 
 
 def _rfid_tag_callback(tag: str) -> None:
     """Callback eseguita quando il lettore RFID intercetta un tag valido.
 
-    - Memorizza i tag sconosciuti in un buffer in-memory così che l'app
-      possa offrire una UX "avvicina il tag" durante la registrazione di un
-      nuovo oggetto.
-    - Per rendere il sistema coeso, ogni tag nuovo nel corso della sessione
-      viene registrato come evento di sistema nel database.
+    Delega all'event engine che:
+    - Memorizza i tag sconosciuti nel buffer (per la UX di registrazione).
+    - Se il tag è associato a un device, genera un evento passage_in/out
+      correlando con i telefoni BLE nelle vicinanze.
+    - Invia notifiche se necessario.
     """
-    # Sempre aggiornato il buffer: gestisce internamente i duplicati.
     try:
-        models.remember_unknown_tag(tag)
+        from app.services.event_engine import rfid_event_callback
+        rfid_event_callback(tag)
     except Exception as exc:
-        print("Impossibile memorizzare tag sconosciuto:", exc)
-
-    with _rfid_seen_lock:
-        if tag in _rfid_seen_tags:
-            return
-        _rfid_seen_tags.add(tag)
-
-    try:
-        models.create_event(
-            user_id=None,
-            event_type="system",
-            direction=None,
-            detected_objects=[{"rfid_tag": tag, "source": "rfid_reader"}],
-            detected_users=[],
-        )
-        print(f"Evento RFID registrato per il tag: {tag}")
-    except Exception as exc:
-        print("Impossibile salvare l'evento RFID:", exc)
+        print(f"[RFID] Errore event engine callback: {exc}")
+        #Fallback: memorizza comunque il tag.
+        try:
+            models.remember_unknown_tag(tag)
+        except Exception:
+            pass
 
 
 def _start_rfid_thread() -> None:
@@ -319,6 +305,13 @@ def on_startup() -> None:
     Il supervisor monitora poi il flag `paired` per attivare/disattivare
     i sensori in tempo reale (es. dopo pairing o factory reset).
     """
+    #Avvia l'event engine (carica mappa BLE->utente).
+    try:
+        from app.services.event_engine import start_engine
+        start_engine()
+    except Exception as exc:
+        print(f"[STARTUP] Errore avvio event engine: {exc}")
+
     global _sensors_supervisor_thread
     _sensors_supervisor_stop.clear()
     _sensors_supervisor_thread = threading.Thread(
@@ -1347,6 +1340,62 @@ def unregister_push_token(
     """Rimuove un push token (es. logout di quel dispositivo)."""
     ok = models.remove_push_token(user["id"], token)
     return {"removed": ok}
+
+
+# --------------------------------------------------------------------------------------
+# BLE DEVICE REGISTRATION (associazione telefono BLE <-> utente)
+# --------------------------------------------------------------------------------------
+class BleRegisterRequest(BaseModel):
+    """Registrazione dell'indirizzo BLE del telefono dell'utente."""
+    ble_address: str
+
+
+class BleInfoOut(BaseModel):
+    """Info BLE registrata per l'utente."""
+    ble_address: Optional[str] = None
+    nearby_devices: int = 0
+
+
+@app.post("/users/me/ble")
+def register_ble(
+    req: BleRegisterRequest,
+    user: dict = Depends(_get_current_user),
+):
+    """Registra l'indirizzo BLE del telefono dell'utente.
+
+    L'app invia il proprio MAC address Bluetooth; il backend lo associa
+    all'utente così che l'event engine possa correlare i passaggi RFID
+    con la presenza dell'utente alla porta.
+    """
+    from app.services.event_engine import register_ble_address
+    ok = register_ble_address(user["id"], req.ble_address)
+    if not ok:
+        raise HTTPException(status_code=400, detail="invalid ble_address")
+    return {"registered": True, "ble_address": req.ble_address.strip().upper()}
+
+
+@app.get("/users/me/ble", response_model=BleInfoOut)
+def get_ble_info(user: dict = Depends(_get_current_user)):
+    """Restituisce l'indirizzo BLE registrato e il numero di device BLE vicini."""
+    from app.services.event_engine import get_ble_address_for_user, get_all_nearby_ble
+    addr = get_ble_address_for_user(user["id"])
+    nearby = get_all_nearby_ble()
+    return BleInfoOut(ble_address=addr, nearby_devices=len(nearby))
+
+
+@app.delete("/users/me/ble")
+def unregister_ble(user: dict = Depends(_get_current_user)):
+    """Rimuove l'associazione BLE dell'utente."""
+    from app.services.event_engine import register_ble_address
+    # Registra stringa vuota per rimuovere.
+    from app.db.storage import DB_LOCK, load_db, save_db, find_by_id
+    with DB_LOCK:
+        db = load_db()
+        record = find_by_id(db["users"], user["id"])
+        if record:
+            record["ble_address"] = None
+            save_db(db)
+    return {"removed": True}
 
 
 # --------------------------------------------------------------------------------------

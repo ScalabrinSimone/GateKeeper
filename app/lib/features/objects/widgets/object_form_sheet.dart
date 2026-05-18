@@ -41,6 +41,7 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
   bool _scanning = false;
   Timer? _scanTimer;
   String? _previousTagBeforeScan;
+  String? _previousSeenAtBeforeScan;
 
   @override
   void initState() {
@@ -64,14 +65,18 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
 
   Future<void> _startScan() async {
     //Memorizzo l'ultimo tag noto del backend per riconoscere "il prossimo nuovo".
+    //Salvo anche il timestamp `seen_at`: se lo stesso tag viene riscansionato
+    //fisicamente, il backend aggiorna `seen_at` e possiamo rilevarlo come "nuovo".
     try {
       final latest = await GateKeeperApi.instance.rfid.latest();
       _previousTagBeforeScan = latest?.tag;
+      _previousSeenAtBeforeScan = latest?.seenAt;
     } on ApiException catch (e) {
       setState(() => _error = e.message);
       return;
     } catch (_) {
       _previousTagBeforeScan = null;
+      _previousSeenAtBeforeScan = null;
     }
     setState(() {
       _scanning = true;
@@ -85,8 +90,14 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
     try {
       final latest = await GateKeeperApi.instance.rfid.latest();
       if (latest == null) return;
-      if (latest.tag == _previousTagBeforeScan) return;
-      //Nuovo tag: lo uso e fermo lo scan.
+      //Rileva un tag "nuovo" se:
+      //- è un tag diverso da quello che c'era prima, OPPURE
+      //- è lo stesso tag ma con un timestamp `seen_at` diverso (riscansionato).
+      final isNewTag = latest.tag != _previousTagBeforeScan;
+      final isSameTagRescanned = latest.tag == _previousTagBeforeScan &&
+          latest.seenAt != _previousSeenAtBeforeScan;
+      if (!isNewTag && !isSameTagRescanned) return;
+      //Nuovo tag (o rescan confermato): lo uso e fermo lo scan.
       _scanTimer?.cancel();
       _scanTimer = null;
       if (!mounted) return;
