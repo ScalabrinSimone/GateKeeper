@@ -43,22 +43,36 @@ from pathlib import Path
 OUTBOX_PATH = Path(__file__).resolve().parents[2] / "outbox.log"
 
 #Carica variabili da file .env nella root backend (se esiste).
-_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
-if _ENV_FILE.is_file():
-    try:
-        with _ENV_FILE.open(encoding="utf-8") as _f:
-            for _line in _f:
-                _line = _line.strip()
-                if not _line or _line.startswith("#"):
-                    continue
-                if "=" in _line:
-                    _key, _val = _line.split("=", 1)
-                    _key = _key.strip()
-                    _val = _val.strip().strip('"').strip("'")
-                    if _key and _key not in os.environ:
-                        os.environ[_key] = _val
-    except Exception:
-        pass
+#Cerca in più posizioni per robustezza (dipende da dove viene avviato il backend).
+_POSSIBLE_ENV_PATHS = [
+    Path(__file__).resolve().parents[2] / ".env",          # backend/.env (da mailer.py)
+    Path.cwd() / ".env",                                    # CWD/.env
+    Path.cwd() / "backend" / ".env",                        # CWD/backend/.env (se avviato dalla root repo)
+]
+
+_env_loaded = False
+for _env_path in _POSSIBLE_ENV_PATHS:
+    if _env_path.is_file():
+        try:
+            with _env_path.open(encoding="utf-8") as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if not _line or _line.startswith("#"):
+                        continue
+                    if "=" in _line:
+                        _key, _val = _line.split("=", 1)
+                        _key = _key.strip()
+                        _val = _val.strip().strip('"').strip("'")
+                        if _key:
+                            os.environ[_key] = _val
+            _env_loaded = True
+            print(f"[MAILER] OK - File .env caricato da: {_env_path}")
+            break
+        except Exception as _exc:
+            print(f"[MAILER] ERRORE lettura .env ({_env_path}): {_exc}")
+
+if not _env_loaded:
+    print("[MAILER] WARN - Nessun file .env trovato. SMTP non configurato (solo terminale + outbox.log).")
 
 
 def _log_outbox(to: str, subject: str, body: str) -> None:
@@ -137,9 +151,9 @@ def send_mail(to: str, subject: str, body: str) -> bool:
                 smtp.login(user, pw)
             smtp.sendmail(sender, [to], msg.as_string())
 
-        print(f"[MAILER] ✓ Email inviata con successo a {to}")
+        print(f"[MAILER] OK - Email inviata con successo a {to}")
         return True
     except Exception as exc:
-        print(f"[MAILER] ✗ Invio SMTP fallito: {exc}")
+        print(f"[MAILER] ERRORE - Invio SMTP fallito: {exc}")
         print(f"[MAILER]   (la mail resta visibile sopra nel terminale e in outbox.log)")
         return False

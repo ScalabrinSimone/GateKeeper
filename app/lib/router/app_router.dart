@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/platform/platform_info.dart';
 import '../core/state/auth_controller.dart';
 import '../core/state/settings_controller.dart';
 import '../core/theme/app_colors.dart';
@@ -42,34 +41,36 @@ class AppRouter {
         final isPublicRoute = loc == '/welcome' ||
             loc == '/login' ||
             loc == '/recover' ||
-            loc == '/verify-email' ||
             loc.startsWith('/onboarding') ||
             loc.startsWith('/invite');
+
+        //La pagina verify-email è accessibile solo nello stage apposito.
+        final isVerifyEmail = loc == '/verify-email';
 
         if (stage == AuthStage.loading) {
           return loc == '/splash' ? null : '/splash';
         }
         if (stage == AuthStage.needsPairing) {
           //Hub non ancora configurato su questo dispositivo: invito al pairing.
-          //Su Web l'utente non può fare il pairing (no UDP): lo lasciamo su
-          ///welcome perché lì può inserire l'URL del tunnel manualmente.
-          if (isPublicRoute) return null;
-          return PlatformInfo.canPairDevice ? '/welcome' : '/welcome';
+          if (isPublicRoute || isVerifyEmail) return null;
+          return '/welcome';
         }
         if (stage == AuthStage.offline) {
-          if (isPublicRoute) return null;
+          if (isPublicRoute || isVerifyEmail) return null;
           return '/welcome';
         }
         if (stage == AuthStage.needsLogin) {
+          //Se l'utente è su /verify-email e fa logout, deve andare a /login.
+          if (isVerifyEmail) return '/login';
           if (isPublicRoute) return null;
           return '/login';
         }
         if (stage == AuthStage.needsEmailVerification) {
-          if (loc == '/verify-email') return null;
+          if (isVerifyEmail) return null;
           return '/verify-email';
         }
         //authenticated.
-        if (loc == '/splash' || isPublicRoute) return '/dashboard';
+        if (loc == '/splash' || isPublicRoute || isVerifyEmail) return '/dashboard';
         return null;
       },
       routes: [

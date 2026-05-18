@@ -305,7 +305,7 @@ def _log_event(
     arrow = "→ FUORI" if direction == "out" else "← DENTRO"
     user_str = f"utente #{user_id}" if user_id else "NESSUN UTENTE"
     print(
-        f"\n[EVENT-ENGINE] ⚡ {arrow} | "
+        f"\n[EVENT-ENGINE] >> {arrow} | "
         f"device=\"{device.get('name')}\" (tag={device.get('rfid_tag')}) | "
         f"{user_str} | tipo={event_type}"
     )
@@ -331,7 +331,7 @@ def _check_and_notify(
     #Possibile furto o uscita non autorizzata.
     if direction == "out" and user_id is None:
         _send_alert_to_all(
-            title="⚠️ Oggetto in uscita senza utente",
+            title="[!] Oggetto in uscita senza utente",
             body=(
                 f"L'oggetto \"{device_name}\" è uscito di casa ma nessun "
                 f"telefono registrato è stato rilevato nelle vicinanze.\n"
@@ -364,16 +364,16 @@ def _check_and_notify(
         username = user.get("username", "Utente") if user else "Utente"
         _send_notification_to_user(
             user_id=user_id,
-            title=f"📦 {device_name} è uscito con te",
-            body=f"L'oggetto essenziale \"{device_name}\" è stato rilevato in uscita.",
+            title=f"{device_name} e' uscito con te",
+            body=f"L'oggetto essenziale \"{device_name}\" e' stato rilevato in uscita.",
         )
 
     #Caso 3: Oggetto rientra. Notifica informativa all'utente.
     if direction == "in" and user_id is not None:
         _send_notification_to_user(
             user_id=user_id,
-            title=f"🏠 {device_name} è rientrato",
-            body=f"\"{device_name}\" è stato rilevato in ingresso.",
+            title=f"{device_name} e' rientrato",
+            body=f"\"{device_name}\" e' stato rilevato in ingresso.",
         )
 
 
@@ -384,7 +384,7 @@ def _send_alert_to_all(
     device: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Invia una notifica a TUTTI gli utenti attivi (email + terminale)."""
-    print(f"\n[NOTIFY] 🚨 ALERT A TUTTI: {title}")
+    print(f"\n[NOTIFY] !!! ALERT A TUTTI: {title}")
     print(f"[NOTIFY]    {body}\n")
 
     try:
@@ -410,7 +410,7 @@ def _send_notification_to_user(
     body: str,
 ) -> None:
     """Invia una notifica a un singolo utente (email + terminale)."""
-    print(f"[NOTIFY] 📬 Per utente #{user_id}: {title}")
+    print(f"[NOTIFY] -> Per utente #{user_id}: {title}")
 
     try:
         user = models.get_user_by_id(user_id)
@@ -445,7 +445,7 @@ def start_engine() -> None:
             return
         _engine_started = True
     _load_ble_user_map()
-    print("[EVENT-ENGINE] ✓ Engine avviato. Mappa BLE caricata.")
+    print("[EVENT-ENGINE] OK - Engine avviato. Mappa BLE caricata.")
     with _ble_user_lock:
         if _ble_user_map:
             print(f"[EVENT-ENGINE]   {len(_ble_user_map)} associazioni BLE->utente caricate.")

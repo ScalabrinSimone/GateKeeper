@@ -242,6 +242,9 @@ def main() -> None:
         log("INFO", f"  Get-Content -Wait '{logs_dir}\\ble.log'")
         log("INFO", f"  Get-Content -Wait '{logs_dir}\\qr.log'")
 
+    #Importa il mailer presto per caricare il .env prima di tutto.
+    from app.security import mailer as _mailer  # noqa: F401
+
     printSection("AVVIO PROGETTO")
 
     log(
