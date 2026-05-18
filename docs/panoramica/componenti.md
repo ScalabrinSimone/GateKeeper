@@ -67,9 +67,9 @@ graph LR
 
 ---
 
-## App Flet
+## App Flutter
 
-L'interfaccia utente del sistema, sviluppata in **Python con Flet**,
+L'interfaccia utente del sistema, sviluppata in **Flutter (Dart)**,
 disponibile su mobile e desktop.
 
 | Funzione | Descrizione |

@@ -55,6 +55,11 @@ nav:
     - Sicurezza: parte-tecnica/sicurezza.md
   - Sviluppo:
     - Roadmap: sviluppo/roadmap.md
+  - Problemi:
+    - Panoramica: problemi/index.md
+    - Flutter e Figma: problemi/flutter-figma.md
+    - Assistenza AI: problemi/ai-assistance.md
+    - Sfide Tecniche: problemi/challenges-solutions.md
 
 extra:
   social:

@@ -49,4 +49,4 @@ Il sistema si basa su **eventi**, non su tracking continuo:
 
 > GateKeeper è un sistema IoT domestico basato su Raspberry Pi che combina
 > RFID e BLE per tracciare oggetti e utenti, con accesso remoto sicuro
-> e gestione multi-utente tramite app Flet.
+> e gestione multi-utente tramite app Flutter.

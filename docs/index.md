@@ -68,7 +68,7 @@ graph LR
 | 🧠 Hub centrale | Raspberry Pi 4 |
 | ⚙️ Backend | FastAPI + Python 3.11+ |
 | 🗄️ Database | SQLite → PostgreSQL |
-| 📱 App | Flet |
+| 📱 App | Flutter |
 | 🌐 Accesso remoto | Cloudflare Tunnel |
 
 ---
@@ -108,5 +108,13 @@ graph LR
     Roadmap e come contribuire al progetto.
 
     [Vai →](sviluppo/roadmap.md)
+
+-   🐛 __Problemi__
+
+    ---
+
+    Sfide tecniche incontrate e soluzioni adottate.
+
+    [Vai →](problemi/index.md)
 
 </div>

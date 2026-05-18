@@ -13,7 +13,7 @@ nessun servizio su Internet.
 
 ```mermaid
 graph TD
-    A[📱 App Flet] -->|HTTPS| B[🌐 Cloudflare Tunnel]
+    A[📱 App Flutter] -->|HTTPS| B[🌐 Cloudflare Tunnel]
     B --> C[🧠 Raspberry Pi 4]
 
     subgraph HUB ["🧠 Raspberry Pi 4 — Hub centrale"]
@@ -42,7 +42,7 @@ sequenceDiagram
     participant RFID as RFID Reader
     participant EE as Event Engine
     participant DB as Database
-    participant APP as App Flet
+    participant APP as App Flutter
 
     U->>BLE: si avvicina alla porta
     BLE->>EE: segnale telefono rilevato
@@ -62,7 +62,7 @@ sequenceDiagram
 | **Hub** | Raspberry Pi 4 | Coordinamento e logica |
 | **Backend** | FastAPI | API, autenticazione, DB |
 | **Accesso** | Cloudflare Tunnel | Connettività remota sicura |
-| **Frontend** | App Flet | Interfaccia utente |
+| **Frontend** | App Flutter | Interfaccia utente |
 
 ---
 
