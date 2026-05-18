@@ -16,7 +16,7 @@ per elaborazione, storage e decisioni logiche.
 |---|---|
 | Ruolo | Hub centrale |
 | Connettività | Wi-Fi, Ethernet, BLE integrato |
-| Software | FastAPI, Event Engine, DB |
+| Software | FastAPI, JSON NoSQL DB |
 | Alimentazione | Continua (consigliato UPS) |
 
 **Responsabilità principali:**
@@ -47,38 +47,54 @@ Il sensore posizionato **alla porta** per rilevare il transito degli oggetti tag
 ## BLE Scanner
 
 Sfrutta il **Bluetooth Low Energy integrato** nel Raspberry Pi per rilevare
-i telefoni degli utenti nelle vicinanze della porta.
+i telefoni nelle vicinanze della porta.
 
 | Caratteristica | Dettaglio |
 |---|---|
 | Tecnologia | Bluetooth Low Energy |
-| Scopo | identificare l'utente presente |
-| Raggio | ~5-10 metri configurabile |
-| Richiede | app installata sul telefono |
+| Scopo | rilevare presenza dispositivi BLE |
+| Raggio | ~5-10 metri |
+| Libreria | bleak 3.0.2 |
 
 **Come funziona:**
 
 ```mermaid
 graph LR
-    A[📱 Telefono utente] -->|segnale BLE| B[Raspberry Pi]
-    B -->|chi è?| C[Database utenti]
-    C -->|match| D[Utente identificato ✅]
+    A[📱 Dispositivo BLE] -->|segnale BLE| B[Raspberry Pi]
+    B -->|classificazione euristica| C[Telefono rilevato ✅]
 ```
+
+> ⚠️ Lo scanner BLE attualmente rileva e classifica i dispositivi ma **non identifica** l'utente specifico. L'associazione telefono-utente è prevista in una fase futura.
 
 ---
 
 ## App Flutter
 
 L'interfaccia utente del sistema, sviluppata in **Flutter (Dart)**,
-disponibile su mobile e desktop.
+disponibile su mobile, desktop e web.
 
 | Funzione | Descrizione |
 |---|---|
-| Dashboard | stato in tempo reale di utenti e oggetti |
-| Notifiche | alert contestuali sugli eventi |
-| Gestione utenti | aggiunta/rimozione membri e ruoli |
-| Gestione oggetti | associazione tag RFID agli oggetti |
-| Setup iniziale | configurazione casa e dispositivi |
+| Dashboard | monitoraggio presenze e statistiche |
+| Eventi | cronologia entrate/uscite con filtri |
+| Utenti | gestione membri e ruoli per colonna |
+| Oggetti | griglia oggetti RFID con filtri per categoria |
+| Impostazioni | tema, lingua, notifiche, sicurezza |
+| Account | profilo, cambio password, preferenze |
+| Setup | configurazione guidata primo avvio |
+
+**Tecnologie utilizzate:**
+
+| Componente | Libreria |
+|---|---|
+| State management | Provider (ChangeNotifier) |
+| Routing | go_router 17.x |
+| Internazionalizzazione | flutter_localizations + intl |
+| Animazioni | flutter_animate |
+| Icone | flutter_svg |
+| Feedback aptico | vibration |
+
+> ⚠️ L'app al momento utilizza **dati mock** (hardcoded). Il collegamento con il backend API reale è in fase di sviluppo.
 
 **Ruoli supportati:**
 
@@ -100,7 +116,7 @@ direttamente su Internet.
 | Protocollo | HTTPS cifrato |
 | VPN richiesta | ❌ No |
 | Configurazione router | ❌ No (nessun port forwarding) |
-| Autenticazione | JWT + tunnel token |
+| Autenticazione | Tunnel token (JWT in futuro) |
 
 ```mermaid
 graph LR
@@ -117,14 +133,16 @@ graph LR
 
 ## Database
 
-Archivia lo **stato persistente** del sistema.
+Archivia lo **stato persistente** del sistema in un file **JSON NoSQL**.
 
-| Entità | Contenuto |
+| Collezione | Contenuto |
 |---|---|
-| `users` | utenti, ruoli, dispositivi BLE associati |
-| `objects` | oggetti, tag RFID, proprietario |
-| `events` | storico entrate/uscite con timestamp |
-| `home_state` | stato attuale di utenti e oggetti |
+| `users` | utenti, ruoli, hash password, UUID BLE |
+| `devices` | oggetti, tag RFID, categoria, stato |
+| `user_devices` | associazioni molti-a-molti utente ↔ dispositivo |
+| `logs` | storico entrate/uscite con timestamp |
+| `events` | eventi di sistema (passaggi, alert) |
 
-> In fase iniziale si utilizza **SQLite** per semplicità.
-> L'architettura supporta migrazione a **PostgreSQL** per deploy più robusti.
+> Il database è un file **JSON** (`backend/app/db/nosql_db.json`) con accesso thread-safe tramite `threading.RLock`. Scritture atomiche via `.tmp` + `os.replace()`.
+>
+> L'architettura è progettata per supportare una futura migrazione a **PostgreSQL**, ma al momento rimane su JSON per semplicità di deploy su Raspberry Pi.

@@ -18,17 +18,16 @@ graph TD
 
     subgraph HUB ["🧠 Raspberry Pi 4 — Hub centrale"]
         C --> D[FastAPI Server]
-        D --> E[Event Engine]
-        D --> F[Database]
-        E --> G[BLE Scanner]
-        E --> H[RFID UHF Reader]
+        D --> F[(JSON NoSQL DB)]
+        D --> G[BLE Scanner]
+        D --> H[RFID UHF Reader]
     end
 
     G -->|rileva telefoni| I[👤 Utenti]
     H -->|rileva tag| J[🏷️ Oggetti]
 
-    I & J --> E
-    E -->|notifiche| A
+    I & J --> D
+    D -->|notifiche| A
 ```
 
 ---
@@ -40,16 +39,16 @@ sequenceDiagram
     actor U as Utente
     participant BLE as BLE Scanner
     participant RFID as RFID Reader
-    participant EE as Event Engine
-    participant DB as Database
+    participant API as FastAPI Backend
+    participant DB as JSON NoSQL DB
     participant APP as App Flutter
 
     U->>BLE: si avvicina alla porta
-    BLE->>EE: segnale telefono rilevato
+    BLE->>API: segnale telefono rilevato
     U->>RFID: passa con oggetti taggati
-    RFID->>EE: lista oggetti in transito
-    EE->>DB: aggiorna stato utente + oggetti
-    EE->>APP: invia notifica contestuale
+    RFID->>API: lista oggetti in transito
+    API->>DB: aggiorna stato utente + oggetti
+    API->>APP: invia notifica contestuale
 ```
 
 ---
@@ -60,7 +59,7 @@ sequenceDiagram
 |---|---|---|
 | **Hardware** | RFID UHF + BLE | Rilevamento fisico eventi |
 | **Hub** | Raspberry Pi 4 | Coordinamento e logica |
-| **Backend** | FastAPI | API, autenticazione, DB |
+| **Backend** | FastAPI | API, logica eventi, DB |
 | **Accesso** | Cloudflare Tunnel | Connettività remota sicura |
 | **Frontend** | App Flutter | Interfaccia utente |
 
