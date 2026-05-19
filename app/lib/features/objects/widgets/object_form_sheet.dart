@@ -37,6 +37,9 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
   bool _busy = false;
   String? _error;
 
+  //Icona personalizzata (solo per categoria "other").
+  IconData? _customIcon;
+
   //Stato della scansione.
   bool _scanning = false;
   Timer? _scanTimer;
@@ -234,11 +237,24 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
                       _CategoryChip(
                         category: c,
                         selected: c == _category,
-                        onTap: () => setState(() => _category = c),
+                        onTap: () => setState(() {
+                          _category = c;
+                          //Reset icona personalizzata se non è "other".
+                          if (c != ObjectCategory.other) _customIcon = null;
+                        }),
                       ),
                   ],
                 ),
               ),
+              //Selezione icona personalizzata (solo per "altro").
+              if (_category == ObjectCategory.other)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _IconPickerRow(
+                    selected: _customIcon,
+                    onPick: (icon) => setState(() => _customIcon = icon),
+                  ),
+                ),
               //Essenziale.
               SwitchListTile.adaptive(
                 value: _essential,
@@ -527,6 +543,166 @@ class _CategoryChip extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+//Lista icone disponibili per gli oggetti personalizzati.
+const _kPickableIcons = <(IconData, String)>[
+  (Icons.inventory_2_rounded, 'Oggetto'),
+  (Icons.star_rounded, 'Stella'),
+  (Icons.favorite_rounded, 'Cuore'),
+  (Icons.watch_rounded, 'Orologio'),
+  (Icons.headphones_rounded, 'Cuffie'),
+  (Icons.camera_alt_rounded, 'Fotocamera'),
+  (Icons.laptop_rounded, 'Laptop'),
+  (Icons.tablet_rounded, 'Tablet'),
+  (Icons.book_rounded, 'Libro'),
+  (Icons.sports_soccer_rounded, 'Sport'),
+  (Icons.medical_services_rounded, 'Medicinali'),
+  (Icons.pets_rounded, 'Animale'),
+  (Icons.directions_car_rounded, 'Auto'),
+  (Icons.music_note_rounded, 'Musica'),
+  (Icons.sports_esports_rounded, 'Gaming'),
+  (Icons.luggage_rounded, 'Valigia'),
+  (Icons.shopping_bag_rounded, 'Shopping'),
+  (Icons.emoji_food_beverage_rounded, 'Borraccia'),
+  (Icons.child_friendly_rounded, 'Bambino'),
+  (Icons.celebration_rounded, 'Evento'),
+  (Icons.lock_rounded, 'Lucchetto'),
+  (Icons.folder_rounded, 'Cartella'),
+  (Icons.build_rounded, 'Attrezzo'),
+  (Icons.kitchen_rounded, 'Cucina'),
+  (Icons.sports_gymnastics_rounded, 'Palestra'),
+];
+
+//Riga di selezione icona + pulsante apertura picker.
+class _IconPickerRow extends StatelessWidget {
+  const _IconPickerRow({required this.selected, required this.onPick});
+  final IconData? selected;
+  final ValueChanged<IconData> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDialog<IconData>(
+          context: context,
+          builder: (ctx) => _IconPickerDialog(current: selected),
+        );
+        if (picked != null) onPick(picked);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.stormyTeal.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.stormyTeal.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.stormyTeal.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                selected ?? Icons.inventory_2_rounded,
+                color: AppColors.stormyTeal,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Icona personalizzata',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.stormyTeal,
+                    ),
+                  ),
+                  Text(
+                    'Tocca per scegliere',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.stormyTeal),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+//Dialogo griglia icone picker.
+class _IconPickerDialog extends StatelessWidget {
+  const _IconPickerDialog({this.current});
+  final IconData? current;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('Scegli un\'icona'),
+      content: SizedBox(
+        width: 360,
+        height: 380,
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 5,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+          ),
+          itemCount: _kPickableIcons.length,
+          itemBuilder: (_, i) {
+            final (icon, label) = _kPickableIcons[i];
+            final isSelected = icon == current;
+            return Tooltip(
+              message: label,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(icon),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.stormyTeal.withValues(alpha: 0.2)
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.stormyTeal
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isSelected
+                        ? AppColors.stormyTeal
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    size: 28,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Annulla'),
+        ),
+      ],
     );
   }
 }

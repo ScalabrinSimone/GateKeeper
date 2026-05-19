@@ -6,6 +6,7 @@ import '../../core/i18n/app_l10n.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/repositories/repositories.dart';
+import '../../data/services/realtime_service.dart';
 import '../../shared/models/enums.dart';
 import '../../shared/models/gate_event.dart';
 import '../../shared/widgets/gk_button.dart';
@@ -35,7 +36,31 @@ class _EventsPageState extends State<EventsPage> {
   @override
   void initState() {
     super.initState();
+    //Ascolta RealtimeService: aggiorna la lista quando arrivano nuovi eventi.
+    RealtimeService.instance.addListener(_onRealtimeUpdate);
+    _syncFromRealtime();
     _load();
+  }
+
+  @override
+  void dispose() {
+    RealtimeService.instance.removeListener(_onRealtimeUpdate);
+    super.dispose();
+  }
+
+  void _onRealtimeUpdate() {
+    if (!mounted) return;
+    _syncFromRealtime();
+  }
+
+  void _syncFromRealtime() {
+    final rt = RealtimeService.instance;
+    if (rt.events.isNotEmpty) {
+      setState(() {
+        _events = rt.events;
+        _loading = false;
+      });
+    }
   }
 
   String? _error;

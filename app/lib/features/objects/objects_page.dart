@@ -8,6 +8,7 @@ import '../../data/api/api_exception.dart';
 import '../../data/api/dto.dart';
 import '../../data/gatekeeper_api.dart';
 import '../../data/repositories/repositories.dart';
+import '../../data/services/realtime_service.dart';
 import '../../shared/models/smart_object.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
@@ -34,7 +35,31 @@ class _ObjectsPageState extends State<ObjectsPage> {
   @override
   void initState() {
     super.initState();
+    //Ascolta RealtimeService: aggiorna la lista quando cambiano gli oggetti.
+    RealtimeService.instance.addListener(_onRealtimeUpdate);
+    _syncFromRealtime();
     _load();
+  }
+
+  @override
+  void dispose() {
+    RealtimeService.instance.removeListener(_onRealtimeUpdate);
+    super.dispose();
+  }
+
+  void _onRealtimeUpdate() {
+    if (!mounted) return;
+    _syncFromRealtime();
+  }
+
+  void _syncFromRealtime() {
+    final rt = RealtimeService.instance;
+    if (rt.objects.isNotEmpty) {
+      setState(() {
+        _objects = rt.objects;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _load() async {

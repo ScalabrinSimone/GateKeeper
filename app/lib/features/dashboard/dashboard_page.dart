@@ -7,56 +7,42 @@ import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/dto.dart';
-import '../../data/repositories/repositories.dart';
+import '../../data/services/realtime_service.dart';
 import '../../shared/models/app_user.dart';
 import '../../shared/models/gate_event.dart';
-import '../../shared/models/smart_object.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../objects/widgets/object_form_sheet.dart';
 
-//Pagina Dashboard: vista bento con stato, salute hub, membri, oggetti, eventi live.
-//Carica tutto dal backend in parallelo; gli errori non bloccano la UI ma
-//mostrano sezioni vuote con CTA "Riprova" implicito (refresh pull-to-refresh).
-class DashboardPage extends StatefulWidget {
+//Pagina Dashboard: ascolta RealtimeService che aggiorna i dati in background.
+//Quando RealtimeService notifica un cambiamento, la dashboard si rirenderizza
+//automaticamente tramite ListenableBuilder senza richieste esplicite.
+class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: RealtimeService.instance,
+      builder: (context, _) => _DashboardView(
+        rt: RealtimeService.instance,
+      ),
+    );
+  }
 }
 
-class _DashboardPageState extends State<DashboardPage> {
-  List<GateEvent> _events = const [];
-  List<AppUser> _users = const [];
-  List<SmartObject> _objects = const [];
-  bool _loading = true;
+class _DashboardView extends StatefulWidget {
+  const _DashboardView({required this.rt});
+  final RealtimeService rt;
 
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  State<_DashboardView> createState() => _DashboardViewState();
+}
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    //Carico in parallelo: usiamo `Future.wait` per ridurre la latenza.
-    //Ogni fonte è già protetta da `catchError`, quindi non serve un
-    //try/catch esterno.
-    final results = await Future.wait([
-      EventsRepository.list().catchError((_) => <GateEvent>[]),
-      UsersRepository.list().catchError((_) => <AppUser>[]),
-      DevicesRepository.list().catchError((_) => <SmartObject>[]),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _events = List<GateEvent>.from(results[0] as List<GateEvent>);
-      _users = results[1] as List<AppUser>;
-      _objects = results[2] as List<SmartObject>;
-      _loading = false;
-    });
-  }
+class _DashboardViewState extends State<_DashboardView> {
+  RealtimeService get rt => widget.rt;
 
   bool get _canManageDevices {
     final u = AuthController.instance.user;
@@ -80,35 +66,29 @@ class _DashboardPageState extends State<DashboardPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.t('objectCreated'))),
       );
-      await _load();
+      await rt.refresh();
     }
   }
 
   void _resolve(GateEvent event) {
-    //Resolve è locale (UI-only) per ora: la persistenza nel backend
-    //richiederebbe un endpoint dedicato events/{id}/resolve. La marcatura
-    //rimane fino al prossimo refresh.
-    setState(() {
-      event.resolved = true;
-    });
+    setState(() => event.resolved = true);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
+    final events = rt.events;
+    final users = rt.users;
+    final objects = rt.objects;
+    final loading = !rt.isRunning && events.isEmpty && users.isEmpty;
 
-    if (_loading) {
+    if (loading) {
       return const Center(
           child: CircularProgressIndicator(color: AppColors.stormyTeal));
     }
 
-    final users = _users;
-    final objects = _objects;
-
-    final unresolved = _events.where((e) => e.isUnresolved).toList(growable: false);
+    final unresolved = events.where((e) => e.isUnresolved).toList(growable: false);
     final isSecure = unresolved.isEmpty;
-    //Conta l'utente loggato come "dentro" finché BLE/RFID non lo aggiorna,
-    //così il riepilogo header è coerente con il contatore "online" sotto.
     final currentUserId = AuthController.instance.user?.id.toString();
     final peopleInside = users.where((u) {
       if (u.isInside) return true;
@@ -121,7 +101,7 @@ class _DashboardPageState extends State<DashboardPage> {
         final wide = constraints.maxWidth >= 1100;
         return RefreshIndicator(
           color: AppColors.stormyTeal,
-          onRefresh: _load,
+          onRefresh: rt.refresh,
           child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
@@ -184,7 +164,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         const SizedBox(width: 16),
                         Expanded(
                           flex: 2,
-                          child: _LiveEventsCard(events: _events, onResolve: _resolve),
+                          child: _LiveEventsCard(events: events, onResolve: _resolve),
                         ),
                       ],
                     )
@@ -205,7 +185,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         const SizedBox(height: 16),
                         SizedBox(
                           height: 520,
-                          child: _LiveEventsCard(events: _events, onResolve: _resolve),
+                          child: _LiveEventsCard(events: events, onResolve: _resolve),
                         ),
                       ],
                     ),

@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/api/dto.dart';
 import '../../data/gatekeeper_api.dart';
-import '../../data/services/event_polling_service.dart';
 import '../../data/services/push_notifications_service.dart';
+import '../../data/services/realtime_service.dart';
 import '../config/api_config.dart';
 import '../storage/secure_storage.dart';
 
@@ -128,7 +128,7 @@ class AuthController extends ChangeNotifier {
           //Inizializzazione best-effort delle push: se Firebase non è
           //configurato il servizio ritorna false senza errori.
           unawaited(PushNotificationsService.instance.initialize());
-          EventPollingService.instance.start();
+          unawaited(RealtimeService.instance.start());
         }
         notifyListeners();
         return;
@@ -159,7 +159,7 @@ class AuthController extends ChangeNotifier {
     } else {
       _stage = AuthStage.authenticated;
       unawaited(PushNotificationsService.instance.initialize());
-      EventPollingService.instance.start();
+      unawaited(RealtimeService.instance.start());
       //Aggiorna la posizione dell'utente a "inside" al login.
       unawaited(_updateCurrentLocation('inside'));
     }
@@ -196,7 +196,7 @@ class AuthController extends ChangeNotifier {
     } else {
       _stage = AuthStage.authenticated;
       unawaited(PushNotificationsService.instance.initialize());
-      EventPollingService.instance.start();
+      unawaited(RealtimeService.instance.start());
     }
     notifyListeners();
   }
@@ -216,7 +216,7 @@ class AuthController extends ChangeNotifier {
       if (_stage == AuthStage.needsEmailVerification && updated.emailVerified != false) {
         _stage = AuthStage.authenticated;
         unawaited(PushNotificationsService.instance.initialize());
-        EventPollingService.instance.start();
+        unawaited(RealtimeService.instance.start());
       }
       notifyListeners();
     } catch (_) {
@@ -229,7 +229,7 @@ class AuthController extends ChangeNotifier {
   //Dopo questa operazione l'app torna in stato `needsPairing` e l'utente
   //deve riscansionare un hub o inserire un URL remoto.
   Future<void> leaveHome() async {
-    EventPollingService.instance.stop();
+    RealtimeService.instance.stop();
     try {
       await _api.auth.logout();
     } catch (_) {
@@ -264,7 +264,7 @@ class AuthController extends ChangeNotifier {
   }
   //Logout: cancella token e torna a login.
   Future<void> logout() async {
-    EventPollingService.instance.stop();
+    RealtimeService.instance.stop();
     //Aggiorna la posizione a "unknown" prima di fare logout.
     try {
       await _updateCurrentLocation('unknown');

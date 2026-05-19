@@ -1,6 +1,11 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/config/api_config.dart';
 import '../../core/i18n/app_l10n.dart';
@@ -64,6 +69,7 @@ class AccountPage extends StatelessWidget {
                 isAdmin: user?.isAdmin ?? false,
                 logoutLabel: l10n.t('logout'),
                 onLogout: () => _logout(context),
+                userId: user?.id.toString() ?? 'guest',
               );
               final info = Column(
                 children: [
@@ -102,22 +108,90 @@ class AccountPage extends StatelessWidget {
   }
 }
 
-class _AvatarBlock extends StatelessWidget {
+class _AvatarBlock extends StatefulWidget {
   const _AvatarBlock({
     required this.name,
     required this.role,
     required this.isAdmin,
     required this.logoutLabel,
     required this.onLogout,
+    required this.userId,
   });
   final String name;
   final String role;
   final bool isAdmin;
   final String logoutLabel;
   final VoidCallback onLogout;
+  final String userId;
+
+  @override
+  State<_AvatarBlock> createState() => _AvatarBlockState();
+}
+
+class _AvatarBlockState extends State<_AvatarBlock> {
+  String? _avatarPath;
+  bool _pickingImage = false;
+  static const _kPrefKey = 'gk.avatar.path.';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedAvatar();
+  }
+
+  Future<void> _loadSavedAvatar() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('$_kPrefKey${widget.userId}');
+      if (saved != null && mounted) {
+        setState(() => _avatarPath = saved);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pickAvatar() async {
+    if (_pickingImage) return;
+    //Web: non supportato image_picker nativo, ma gestiamo il caso.
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Caricamento immagine non disponibile su web.')),
+      );
+      return;
+    }
+    setState(() => _pickingImage = true);
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+      if (!mounted) return;
+      setState(() => _avatarPath = picked.path);
+      //Salva il percorso in SharedPreferences (locale al dispositivo).
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('$_kPrefKey${widget.userId}', picked.path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Errore: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pickingImage = false);
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    setState(() => _avatarPath = null);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_kPrefKey${widget.userId}');
+  }
 
   String get _initial {
-    final t = name.trim();
+    final t = widget.name.trim();
     return t.isEmpty ? '?' : t.substring(0, 1).toUpperCase();
   }
 
@@ -126,7 +200,12 @@ class _AvatarBlock extends StatelessWidget {
     final theme = Theme.of(context);
     return Column(
       children: [
-        Stack(
+        GestureDetector(
+          onTap: _pickAvatar,
+          onLongPress: _avatarPath != null ? _removeAvatar : null,
+          child: Tooltip(
+            message: 'Tocca per cambiare foto',
+            child: Stack(
           clipBehavior: Clip.none,
           children: [
             Container(
@@ -144,12 +223,39 @@ class _AvatarBlock extends StatelessWidget {
                 ],
               ),
               alignment: Alignment.center,
-              child: Text(
-                _initial,
-                style: const TextStyle(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic),
+              clipBehavior: Clip.hardEdge,
+              child: _avatarPath != null
+                  ? Image.file(
+                      File(_avatarPath!),
+                      fit: BoxFit.cover,
+                      width: 156,
+                      height: 156,
+                      errorBuilder: (_, __, ___) => Text(
+                        _initial,
+                        style: const TextStyle(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic),
+                      ),
+                    )
+                  : Text(
+                      _initial,
+                      style: const TextStyle(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic),
+                    ),
+            ),
+            //Badge fotocamera in basso a sinistra.
+            Positioned(
+              bottom: -6,
+              left: -6,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.charcoalBlue.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: _pickingImage
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.photo_camera_rounded, color: Colors.white, size: 16),
               ),
             ),
-            if (isAdmin)
+            if (widget.isAdmin)
               Positioned(
                 bottom: -6,
                 right: -6,
@@ -164,11 +270,13 @@ class _AvatarBlock extends StatelessWidget {
               ),
           ],
         ),
+          ),
+        ),
         const SizedBox(height: 24),
-        Text(name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, fontStyle: FontStyle.italic)),
+        Text(widget.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, fontStyle: FontStyle.italic)),
         const SizedBox(height: 6),
         Text(
-          role.toUpperCase(),
+          widget.role,
           style: theme.textTheme.labelSmall?.copyWith(
             letterSpacing: 2,
             fontWeight: FontWeight.w900,
@@ -179,9 +287,9 @@ class _AvatarBlock extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: GKButton(
-            onPressed: onLogout,
+            onPressed: widget.onLogout,
             icon: Icons.logout_rounded,
-            label: logoutLabel,
+            label: widget.logoutLabel,
             variant: GKButtonVariant.danger,
             expanded: true,
           ),
