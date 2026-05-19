@@ -1,3 +1,4 @@
 {
-    "github.copilot.llm-gateway.serverUrl": "https://api.llmgateway.io/v1"
+    "github.copilot.llm-gateway.serverUrl": "https://api.llmgateway.io/v1",
+    "cmake.sourceDirectory": "C:/Users/ender/Desktop/GateKeeper/app/linux"
 }
