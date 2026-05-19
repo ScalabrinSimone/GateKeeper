@@ -147,15 +147,74 @@ class EventsRepository {
     }
   }
 
+  //Genera descrizioni dettagliate: estrae nomi oggetti e utenti dai campi JSON.
   static String _describe(EventType type, EventDto e, {required bool langIt}) {
+    final objs = _safeParseList(e.detectedObjects);
+    final users = _safeParseList(e.detectedUsers);
+
+    //Estrai nomi oggetti.
+    final objNames = <String>[];
+    for (final o in objs) {
+      if (o is Map) {
+        final name = o['name']?.toString();
+        if (name != null && name.isNotEmpty) objNames.add('"$name"');
+      }
+    }
+
+    //Estrai nomi utenti.
+    final userNames = <String>[];
+    for (final u in users) {
+      if (u is Map) {
+        final name = u['username']?.toString();
+        if (name != null && name.isNotEmpty) userNames.add(name);
+      }
+    }
+
+    final objStr = objNames.isEmpty ? null : objNames.join(', ');
+    final userStr = userNames.isEmpty ? null : userNames.join(', ');
+
     switch (type) {
       case EventType.entry:
-        return langIt ? 'Ingresso registrato dal sistema.' : 'Entry detected by the system.';
+        if (userStr != null && objStr != null) {
+          return langIt
+              ? '$userStr è rientrato con $objStr.'
+              : '$userStr came back with $objStr.';
+        } else if (userStr != null) {
+          return langIt ? '$userStr è rientrato.' : '$userStr came back home.';
+        } else if (objStr != null) {
+          return langIt ? '$objStr è rientrato.' : '$objStr came back inside.';
+        }
+        return langIt ? 'Ingresso rilevato alla porta.' : 'Entry detected at the door.';
+
       case EventType.exit:
-        return langIt ? 'Uscita registrata dal sistema.' : 'Exit detected by the system.';
+        if (userStr != null && objStr != null) {
+          return langIt
+              ? '$userStr è uscito con $objStr.'
+              : '$userStr left with $objStr.';
+        } else if (userStr != null) {
+          return langIt ? '$userStr è uscito.' : '$userStr left home.';
+        } else if (objStr != null) {
+          return langIt ? '$objStr è uscito.' : '$objStr went outside.';
+        }
+        return langIt ? 'Uscita rilevata alla porta.' : 'Exit detected at the door.';
+
       case EventType.risk:
-        return langIt ? 'Avviso: condizione di rischio rilevata.' : 'Alert: risky condition detected.';
+        if (objStr != null) {
+          return langIt
+              ? 'Avviso: $objStr in movimento senza utente associato!'
+              : 'Alert: $objStr moved without an associated user!';
+        }
+        return langIt
+            ? 'Avviso: oggetto in uscita senza utente rilevato!'
+            : 'Alert: object exited without a detected user!';
+
       case EventType.system:
+        final tag = objs.isNotEmpty && objs[0] is Map
+            ? objs[0]['rfid_tag']?.toString()
+            : null;
+        if (tag != null) {
+          return langIt ? 'Tag RFID $tag rilevato.' : 'RFID tag $tag detected.';
+        }
         return langIt ? 'Evento di sistema.' : 'System event.';
     }
   }

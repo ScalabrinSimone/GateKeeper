@@ -822,9 +822,13 @@ class _LiveEventsCard extends StatelessWidget {
               ),
             )
           else
-          Expanded(
+          //ConstrainedBox invece di Expanded: evita RenderBox unbounded
+          //quando il card è dentro SingleChildScrollView (wide layout).
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 480),
             child: ListView.separated(
               padding: EdgeInsets.zero,
+              shrinkWrap: true,
               itemCount: events.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {

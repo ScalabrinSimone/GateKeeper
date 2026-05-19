@@ -33,16 +33,82 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _applyingRemote = false;
   late final TextEditingController _remoteCtrl;
 
+  //Stato BLE.
+  String? _bleAddress;
+  bool _loadingBle = false;
+  bool _savingBle = false;
+  List<Map<String, dynamic>> _nearbyBle = const [];
+  bool _showingNearby = false;
+
   @override
   void initState() {
     super.initState();
     _remoteCtrl = TextEditingController(text: widget.settings.remoteTunnelUrl ?? '');
+    _loadBleInfo();
   }
 
   @override
   void dispose() {
     _remoteCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBleInfo() async {
+    try {
+      final info = await GateKeeperApi.instance.users.getBleInfo();
+      if (mounted) {
+        setState(() => _bleAddress = info['ble_address']?.toString());
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadNearby() async {
+    setState(() {
+      _loadingBle = true;
+      _showingNearby = true;
+    });
+    try {
+      final list = await GateKeeperApi.instance.users.bleNearby();
+      if (mounted) setState(() => _nearbyBle = list);
+    } catch (_) {
+      if (mounted) setState(() => _nearbyBle = const []);
+    } finally {
+      if (mounted) setState(() => _loadingBle = false);
+    }
+  }
+
+  Future<void> _registerBle(String address, AppL10n l10n) async {
+    setState(() => _savingBle = true);
+    try {
+      await GateKeeperApi.instance.users.registerBle(address);
+      if (mounted) {
+        setState(() {
+          _bleAddress = address;
+          _showingNearby = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.t('bleRegistered'))),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _savingBle = false);
+    }
+  }
+
+  Future<void> _unregisterBle(AppL10n l10n) async {
+    try {
+      await GateKeeperApi.instance.users.unregisterBle();
+      if (mounted) {
+        setState(() => _bleAddress = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.t('bleRemoved'))),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _applyRemote(AppL10n l10n) async {
@@ -545,6 +611,112 @@ class _SettingsPageState extends State<SettingsPage> {
                   value: widget.settings.pushEnabled,
                   activeThumbColor: AppColors.stormyTeal,
                   onChanged: (v) => _togglePush(v, l10n),
+                ),
+              ),
+            ],
+          ),
+          //Sezione BLE: l'utente seleziona il proprio dispositivo BLE per
+          //permettere al Raspberry di associare i passaggi RFID alla persona.
+          _Section(
+            title: l10n.t('bleSectionTitle'),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 6),
+                child: Text(
+                  l10n.t('bleSectionExplain'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        height: 1.4,
+                      ),
+                ),
+              ),
+              if (_bleAddress != null)
+                _Tile(
+                  icon: Icons.bluetooth_connected_rounded,
+                  title: l10n.t('bleRegisteredTitle'),
+                  subtitle: _bleAddress!,
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                    tooltip: l10n.t('bleRemove'),
+                    onPressed: () => _unregisterBle(l10n),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                  child: Text(
+                    l10n.t('bleNotRegistered'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.orangeGold,
+                          fontStyle: FontStyle.italic,
+                        ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    GKButton(
+                      onPressed: _loadingBle ? null : _loadNearby,
+                      label: _loadingBle ? l10n.t('loadingDots') : l10n.t('bleScan'),
+                      icon: Icons.bluetooth_searching_rounded,
+                      variant: GKButtonVariant.secondary,
+                      dense: true,
+                      expanded: true,
+                    ),
+                    if (_showingNearby) ...[
+                      const SizedBox(height: 8),
+                      if (_nearbyBle.isEmpty && !_loadingBle)
+                        Text(
+                          l10n.t('bleNoDevices'),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontStyle: FontStyle.italic,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                              ),
+                        )
+                      else
+                        for (final dev in _nearbyBle)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.stormyTeal.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.stormyTeal.withValues(alpha: 0.2)),
+                            ),
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(
+                                dev['is_phone'] == true
+                                    ? Icons.smartphone_rounded
+                                    : Icons.bluetooth_rounded,
+                                color: AppColors.stormyTeal,
+                              ),
+                              title: Text(
+                                dev['name']?.toString() ?? 'sconosciuto',
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              subtitle: Text(
+                                '${dev['address']} • ${dev['last_seen_seconds_ago']}s fa',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                      fontFamily: 'monospace',
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                    ),
+                              ),
+                              trailing: _savingBle
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : TextButton(
+                                      onPressed: () => _registerBle(dev['address'].toString(), l10n),
+                                      child: Text(l10n.t('bleSelect')),
+                                    ),
+                            ),
+                          ),
+                    ],
+                  ],
                 ),
               ),
             ],

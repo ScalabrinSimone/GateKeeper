@@ -60,4 +60,10 @@ class UsersApi {
   Future<void> unregisterBle() async {
     await _client.delete('/users/me/ble');
   }
+
+  //Lista dispositivi BLE rilevati nelle vicinanze del Raspberry.
+  Future<List<Map<String, dynamic>>> bleNearby() async {
+    final res = await _client.get('/ble/nearby');
+    return (res as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
 }

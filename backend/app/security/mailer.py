@@ -99,12 +99,44 @@ def _print_terminal(to: str, subject: str, body: str) -> None:
     print(f"{'='*60}\n")
 
 
+def _ensure_env_loaded() -> None:
+    """Ricarica le variabili d'ambiente da .env se non ancora caricate.
+
+    Chiamato prima di ogni invio mail per coprire il caso in cui il backend
+    venga avviato direttamente da uvicorn (senza run_all.py) o da una directory
+    diversa da quella del progetto.
+    """
+    if os.getenv("GK_SMTP_HOST"):
+        return  # gia' caricato
+    for _env_path in _POSSIBLE_ENV_PATHS:
+        if _env_path.is_file():
+            try:
+                with _env_path.open(encoding="utf-8") as _f:
+                    for _line in _f:
+                        _line = _line.strip()
+                        if not _line or _line.startswith("#"):
+                            continue
+                        if "=" in _line:
+                            _k, _v = _line.split("=", 1)
+                            _k = _k.strip()
+                            _v = _v.strip().strip('"').strip("'")
+                            if _k:
+                                os.environ[_k] = _v
+                print(f"[MAILER] ENV ricaricato da: {_env_path}")
+                break
+            except Exception:
+                pass
+
+
 def send_mail(to: str, subject: str, body: str) -> bool:
     """Invia una mail via SMTP. Stampa SEMPRE nel terminale + outbox.log.
 
     Se SMTP è configurato, invia anche la mail reale. Se l'invio fallisce,
     il contenuto resta comunque visibile nel terminale e nel file outbox.log.
     """
+    #Assicura che le variabili d'ambiente siano caricate (lazy reload).
+    _ensure_env_loaded()
+
     #Stampa sempre nel terminale (utile in sviluppo e per vedere i codici).
     _print_terminal(to, subject, body)
     #Salva sempre in outbox.log come backup.

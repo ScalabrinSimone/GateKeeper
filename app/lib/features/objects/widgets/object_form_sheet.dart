@@ -15,9 +15,9 @@ import '../../auth/widgets/gk_text_field.dart';
 
 //Sheet di creazione/modifica di un oggetto smart.
 //Supporta:
-//- inserimento manuale del tag RFID,
-//- scansione automatica: si abilita una "modalità scan" che fa polling
-//  sull'endpoint /rfid/scan/latest finché non arriva un nuovo tag o si annulla.
+//- inserimento manuale del tag RFID (utile se non si ha il lettore connesso),
+//- scansione automatica tramite polling /rfid/scan/latest,
+//- selezione icona personalizzata per il tipo di oggetto.
 class ObjectFormSheet extends StatefulWidget {
   const ObjectFormSheet({super.key, this.editing});
 
@@ -43,6 +43,9 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
   String? _previousTagBeforeScan;
   String? _previousSeenAtBeforeScan;
 
+  //Modalità input tag: scan o manuale.
+  bool _manualTagInput = false;
+
   @override
   void initState() {
     super.initState();
@@ -65,8 +68,6 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
 
   Future<void> _startScan() async {
     //Memorizzo l'ultimo tag noto del backend per riconoscere "il prossimo nuovo".
-    //Salvo anche il timestamp `seen_at`: se lo stesso tag viene riscansionato
-    //fisicamente, il backend aggiorna `seen_at` e possiamo rilevarlo come "nuovo".
     try {
       final latest = await GateKeeperApi.instance.rfid.latest();
       _previousTagBeforeScan = latest?.tag;
@@ -90,14 +91,10 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
     try {
       final latest = await GateKeeperApi.instance.rfid.latest();
       if (latest == null) return;
-      //Rileva un tag "nuovo" se:
-      //- è un tag diverso da quello che c'era prima, OPPURE
-      //- è lo stesso tag ma con un timestamp `seen_at` diverso (riscansionato).
       final isNewTag = latest.tag != _previousTagBeforeScan;
       final isSameTagRescanned = latest.tag == _previousTagBeforeScan &&
           latest.seenAt != _previousSeenAtBeforeScan;
       if (!isNewTag && !isSameTagRescanned) return;
-      //Nuovo tag (o rescan confermato): lo uso e fermo lo scan.
       _scanTimer?.cancel();
       _scanTimer = null;
       if (!mounted) return;
@@ -126,8 +123,6 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
       setState(() => _error = l10n.t('objectNameRequired'));
       return;
     }
-    //Il tag RFID è obbligatorio: in creazione deve venire da una scansione,
-    //in modifica deve restare presente (non lo si può "togliere").
     if (tag.isEmpty) {
       setState(() => _error = l10n.t('rfidTagRequired'));
       return;
@@ -142,20 +137,20 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
       if (editing == null) {
         saved = await GateKeeperApi.instance.devices.create(
           name: name,
-          rfidTag: tag.isEmpty ? null : tag,
+          rfidTag: tag,
           category: _categoryToString(_category),
           isEssential: _essential,
         );
       } else {
         saved = await GateKeeperApi.instance.devices.update(int.parse(editing.id), {
           'name': name,
-          if (tag.isNotEmpty) 'rfid_tag': tag,
+          'rfid_tag': tag,
           'category': _categoryToString(_category),
           'is_essential': _essential,
         });
       }
-      //Consuma il tag dal buffer scan (se proveniva da scansione).
-      if (tag.isNotEmpty) {
+      //Consuma il tag dal buffer scan (solo se era una scansione automatica).
+      if (!_manualTagInput && tag.isNotEmpty) {
         try {
           await GateKeeperApi.instance.rfid.consume(tag);
         } catch (_) {}
@@ -214,19 +209,21 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
                 label: l10n.t('objectName'),
                 prefixIcon: Icons.label_rounded,
               ),
-              //Card "Tag RFID": campo read-only + chip di stato + scan.
-              //Per evitare che l'utente registri un oggetto inesistente,
-              //il tag deve essere SEMPRE letto dal lettore RFID prima di
-              //salvare. In modifica il tag già assegnato resta visibile.
               const SizedBox(height: 8),
-              _RfidTagCard(
+              //Sezione tag RFID con toggle modalità.
+              _RfidTagSection(
                 controller: _tagCtrl,
                 scanning: _scanning,
+                manualInput: _manualTagInput,
                 onStart: _startScan,
                 onStop: _stopScan,
+                onToggleManual: () => setState(() {
+                  _manualTagInput = !_manualTagInput;
+                  if (_manualTagInput) _stopScan();
+                }),
               ),
               const SizedBox(height: 6),
-              //Categoria.
+              //Categoria con chip.
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Wrap(
@@ -253,45 +250,194 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
                         ?.copyWith(fontWeight: FontWeight.w800)),
                 subtitle: Text(l10n.t('essentialHint'),
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
                       fontStyle: FontStyle.italic,
                     )),
               ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  child:
-                      Text(_error!, style: const TextStyle(color: AppColors.danger)),
+                  child: Text(_error!, style: const TextStyle(color: AppColors.danger)),
                 ),
               const SizedBox(height: 10),
-              GKButton(
-                //Submit attivo solo se nome e tag (scansionato) sono presenti.
-                onPressed: (_busy || _tagCtrl.text.trim().isEmpty)
-                    ? null
-                    : _submit,
-                label: _busy
-                    ? l10n.t('loadingDots')
-                    : (isEdit ? l10n.t('save') : l10n.t('create')),
-                icon: Icons.check_rounded,
-                expanded: true,
-              ),
-              if (!_busy && _tagCtrl.text.trim().isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    l10n.t('rfidTagRequiredHint'),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
+              AnimatedBuilder(
+                animation: _tagCtrl,
+                builder: (_, __) => GKButton(
+                  onPressed: (_busy || _tagCtrl.text.trim().isEmpty) ? null : _submit,
+                  label: _busy
+                      ? l10n.t('loadingDots')
+                      : (isEdit ? l10n.t('save') : l10n.t('create')),
+                  icon: Icons.check_rounded,
+                  expanded: true,
                 ),
+              ),
               const SizedBox(height: 8),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+//Sezione tag RFID con toggle tra modalità scan e manuale.
+class _RfidTagSection extends StatelessWidget {
+  const _RfidTagSection({
+    required this.controller,
+    required this.scanning,
+    required this.manualInput,
+    required this.onStart,
+    required this.onStop,
+    required this.onToggleManual,
+  });
+
+  final TextEditingController controller;
+  final bool scanning;
+  final bool manualInput;
+  final VoidCallback onStart;
+  final VoidCallback onStop;
+  final VoidCallback onToggleManual;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppL10n.of(context);
+
+    if (manualInput) {
+      //Modalità manuale: campo editabile.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: controller,
+            style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace'),
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              labelText: l10n.t('rfidTagLabel'),
+              prefixIcon: const Icon(Icons.qr_code_2_rounded, color: AppColors.stormyTeal),
+              hintText: 'Es. E2000017221101...',
+              suffixIcon: ValueListenableBuilder(
+                valueListenable: controller,
+                builder: (_, v, __) => v.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded),
+                        onPressed: controller.clear,
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextButton.icon(
+            onPressed: onToggleManual,
+            icon: const Icon(Icons.sensors_rounded, size: 18),
+            label: Text(l10n.t('startScan')),
+          ),
+        ],
+      );
+    }
+
+    //Modalità scan.
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final hasTagNow = controller.text.trim().isNotEmpty;
+        final c = hasTagNow ? AppColors.success : AppColors.orangeGold;
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: c.withValues(alpha: 0.06),
+            border: Border.all(color: c.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    hasTagNow ? Icons.check_circle_rounded : Icons.qr_code_2_rounded,
+                    color: c,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    hasTagNow
+                        ? l10n.t('tagScanned').toUpperCase()
+                        : l10n.t('rfidTagLabel').toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w900,
+                      color: c,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (hasTagNow)
+                SelectableText(
+                  controller.text,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                )
+              else
+                Text(
+                  scanning ? l10n.t('scanningTag') : l10n.t('rfidTagRequiredHint'),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: GKButton(
+                      onPressed: scanning ? onStop : onStart,
+                      label: scanning
+                          ? l10n.t('stopScan')
+                          : (hasTagNow ? l10n.t('rescanTag') : l10n.t('startScan')),
+                      icon: scanning ? Icons.stop_circle_rounded : Icons.sensors_rounded,
+                      variant: scanning
+                          ? GKButtonVariant.danger
+                          : (hasTagNow ? GKButtonVariant.ghost : GKButtonVariant.secondary),
+                      expanded: true,
+                      dense: true,
+                    ),
+                  ),
+                  if (scanning) ...[
+                    const SizedBox(width: 10),
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.stormyTeal),
+                    ),
+                  ],
+                ],
+              ),
+              //Link per passare all'inserimento manuale.
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: onToggleManual,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerLeft,
+                ),
+                child: Text(
+                  l10n.t('enterTagManually'),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -326,15 +472,15 @@ class _CategoryChip extends StatelessWidget {
   String _label(AppL10n l10n) {
     switch (category) {
       case ObjectCategory.keys:
-        return 'Keys';
+        return l10n.languageCode == 'it' ? 'Chiavi' : 'Keys';
       case ObjectCategory.wallet:
-        return 'Wallet';
+        return l10n.languageCode == 'it' ? 'Portafoglio' : 'Wallet';
       case ObjectCategory.umbrella:
-        return 'Umbrella';
+        return l10n.languageCode == 'it' ? 'Ombrello' : 'Umbrella';
       case ObjectCategory.bag:
-        return 'Bag';
+        return l10n.languageCode == 'it' ? 'Borsa' : 'Bag';
       case ObjectCategory.phone:
-        return 'Phone';
+        return l10n.languageCode == 'it' ? 'Telefono' : 'Phone';
       case ObjectCategory.other:
         return l10n.languageCode == 'it' ? 'Altro' : 'Other';
     }
@@ -399,129 +545,5 @@ String _categoryToString(ObjectCategory c) {
       return 'phone';
     case ObjectCategory.other:
       return 'other';
-  }
-}
-
-//Card "Tag RFID" del form. Mostra:
-//- chip di stato (Tag rilevato vs Avvicina un tag),
-//- valore esadecimale read-only (selezionabile),
-//- pulsante grande "Scansiona tag" / "Annulla".
-//Il campo NON è editabile manualmente: serve evitare la registrazione di
-//tag inesistenti o casuali.
-class _RfidTagCard extends StatelessWidget {
-  const _RfidTagCard({
-    required this.controller,
-    required this.scanning,
-    required this.onStart,
-    required this.onStop,
-  });
-
-  final TextEditingController controller;
-  final bool scanning;
-  final VoidCallback onStart;
-  final VoidCallback onStop;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final theme = Theme.of(context);
-        final l10n = AppL10n.of(context);
-        final hasTagNow = controller.text.trim().isNotEmpty;
-        final c = hasTagNow ? AppColors.success : AppColors.orangeGold;
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: c.withValues(alpha: 0.06),
-            border: Border.all(color: c.withValues(alpha: 0.3)),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    hasTagNow
-                        ? Icons.check_circle_rounded
-                        : Icons.qr_code_2_rounded,
-                    color: c,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    hasTagNow
-                        ? l10n.t('tagScanned').toUpperCase()
-                        : l10n.t('rfidTagLabel').toUpperCase(),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      letterSpacing: 1.4,
-                      fontWeight: FontWeight.w900,
-                      color: c,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              //Valore del tag: visibile solo se presente, selezionabile per
-              //copia/incolla; in alternativa placeholder informativo.
-              if (hasTagNow)
-                SelectableText(
-                  controller.text,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                )
-              else
-                Text(
-                  scanning
-                      ? l10n.t('scanningTag')
-                      : l10n.t('rfidTagRequiredHint'),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: GKButton(
-                      onPressed: scanning ? onStop : onStart,
-                      label: scanning
-                          ? l10n.t('stopScan')
-                          : (hasTagNow ? l10n.t('rescanTag') : l10n.t('startScan')),
-                      icon: scanning
-                          ? Icons.stop_circle_rounded
-                          : Icons.sensors_rounded,
-                      variant: scanning
-                          ? GKButtonVariant.danger
-                          : (hasTagNow
-                              ? GKButtonVariant.ghost
-                              : GKButtonVariant.secondary),
-                      expanded: true,
-                      dense: true,
-                    ),
-                  ),
-                  if (scanning) ...[
-                    const SizedBox(width: 10),
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.stormyTeal,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 }

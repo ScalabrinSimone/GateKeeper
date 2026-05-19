@@ -160,6 +160,8 @@ class AuthController extends ChangeNotifier {
       _stage = AuthStage.authenticated;
       unawaited(PushNotificationsService.instance.initialize());
       EventPollingService.instance.start();
+      //Aggiorna la posizione dell'utente a "inside" al login.
+      unawaited(_updateCurrentLocation('inside'));
     }
     notifyListeners();
   }
@@ -263,6 +265,10 @@ class AuthController extends ChangeNotifier {
   //Logout: cancella token e torna a login.
   Future<void> logout() async {
     EventPollingService.instance.stop();
+    //Aggiorna la posizione a "unknown" prima di fare logout.
+    try {
+      await _updateCurrentLocation('unknown');
+    } catch (_) {}
     try {
       await _api.auth.logout();
     } catch (_) {}
@@ -272,6 +278,17 @@ class AuthController extends ChangeNotifier {
     //Se l'hub è ancora accoppiato, andiamo a "needsLogin", altrimenti pairing.
     _stage = (_hubInfo?.paired ?? false) ? AuthStage.needsLogin : AuthStage.needsPairing;
     notifyListeners();
+  }
+
+  //Aggiorna la current_location dell'utente loggato tramite l'API.
+  Future<void> _updateCurrentLocation(String location) async {
+    final uid = _user?.id;
+    if (uid == null) return;
+    try {
+      await _api.users.update(uid, {'current_location': location});
+    } catch (_) {
+      //Best-effort: non blocca il flusso.
+    }
   }
 
   //Factory reset (solo admin): svuota tutto e torna a pairing.

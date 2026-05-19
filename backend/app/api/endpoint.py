@@ -1386,8 +1386,6 @@ def get_ble_info(user: dict = Depends(_get_current_user)):
 @app.delete("/users/me/ble")
 def unregister_ble(user: dict = Depends(_get_current_user)):
     """Rimuove l'associazione BLE dell'utente."""
-    from app.services.event_engine import register_ble_address
-    # Registra stringa vuota per rimuovere.
     from app.db.storage import DB_LOCK, load_db, save_db, find_by_id
     with DB_LOCK:
         db = load_db()
@@ -1396,6 +1394,36 @@ def unregister_ble(user: dict = Depends(_get_current_user)):
             record["ble_address"] = None
             save_db(db)
     return {"removed": True}
+
+
+class BleNearbyDevice(BaseModel):
+    """Dispositivo BLE rilevato nelle vicinanze del Raspberry."""
+    address: str
+    name: str
+    is_phone: bool
+    last_seen_seconds_ago: float
+
+
+@app.get("/ble/nearby", response_model=List[BleNearbyDevice])
+def ble_nearby(_user: dict = Depends(_get_current_user)):
+    """Lista dei dispositivi BLE rilevati nelle vicinanze dell'hub.
+
+    Permette all'utente di identificare il proprio telefono nella lista
+    e registrarlo come dispositivo BLE personale.
+    """
+    import time
+    from app.services.event_engine import get_all_nearby_ble
+    now = time.time()
+    devices = get_all_nearby_ble()
+    return [
+        BleNearbyDevice(
+            address=d.get("address", ""),
+            name=d.get("name", "sconosciuto"),
+            is_phone=bool(d.get("is_phone", False)),
+            last_seen_seconds_ago=round(now - d.get("last_seen", now), 1),
+        )
+        for d in devices
+    ]
 
 
 # --------------------------------------------------------------------------------------

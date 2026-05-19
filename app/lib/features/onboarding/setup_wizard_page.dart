@@ -71,7 +71,8 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
 
   bool get _needsFactoryCode => widget.auth.hubInfo?.requiresFactoryCode ?? false;
 
-  static final _emailRegex = RegExp(r'^[\w.+\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
+  //Regex email: accetta domini multi-livello (es. 10933919@itisrossi.vi.it).
+  static final _emailRegex = RegExp(r'^[\w.+\-]+@([\w\-]+\.)+[a-zA-Z]{2,}$');
 
   Future<void> _submitAdmin(AppL10n l10n) async {
     if (_busy) return;

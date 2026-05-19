@@ -60,7 +60,8 @@ class _InviteAcceptPageState extends State<InviteAcceptPage> {
   int _cooldown = 0;
   Timer? _cooldownTimer;
 
-  static final _emailRegex = RegExp(r'^[\w.+\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
+  //Regex email: accetta domini multi-livello (es. 10933919@itisrossi.vi.it).
+  static final _emailRegex = RegExp(r'^[\w.+\-]+@([\w\-]+\.)+[a-zA-Z]{2,}$');
 
   @override
   void initState() {
