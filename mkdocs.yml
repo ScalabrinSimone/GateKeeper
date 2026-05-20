@@ -1,95 +1,154 @@
 site_name: GateKeeper Docs
+site_description: Sistema IoT domestico intelligente — Smart tag, safe exit
+site_author: IoTeam
+# TODO: aggiorna con il tuo URL di deploy (es. https://scalabrimsimone.github.io/GateKeeper)
+site_url: https://scalabrimsimone.github.io/GateKeeper
 
 theme:
   name: material
+  # TODO: inserisci il logo nella cartella docs/assets/
+  logo: assets/logo.png
+  favicon: assets/logo.png
+
   palette:
+    # Modalità scura (default GateKeeper — Ink Black)
     - scheme: slate
-      primary: black
-      accent: cyan
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
-        name: switch to light mode
+        name: Passa alla modalità chiara
+    # Modalità chiara
     - scheme: default
       primary: custom
-      accent: orange
+      accent: custom
       toggle:
         icon: material/brightness-7
-        name: switch to dark mode
-  
-  logo: assets/logo.png
+        name: Passa alla modalità scura
+
+  font:
+    text: Inter
+    code: JetBrains Mono
 
   features:
-    - navigation.instant
-    - navigation.sections
-    - navigation.top
-    - navigation.tabs
-    - toc.integrate
-    - content.code.copy
-    - content.tabs.link
-    - search.highlight
-    - search.suggest
+    # Navigazione
+    - navigation.instant          # Caricamento istantaneo delle pagine (SPA)
+    - navigation.instant.progress # Barra di progresso durante caricamento
+    - navigation.sections         # Sezioni nel menu laterale
+    - navigation.tabs             # Tab orizzontali in alto
+    - navigation.tabs.sticky      # Tab rimangono visibili durante lo scroll
+    - navigation.top              # Pulsante "torna su"
+    - navigation.tracking         # Aggiorna URL allo scroll (ancora attiva)
+    - navigation.indexes          # Pagine indice per ogni sezione
+    # Contenuto
+    - content.code.copy           # Pulsante copia nei blocchi codice
+    - content.code.annotate       # Annotazioni nei blocchi codice
+    - content.tabs.link           # Tab sincronizzate tra pagine
+    - content.tooltips            # Tooltip sugli abbreviazioni
+    # Ricerca
+    - search.highlight            # Evidenzia i risultati di ricerca
+    - search.suggest              # Suggerimenti durante la ricerca
+    - search.share                # Condivisione link ricerca
+    # Header
+    - header.autohide             # Header si nasconde allo scroll
 
 extra_css:
   - stylesheets/extra.css
 
+extra_javascript:
+  - stylesheets/extra.js
+
 # Repository
-repo_name: GateKeeper
-repo_url: https://github.com/ScalabrinSimone/GateKeeper.git
+repo_name: ScalabrinSimone/GateKeeper
+# TODO: aggiorna con il link corretto alla repo GitHub
+repo_url: https://github.com/ScalabrinSimone/GateKeeper
+edit_uri: edit/main/docs/
 
 # Copyright
-copyright: Copyright &copy; 2026 IoTeam
+copyright: Copyright &copy; 2026 IoTeam — GateKeeper Project
 
 markdown_extensions:
-  - admonition
-  - attr_list
-  - md_in_html
+  - admonition                    # Box informativi (note, warning, tip…)
+  - attr_list                     # Attributi HTML inline negli elementi Markdown
+  - md_in_html                    # Markdown dentro blocchi HTML
+  - def_list                      # Liste di definizioni
+  - tables                        # Tabelle GFM
+  - footnotes                     # Note a piè di pagina
   - toc:
-      permalink: true
+      permalink: true             # Ancora permanente per ogni titolo
+      permalink_title: "Link a questa sezione"
+      toc_depth: 3
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
-  - pymdownx.details
-  - pymdownx.tabbed
-  - pymdownx.highlight
-  - pymdownx.arithmatex
-
+  - pymdownx.details              # Blocchi espandibili (summary/details)
+  - pymdownx.tabbed:
+      alternate_style: true       # Stile moderno per le tab
+  - pymdownx.highlight:
+      anchor_linenums: true       # Linee con ancore nei blocchi codice
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite         # Syntax highlight inline
+  - pymdownx.snippets             # Include file esterni
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.keys                 # Rappresentazione tasti (Ctrl+C)
+  - pymdownx.mark                 # Testo evidenziato ==così==
+  - pymdownx.caret                # Testo in apice ^così^
+  - pymdownx.tilde                # Testo barrato ~~così~~
+  - pymdownx.tasklist:
+      custom_checkbox: true       # Checkbox personalizzate
 
 nav:
   - Home: index.md
   - Panoramica:
-    - Idea: panoramica/idea.md
+    - panoramica/index.md
+    - Idea e Concetto: panoramica/idea.md
     - Architettura: panoramica/architettura.md
     - Componenti: panoramica/componenti.md
+  - Parte Tecnica:
+    - parte-tecnica/index.md
+    - Backend FastAPI: parte-tecnica/backend.md
+    - Database NoSQL: parte-tecnica/database.md
+    - Hardware & Circuito: parte-tecnica/hardware.md
+    - App Flutter: parte-tecnica/flutter-app.md
+    - Sicurezza: parte-tecnica/sicurezza.md
+    - Setup MkDocs: parte-tecnica/mkdocs-setup.md
   - Guida Utente:
+    - guida-utente/index.md
     - Installazione: guida-utente/installazione.md
     - Primo avvio: guida-utente/primo-avvio.md
+    - Ricreare il Progetto: guida-utente/ricreare-progetto.md
     - Notifiche: guida-utente/notifiche.md
-  - Parte Tecnica:
-    - Backend: parte-tecnica/backend.md
-    - Database: parte-tecnica/database.md
-    - Hardware: parte-tecnica/hardware.md
-    - Sicurezza: parte-tecnica/sicurezza.md
   - Sviluppo:
+    - sviluppo/index.md
     - Roadmap: sviluppo/roadmap.md
-  - Problemi:
-    - Panoramica: problemi/index.md
+    - Team Workflow: sviluppo/workflow.md
+  - Problemi & Soluzioni:
+    - problemi/index.md
     - Flutter e Figma: problemi/flutter-figma.md
     - Assistenza AI: problemi/ai-assistance.md
     - Sfide Tecniche: problemi/challenges-solutions.md
+    - Traduzione i18n: problemi/i18n-traduzione.md
 
 extra:
+  # TODO: aggiorna i link social del team
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/ScalabrinSimone/GateKeeper.git
+      link: https://github.com/ScalabrinSimone/GateKeeper
+      name: Repository GitHub
     - icon: fontawesome/brands/discord
       link: https://discord.gg/jARTvAt8Kh
+      name: Server Discord
+  # Versioning (opzionale)
+  # version:
+  #   provider: mike
 
-
-# extra_javascript:
-#   - https://unpkg.com/aos@2.3.1/dist/aos.js
-
-# extra_css:
-#   - https://unpkg.com/aos@2.3.1/dist/aos.css
-#   - stylesheets/extra.css
+plugins:
+  - search:
+      lang: it
+  - minify:
+      minify_html: true

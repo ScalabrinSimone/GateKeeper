@@ -1,3 +1,4 @@
-# Requirements di MkDocs-material
-
-mkdocs-material
+# Dipendenze documentazione MkDocs
+# Pinned to 9.5.x — la versione 9.6+ aggiunge avvisi su MkDocs 2.0 (non pertinenti)
+mkdocs-material>=9.5,<9.6
+mkdocs-minify-plugin>=0.8
