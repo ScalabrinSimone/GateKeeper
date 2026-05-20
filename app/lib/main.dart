@@ -1,34 +1,28 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'app.dart';
+import 'core/state/auth_controller.dart';
+import 'core/state/notifications_controller.dart';
+import 'core/state/settings_controller.dart';
 
-void main() async {
-  // ensureInitialized() è obbligatorio se chiami metodi di piattaforma
-  // (come SystemChrome o plugin nativi) prima di runApp().
+//Entry point: inizializza settings + notifiche + auth, poi avvia l'app.
+//Il bootstrap di auth viene avviato in background: lo splash sta su finché
+//il controller passa a uno stato definito.
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── Titlebar desktop ────────────────────────────────────────────────────
-  // Su Windows/Linux/macOS Flutter mostra una titlebar nativa.
-  // Per nasconderla si usa window_manager (non ancora in pubspec.yaml).
-  //
-  // TODO: aggiungi window_manager al pubspec.yaml e sostituisci con:
-  //   import 'package:window_manager/window_manager.dart';
-  //   await windowManager.ensureInitialized();
-  //   await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Color(0xFF0D1117),
-    ),
-  );
+  final settings = SettingsController();
+  await settings.load();
 
-  // TODO: inizializzare qui i servizi globali quando pronti:
-  // - lettura config ambiente (dev/prod)
-  // - flutter_secure_storage per il JWT
-  // - bootstrap ApiClient con baseUrl da config
+  //Notifiche locali: best-effort, se fallisce non blocca l'app.
+  unawaited(NotificationsController.instance.initialize());
 
-  // GateKeeperApp crea i provider (ThemeProvider, LocaleProvider)
-  // e li inietta nell'albero dei widget tramite MultiProvider.
-  runApp(const GateKeeperApp());
+  final auth = AuthController();
+  //Avvio del bootstrap senza await: il router mostra lo splash finché
+  //AuthController è in stage 'loading', poi notifica.
+  unawaited(auth.bootstrap());
+
+  runApp(GateKeeperApp(settings: settings, auth: auth));
 }

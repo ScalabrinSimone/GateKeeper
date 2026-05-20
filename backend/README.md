@@ -60,7 +60,36 @@ Opzioni utili:
 ```bash
 python run_all.py --host 0.0.0.0 --port 8000
 python run_all.py --reset-db
+python run_all.py --factory-reset   # svuota DB e rigenera factory_code
+python run_all.py --seed-test       # crea account test/test1234 + dati demo
 ```
+
+### Account di test
+
+Per saltare il pairing in sviluppo e provare subito l'app:
+
+```bash
+python run_all.py --seed-test
+```
+
+Credenziali generate:
+
+- username: `test`
+- password: `test1234`
+- ruolo: admin
+- house: `Casa Demo`
+
+### Reset di fabbrica sul Raspberry
+
+Quando vuoi disaccoppiare l'hub da una casa direttamente sul Pi
+(ad esempio se hai perso l'admin), esegui:
+
+```bash
+python scripts/factory_reset.py
+```
+
+Il comando svuota i database, rigenera un `factory_code` e lo stampa
+in console. Questo codice va inserito nell'app durante il nuovo pairing.
 
 ## Avvio solo API
 
@@ -80,6 +109,21 @@ uvicorn app.api.endpoint:app --host 0.0.0.0 --port 8000
 - `POST /user-devices`, `GET /user-devices`, `GET /user-devices/{association_id}`, `DELETE /user-devices/{association_id}`
 - `POST /logs`, `GET /logs`, `GET /logs/{log_id}`, `PUT /logs/{log_id}`, `DELETE /logs/{log_id}`
 - `POST /events`, `GET /events`, `GET /events/{event_id}`, `PUT /events/{event_id}`, `DELETE /events/{event_id}`
+
+### Endpoint aggiunti per l'app
+
+- `GET /hub/info`, `GET /hub/status` — stato pairing
+- `POST /hub/pair` — primo pairing (crea admin + marca paired)
+- `POST /hub/factory-reset` — reset (solo admin Bearer token)
+- `POST /auth/login`, `GET /auth/me`, `POST /auth/logout`
+- `POST /auth/forgot-password`, `POST /auth/reset-password`
+- `POST /invites`, `GET /invites`, `GET /invites/by-token/{token}`,
+  `POST /invites/accept`, `DELETE /invites/{id}`
+
+### Discovery LAN (UDP)
+
+L'hub risponde a broadcast UDP `GATEKEEPER_DISCOVER?` sulla porta 51820,
+così l'app Flutter può scoprire automaticamente l'IP del Raspberry.
 
 ## Note operative
 

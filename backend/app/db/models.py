@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from .storage import (
     DB_LOCK,
@@ -84,6 +84,70 @@ def _unique_exists(records: List[Dict[str, Any]], field: str, value: Any, *, exc
     return False
 
 
+# Permessi granulari assegnabili ai membri non-admin.
+# L'admin ha tutto implicitamente; per gli altri i default dipendono dal ruolo
+# e possono essere modificati in app.
+PERMISSION_KEYS: tuple[str, ...] = (
+    "can_manage_devices",
+    "can_manage_users",
+    "can_view_events",
+    "can_manage_invites",
+    "can_acknowledge_alerts",
+    "can_configure_hub",
+)
+
+
+def _default_permissions_for_role(role: str) -> Dict[str, bool]:
+    """Permessi di default in base al ruolo iniziale dell'utente."""
+    if role == "admin":
+        return {key: True for key in PERMISSION_KEYS}
+    if role == "adult":
+        return {
+            "can_manage_devices": False,
+            "can_manage_users": False,
+            "can_view_events": True,
+            "can_manage_invites": False,
+            "can_acknowledge_alerts": True,
+            "can_configure_hub": False,
+        }
+    # child
+    return {key: False for key in PERMISSION_KEYS}
+
+
+def _normalize_permissions(
+    permissions: Optional[Dict[str, Any]],
+    role: str,
+) -> Dict[str, bool]:
+    """Applica i default del ruolo e accetta solo le chiavi note."""
+    base = _default_permissions_for_role(role)
+    if not permissions:
+        return base
+    for key, value in permissions.items():
+        if key in PERMISSION_KEYS:
+            base[key] = bool(value)
+    return base
+
+
+def _user_public(record: Dict[str, Any]) -> Dict[str, Any]:
+    """Proiezione 'safe' di un record utente (niente password hash)."""
+    role = record.get("role", "adult")
+    permissions = _normalize_permissions(record.get("permissions"), role)
+    return {
+        "id": record.get("id"),
+        "email": record.get("email"),
+        "username": record.get("username"),
+        "role": role,
+        "uuid": record.get("uuid"),
+        "is_active": bool(record.get("is_active")),
+        "last_seen_at": record.get("last_seen_at"),
+        "current_location": record.get("current_location"),
+        "created_at": record.get("created_at"),
+        "permissions": permissions,
+        "push_tokens": list(record.get("push_tokens") or []),
+        "email_verified": record.get("email_verified"),
+    }
+
+
 # --------------------------------------------------------------------------------------
 # USERS
 # --------------------------------------------------------------------------------------
@@ -96,6 +160,7 @@ def create_user(
     is_active: bool = True,
     last_seen_at: Optional[str] = None,
     current_location: str = "unknown",
+    permissions: Optional[Dict[str, Any]] = None,
 ) -> int:
     """Crea un utente."""
     if not username or not username.strip():
@@ -122,6 +187,7 @@ def create_user(
         uuid_value = str(uuid_value).strip()
 
     pw_hash = generate_password_hash(password)
+    perms = _normalize_permissions(permissions, role)
 
     with DB_LOCK:
         init_db()
@@ -148,6 +214,9 @@ def create_user(
                 "last_seen_at": last_seen_at,
                 "current_location": current_location,
                 "created_at": _now_iso(),
+                "permissions": perms,
+                "push_tokens": [],
+                "email_verified": False,
             }
         )
         save_db(db)
@@ -180,19 +249,7 @@ def list_users(
                 continue
             if current_location is not None and record.get("current_location") != current_location:
                 continue
-            result.append(
-                {
-                    "id": record.get("id"),
-                    "email": record.get("email"),
-                    "username": record.get("username"),
-                    "role": record.get("role"),
-                    "uuid": record.get("uuid"),
-                    "is_active": bool(record.get("is_active")),
-                    "last_seen_at": record.get("last_seen_at"),
-                    "current_location": record.get("current_location"),
-                    "created_at": record.get("created_at"),
-                }
-            )
+            result.append(_user_public(record))
         return sorted(result, key=lambda item: item["id"])
 
 
@@ -201,19 +258,7 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     with DB_LOCK:
         db = load_db()
         record = find_by_id(db["users"], user_id)
-        if record is None:
-            return None
-        return {
-            "id": record.get("id"),
-            "email": record.get("email"),
-            "username": record.get("username"),
-            "role": record.get("role"),
-            "uuid": record.get("uuid"),
-            "is_active": bool(record.get("is_active")),
-            "last_seen_at": record.get("last_seen_at"),
-            "current_location": record.get("current_location"),
-            "created_at": record.get("created_at"),
-        }
+        return _user_public(record) if record is not None else None
 
 
 def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
@@ -222,17 +267,7 @@ def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
         db = load_db()
         for record in db["users"]:
             if record.get("username") == username:
-                return {
-                    "id": record.get("id"),
-                    "email": record.get("email"),
-                    "username": record.get("username"),
-                    "role": record.get("role"),
-                    "uuid": record.get("uuid"),
-                    "is_active": bool(record.get("is_active")),
-                    "last_seen_at": record.get("last_seen_at"),
-                    "current_location": record.get("current_location"),
-                    "created_at": record.get("created_at"),
-                }
+                return _user_public(record)
         return None
 
 
@@ -243,17 +278,7 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         db = load_db()
         for record in db["users"]:
             if record.get("email") == email:
-                return {
-                    "id": record.get("id"),
-                    "email": record.get("email"),
-                    "username": record.get("username"),
-                    "role": record.get("role"),
-                    "uuid": record.get("uuid"),
-                    "is_active": bool(record.get("is_active")),
-                    "last_seen_at": record.get("last_seen_at"),
-                    "current_location": record.get("current_location"),
-                    "created_at": record.get("created_at"),
-                }
+                return _user_public(record)
         return None
 
 
@@ -904,3 +929,438 @@ def delete_event(event_id: int) -> bool:
             return False
         save_db(db)
         return True
+
+
+# --------------------------------------------------------------------------------------
+# AUTH HELPERS
+# --------------------------------------------------------------------------------------
+def verify_user_password(identifier: str, password: str) -> Optional[Dict[str, Any]]:
+    """Verifica username/email + password. Ritorna l'utente se ok, altrimenti None."""
+    from werkzeug.security import check_password_hash
+
+    if not identifier or not password:
+        return None
+
+    identifier_norm = identifier.strip().lower()
+    with DB_LOCK:
+        db = load_db()
+        for record in db["users"]:
+            if (
+                str(record.get("username", "")).lower() == identifier_norm
+                or str(record.get("email", "")).lower() == identifier_norm
+            ):
+                try:
+                    if check_password_hash(record.get("hash_psw", ""), password):
+                        return _user_public(record)
+                except Exception:
+                    return None
+                return None
+    return None
+
+
+def update_user_permissions(
+    user_id: int,
+    permissions: Dict[str, Any],
+) -> bool:
+    """Aggiorna i permessi granulari di un utente.
+
+    L'admin non può perdere i propri permessi: in tal caso vengono forzati
+    a tutto True. Tutte le chiavi non in PERMISSION_KEYS sono ignorate.
+    """
+    with DB_LOCK:
+        db = load_db()
+        record = find_by_id(db["users"], user_id)
+        if record is None:
+            return False
+        role = record.get("role", "adult")
+        normalized = _normalize_permissions(permissions, role)
+        if role == "admin":
+            normalized = {key: True for key in PERMISSION_KEYS}
+        record["permissions"] = normalized
+        save_db(db)
+        return True
+
+
+# --------------------------------------------------------------------------------------
+# PUSH TOKENS (FCM/APNs)
+# --------------------------------------------------------------------------------------
+def add_push_token(user_id: int, token: str, platform: str = "unknown") -> bool:
+    """Aggiunge (se assente) un token push di un dispositivo dell'utente."""
+    token = (token or "").strip()
+    if not token:
+        raise ValueError("push token is required")
+    if platform not in ("android", "ios", "web", "desktop", "unknown"):
+        platform = "unknown"
+
+    with DB_LOCK:
+        db = load_db()
+        record = find_by_id(db["users"], user_id)
+        if record is None:
+            return False
+        tokens = list(record.get("push_tokens") or [])
+        tokens = [t for t in tokens if isinstance(t, dict) and t.get("token") != token]
+        tokens.append({"token": token, "platform": platform, "registered_at": _now_iso()})
+        record["push_tokens"] = tokens
+        save_db(db)
+        return True
+
+
+def remove_push_token(user_id: int, token: str) -> bool:
+    """Rimuove un token push (es. logout di un dispositivo)."""
+    token = (token or "").strip()
+    if not token:
+        return False
+    with DB_LOCK:
+        db = load_db()
+        record = find_by_id(db["users"], user_id)
+        if record is None:
+            return False
+        tokens = list(record.get("push_tokens") or [])
+        new_tokens = [t for t in tokens if not (isinstance(t, dict) and t.get("token") == token)]
+        record["push_tokens"] = new_tokens
+        save_db(db)
+        return True
+
+
+# --------------------------------------------------------------------------------------
+# RFID UNKNOWN TAGS (buffer per la fase di registrazione)
+# --------------------------------------------------------------------------------------
+import threading as _threading
+from collections import deque as _deque
+
+_UNKNOWN_TAGS_LOCK = _threading.Lock()
+_UNKNOWN_TAGS: "_deque[Dict[str, Any]]" = _deque(maxlen=20)
+
+
+def remember_unknown_tag(tag: str) -> None:
+    """Memorizza un tag RFID rilevato che non è ancora associato a un device.
+
+    Viene popolato dal callback del lettore RFID. L'app, durante la procedura
+    di registrazione di un nuovo oggetto, fa polling su `latest_unknown_tag`
+    per pre-compilare automaticamente il campo `rfid_tag`.
+    """
+    tag = (tag or "").strip()
+    if not tag:
+        return
+    with DB_LOCK:
+        db = load_db()
+        for record in db.get("devices", []):
+            if record.get("rfid_tag") == tag:
+                return  # tag già assegnato, non interessante
+    with _UNKNOWN_TAGS_LOCK:
+        for entry in _UNKNOWN_TAGS:
+            if entry.get("tag") == tag:
+                entry["seen_at"] = _now_iso()
+                return
+        _UNKNOWN_TAGS.append({"tag": tag, "seen_at": _now_iso()})
+
+
+def latest_unknown_tag() -> Optional[Dict[str, Any]]:
+    """Restituisce l'ultimo tag sconosciuto rilevato (o None)."""
+    with _UNKNOWN_TAGS_LOCK:
+        if not _UNKNOWN_TAGS:
+            return None
+        return dict(_UNKNOWN_TAGS[-1])
+
+
+def list_unknown_tags() -> List[Dict[str, Any]]:
+    """Tutti i tag sconosciuti recenti (più recenti per ultimi)."""
+    with _UNKNOWN_TAGS_LOCK:
+        return [dict(entry) for entry in _UNKNOWN_TAGS]
+
+
+def consume_unknown_tag(tag: str) -> bool:
+    """Rimuove un tag sconosciuto dal buffer (lo abbiamo appena assegnato)."""
+    tag = (tag or "").strip()
+    if not tag:
+        return False
+    with _UNKNOWN_TAGS_LOCK:
+        for entry in list(_UNKNOWN_TAGS):
+            if entry.get("tag") == tag:
+                _UNKNOWN_TAGS.remove(entry)
+                return True
+    return False
+
+
+# --------------------------------------------------------------------------------------
+# INVITES (link per invitare un nuovo membro)
+# --------------------------------------------------------------------------------------
+def create_invite(
+    created_by_user_id: int,
+    role: str = "adult",
+    suggested_name: Optional[str] = None,
+    ttl_hours: int = 24 * 7,
+) -> Dict[str, Any]:
+    """Genera un invito monouso a tempo. Restituisce l'invito con il token."""
+    from secrets import token_urlsafe
+    from datetime import timedelta
+
+    role = _validate_choice(role, ("admin", "adult", "child"), "role", default="adult")
+    _ensure_user_exists(created_by_user_id)
+
+    token = token_urlsafe(16)
+    expires = datetime.now(timezone.utc) + timedelta(hours=max(1, int(ttl_hours)))
+
+    with DB_LOCK:
+        db = load_db()
+        invite_id = next_id(db, "invites")
+        record = {
+            "id": invite_id,
+            "token": token,
+            "role": role,
+            "suggested_name": suggested_name,
+            "created_by": created_by_user_id,
+            "created_at": _now_iso(),
+            "expires_at": expires.replace(microsecond=0).isoformat(),
+            "consumed": False,
+            "consumed_by": None,
+            "consumed_at": None,
+        }
+        db["invites"].append(record)
+        save_db(db)
+        return record
+
+
+def list_invites(active_only: bool = True) -> List[Dict[str, Any]]:
+    """Elenca gli inviti generati. Se active_only, esclude i consumati/scaduti."""
+    now = datetime.now(timezone.utc)
+    with DB_LOCK:
+        db = load_db()
+        out: List[Dict[str, Any]] = []
+        for record in db.get("invites", []):
+            if active_only:
+                if record.get("consumed"):
+                    continue
+                try:
+                    if datetime.fromisoformat(record["expires_at"]) < now:
+                        continue
+                except Exception:
+                    continue
+            out.append(dict(record))
+        return sorted(out, key=lambda item: item["id"], reverse=True)
+
+
+def get_invite_by_token(token: str) -> Optional[Dict[str, Any]]:
+    """Recupera un invito tramite token. Non lo consuma."""
+    with DB_LOCK:
+        db = load_db()
+        for record in db.get("invites", []):
+            if record.get("token") == token:
+                return dict(record)
+    return None
+
+
+def consume_invite(
+    token: str,
+    username: str,
+    password: str,
+    email: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Consuma un invito: crea il nuovo utente con il ruolo previsto."""
+    if not username or not password:
+        raise ValueError("username e password sono obbligatori")
+
+    with DB_LOCK:
+        db = load_db()
+        invite_record = None
+        for record in db.get("invites", []):
+            if record.get("token") == token:
+                invite_record = record
+                break
+
+        if invite_record is None:
+            raise ValueError("invito non trovato")
+        if invite_record.get("consumed"):
+            raise ValueError("invito già consumato")
+        try:
+            expires = datetime.fromisoformat(invite_record["expires_at"])
+        except Exception:
+            raise ValueError("invito non valido")
+        if expires < datetime.now(timezone.utc):
+            raise ValueError("invito scaduto")
+
+        role = invite_record.get("role", "adult")
+
+    # Creazione utente (usa il lock internamente).
+    user_id = create_user(
+        username=username,
+        password=password,
+        email=email,
+        role=role,
+    )
+
+    with DB_LOCK:
+        db = load_db()
+        for record in db.get("invites", []):
+            if record.get("token") == token:
+                record["consumed"] = True
+                record["consumed_by"] = user_id
+                record["consumed_at"] = _now_iso()
+                break
+        save_db(db)
+        user = get_user_by_id(user_id)
+        return user or {"id": user_id}
+
+
+def revoke_invite(invite_id: int) -> bool:
+    """Cancella un invito non ancora consumato."""
+    with DB_LOCK:
+        db = load_db()
+        return delete_by_id(db.get("invites", []), invite_id) and (save_db(db) or True)
+
+
+# --------------------------------------------------------------------------------------
+# PASSWORD RESET
+# --------------------------------------------------------------------------------------
+def create_password_reset(email: str, ttl_minutes: int = 30) -> Optional[Dict[str, Any]]:
+    """Crea un token di reset password. Restituisce None se l'email non esiste."""
+    from secrets import token_urlsafe
+    from datetime import timedelta
+
+    user = get_user_by_email(email)
+    if not user:
+        return None
+
+    token = token_urlsafe(20)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=max(5, int(ttl_minutes)))
+
+    with DB_LOCK:
+        db = load_db()
+        reset_id = next_id(db, "password_resets")
+        record = {
+            "id": reset_id,
+            "user_id": user["id"],
+            "email": user["email"],
+            "token": token,
+            "created_at": _now_iso(),
+            "expires_at": expires.replace(microsecond=0).isoformat(),
+            "used": False,
+        }
+        db["password_resets"].append(record)
+        save_db(db)
+        return record
+
+
+def consume_password_reset(token: str, new_password: str) -> bool:
+    """Usa un token di reset per impostare una nuova password."""
+    if not new_password or len(new_password) < 6:
+        raise ValueError("password troppo corta (min. 6 caratteri)")
+
+    with DB_LOCK:
+        db = load_db()
+        target = None
+        for record in db.get("password_resets", []):
+            if record.get("token") == token:
+                target = record
+                break
+        if target is None:
+            return False
+        if target.get("used"):
+            return False
+        try:
+            expires = datetime.fromisoformat(target["expires_at"])
+        except Exception:
+            return False
+        if expires < datetime.now(timezone.utc):
+            return False
+
+        user_id = int(target["user_id"])
+        target["used"] = True
+        target["used_at"] = _now_iso()
+        save_db(db)
+
+    # Aggiornamento password fuori dal blocco precedente per riusare update_user.
+    return update_user(user_id, password=new_password)
+
+
+# --------------------------------------------------------------------------------------
+# HUB STATE (singleton meta)
+# --------------------------------------------------------------------------------------
+def get_hub() -> Dict[str, Any]:
+    """Stato dell'hub (paired/admin/house_name/factory_code)."""
+    from .storage import get_hub_state
+    return get_hub_state()
+
+
+def set_hub(updates: Dict[str, Any]) -> Dict[str, Any]:
+    """Aggiorna lo stato dell'hub."""
+    from .storage import set_hub_state
+    return set_hub_state(updates)
+
+
+def factory_reset_all() -> Dict[str, Any]:
+    """Svuota tutto e rigenera un factory code per il prossimo pairing."""
+    from secrets import token_hex
+    from .storage import factory_reset as storage_reset
+    new_code = token_hex(3).upper()  # es. "9F2A1C"
+    return storage_reset(factory_code=new_code)
+
+
+# --------------------------------------------------------------------------------------
+# EMAIL VERIFICATION
+# --------------------------------------------------------------------------------------
+def create_email_verification(user_id: int, ttl_minutes: int = 15) -> Dict[str, Any]:
+    """Crea un codice di verifica email a 6 cifre per l'utente."""
+    from secrets import randbelow
+    from datetime import timedelta
+
+    code = f"{randbelow(1_000_000):06d}"
+    expires = datetime.now(timezone.utc) + timedelta(minutes=max(5, int(ttl_minutes)))
+
+    with DB_LOCK:
+        db = load_db()
+        # Invalida eventuali codici precedenti per lo stesso utente.
+        for rec in db.get("email_verifications", []):
+            if rec.get("user_id") == user_id and not rec.get("used"):
+                rec["used"] = True
+        verify_id = next_id(db, "email_verifications")
+        record = {
+            "id": verify_id,
+            "user_id": user_id,
+            "code": code,
+            "created_at": _now_iso(),
+            "expires_at": expires.replace(microsecond=0).isoformat(),
+            "used": False,
+        }
+        db["email_verifications"].append(record)
+        save_db(db)
+        return record
+
+
+def consume_email_verification(user_id: int, code: str) -> bool:
+    """Verifica il codice e marca l'utente come email_verified."""
+    with DB_LOCK:
+        db = load_db()
+        target = None
+        for rec in db.get("email_verifications", []):
+            if rec.get("user_id") == user_id and rec.get("code") == code and not rec.get("used"):
+                target = rec
+                break
+        if target is None:
+            return False
+        try:
+            expires = datetime.fromisoformat(target["expires_at"])
+        except Exception:
+            return False
+        if expires < datetime.now(timezone.utc):
+            return False
+        target["used"] = True
+        target["used_at"] = _now_iso()
+        # Marca l'utente come verificato.
+        users = db["users"]
+        for u in users:
+            if u.get("id") == user_id:
+                u["email_verified"] = True
+                break
+        save_db(db)
+        return True
+
+
+def count_admins() -> int:
+    """Conta gli admin attivi nel sistema."""
+    with DB_LOCK:
+        db = load_db()
+        return sum(
+            1 for u in db["users"]
+            if u.get("role") == "admin" and u.get("is_active", True)
+        )

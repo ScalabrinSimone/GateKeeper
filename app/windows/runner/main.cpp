@@ -5,22 +5,16 @@
 #include "flutter_window.h"
 #include "utils.h"
 
-// Punto di ingresso per Windows.
-// Per rimuovere la titlebar nativa (barra "app" in cima),
-// impostiamo una finestra senza decorazioni e gestiamo
-// il resize manualmente tramite il plugin window_manager.
-// TODO: integrare window_manager per borderless window:
-//   1. aggiungere window_manager al pubspec.yaml
-//   2. chiamare windowManager.setTitleBarStyle(TitleBarStyle.hidden)
-//   3. wrappare la root con WindowCaption per drag
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
-  // Attach a console to the process for debugging.
-  if (!::AttachConsole(ATTACH_PARENT_PROCESS)) {
-    ::AllocConsole();
-    ::AttachConsole(GetCurrentProcessId());
+  // Attach to console when present (e.g., 'flutter run') or create a
+  // new console when running with a debugger.
+  if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
+    CreateAndAttachConsole();
   }
 
+  // Initialize COM, so that it is available for use in the library and/or
+  // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
   flutter::DartProject project(L"data");
@@ -32,7 +26,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 800);
+  Win32Window::Size size(1280, 720);
   if (!window.Create(L"GateKeeper", origin, size)) {
     return EXIT_FAILURE;
   }

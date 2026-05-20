@@ -1,5 +1,4 @@
-# File necessario per la generazione del multilinguaggio
-
 arb-dir: lib/l10n
 template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
+nullable-getter: false

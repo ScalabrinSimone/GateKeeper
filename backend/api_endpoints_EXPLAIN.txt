@@ -1,4 +1,3 @@
-
 DOCUMENTAZIONE API - DEVICE ACCESS API
 ======================================
 
@@ -198,6 +197,82 @@ COME AVVIARE
 Il metodo consigliato è:
 python run_all.py
 
-Opzionalmente:
-python run_all.py --reset-db
-per rigenerare il database da zero.
+Opzioni utili:
+  --reset-db           cancella e ricrea il database all'avvio
+  --factory-reset      esegue un factory reset (rigenera factory_code)
+
+Nota: in passato esisteva l'opzione --seed-test (utente di prova). È stata
+rimossa: il primo utente deve sempre essere creato via app facendo il
+pairing dell'hub.
+
+================================================================
+NUOVI ENDPOINT (auth, pairing, invites, recovery, factory reset)
+================================================================
+
+7) HUB
+   a) GET  /hub/info
+      - Pubblico. Restituisce { paired, house_name, requires_factory_code }.
+      - L'app lo chiama per capire se mostrare login o pair.
+   b) GET  /hub/status
+      - Pubblico. Dettaglio: paired/admin_user_id/paired_at/house_name.
+   c) POST /hub/pair
+      - Pubblico (una sola volta). Body:
+          { house_name, username, password, email, factory_code? }
+        Crea l'admin, marca l'hub come paired e ritorna { token, user }.
+        Se l'hub è stato resettato di fabbrica, `factory_code` è obbligatorio.
+   d) POST /hub/factory-reset
+      - Solo admin (Bearer token). Body: { confirm: true }.
+        Svuota DB, rigenera secret e factory_code.
+
+8) AUTH
+   a) POST /auth/login
+      - Body: { identifier (username o email), password }. Ritorna { token, user }.
+   b) GET  /auth/me
+      - Bearer token. Ritorna l'utente del token.
+   c) POST /auth/logout
+      - Bearer token. Lato server è un ack: il client elimina il token salvato.
+   d) POST /auth/forgot-password
+      - Body: { email }. Sempre 200 (non rivela se l'email esiste).
+        Genera un token di reset e prova a mandare la mail.
+        Se non c'è SMTP, scrive la mail in `outbox.log`.
+   e) POST /auth/reset-password
+      - Body: { token, new_password }.
+
+9) INVITES
+   a) POST /invites
+      - Solo admin. Body: { role, suggested_name?, ttl_hours? }.
+        Ritorna invito con `token` da condividere come link.
+   b) GET  /invites?active_only=true
+      - Solo admin. Lista degli inviti.
+   c) GET  /invites/by-token/{token}
+      - Pubblico. Usato dall'app per mostrare il form di accettazione.
+   d) POST /invites/accept
+      - Pubblico. Body: { token, username, password, email? }.
+        Crea il nuovo membro e ritorna { token, user }.
+   e) DELETE /invites/{invite_id}
+      - Solo admin. Revoca un invito.
+
+10) DISCOVERY (LAN)
+    - L'API NON espone endpoint dedicati: il discovery avviene via UDP
+      broadcast sulla porta 51820.
+    - L'app manda "GATEKEEPER_DISCOVER?" in broadcast e l'hub risponde con
+      un JSON che include api_port, paired e house_name.
+
+11) PERMESSI MEMBRI
+   a) PUT /users/{user_id}/permissions
+      - Solo admin. Aggiorna i permessi granulari del membro.
+      - Chiavi: can_manage_devices, can_manage_users, can_view_events,
+        can_manage_invites, can_acknowledge_alerts, can_configure_hub.
+
+12) RFID SCAN (registrazione tag)
+   a) GET /rfid/scan/latest  -> ultimo tag sconosciuto rilevato (o null).
+   b) GET /rfid/scan         -> lista degli ultimi tag sconosciuti.
+   c) DELETE /rfid/scan/{tag}-> rimuove un tag dal buffer (consumato).
+   - Richiede ruolo admin oppure permesso can_manage_devices.
+
+13) PUSH TOKENS (FCM/APNs)
+   a) POST /users/me/push-token { token, platform }
+      - Registra il token push del dispositivo per l'utente loggato.
+   b) DELETE /users/me/push-token?token=...
+      - Rimuove un token (logout di quel dispositivo).
+

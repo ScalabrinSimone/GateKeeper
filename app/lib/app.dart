@@ -1,81 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:provider/provider.dart';
 
-import 'core/providers/locale_provider.dart';
-import 'core/providers/theme_provider.dart';
-import 'l10n/app_localizations.dart';
+import 'core/i18n/app_l10n.dart';
+import 'core/state/auth_controller.dart';
+import 'core/state/settings_controller.dart';
+import 'core/theme/app_theme.dart';
 import 'router/app_router.dart';
-import 'theme/app_theme.dart';
 
-/// Root widget dell'app GateKeeper.
-///
-/// Struttura:
-/// ```
-/// MultiProvider   ← inietta ThemeProvider e LocaleProvider
-///   └─ _AppView  ← Consumer2 che reagisce ai cambi di tema/lingua
-///        └─ MaterialApp.router
-/// ```
-///
-/// Separare [GateKeeperApp] (che crea i provider) da [_AppView] (che li
-/// consuma) è il pattern standard con provider: evita che il MultiProvider
-/// stesso si ricostruisca quando i provider notificano.
-class GateKeeperApp extends StatelessWidget {
-  const GateKeeperApp({super.key});
+//Widget root: ascolta SettingsController e AuthController per ricostruire il
+//MaterialApp quando cambiano tema, lingua o stato di auth.
+class GateKeeperApp extends StatefulWidget {
+  const GateKeeperApp({super.key, required this.settings, required this.auth});
+
+  final SettingsController settings;
+  final AuthController auth;
 
   @override
-  Widget build(BuildContext context) {
-    // MultiProvider registra più ChangeNotifier in una sola volta.
-    // L'ordine non conta (non ci sono dipendenze tra i due provider).
-    return MultiProvider(
-      providers: [
-        // Gestisce dark / light mode
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        // Gestisce la lingua (it / en)
-        ChangeNotifierProvider(create: (_) => LocaleProvider()),
-      ],
-      child: const _AppView(),
-    );
-  }
+  State<GateKeeperApp> createState() => _GateKeeperAppState();
 }
 
-/// Widget che consuma [ThemeProvider] e [LocaleProvider] e costruisce
-/// il [MaterialApp.router] con i valori correnti.
-///
-/// [Consumer2] ascolta entrambi i provider e si ricostruisce solo quando
-/// uno dei due notifica un cambiamento — non alla ogni rebuild del parent.
-class _AppView extends StatelessWidget {
-  const _AppView();
+class _GateKeeperAppState extends State<GateKeeperApp> {
+  late final _router =
+      AppRouter.build(settings: widget.settings, auth: widget.auth);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.settings.addListener(_onSettingsChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.settings.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
+  void _onSettingsChanged() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
-    // Consumer2 = ascolta due provider contemporaneamente
-    return Consumer2<ThemeProvider, LocaleProvider>(
-      builder: (context, themeProvider, localeProvider, _) {
-        return MaterialApp.router(
-          title: 'GateKeeper',
-          debugShowCheckedModeBanner: false,
-
-          // Tema: dark o light in base al provider
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: themeProvider.isDark ? ThemeMode.dark : ThemeMode.light,
-
-          // Router declarativo go_router
-          routerConfig: AppRouter.router,
-
-          // Lingua corrente dal provider
-          locale: localeProvider.locale,
-          supportedLocales: AppLocalizations.supportedLocales,
-          // Importante: niente `const` qui, perché i delegati non sono const.
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-        );
-      },
+    return MaterialApp.router(
+      debugShowCheckedModeBanner: false,
+      title: 'GateKeeper',
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: widget.settings.themeMode,
+      routerConfig: _router,
+      locale: widget.settings.locale,
+      supportedLocales: AppL10n.supportedLocales,
+      localizationsDelegates: const [
+        AppL10nDelegate(),
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
     );
   }
 }

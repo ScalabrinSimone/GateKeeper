@@ -1,180 +1,244 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/account/account_screen.dart';
-import '../features/auth/login_screen.dart';
-import '../features/auth/setup_screen.dart';
-import '../features/dashboard/dashboard_screen.dart';
-import '../features/events/events_screen.dart';
-import '../features/objects/objects_screen.dart';
-import '../features/settings/settings_screen.dart';
-import '../features/shell/app_shell.dart';
-import '../features/users/users_screen.dart';
+import '../core/state/auth_controller.dart';
+import '../core/state/settings_controller.dart';
+import '../core/theme/app_colors.dart';
+import '../features/account/account_page.dart';
+import '../features/auth/email_verification_page.dart';
+import '../features/auth/login_page.dart';
+import '../features/auth/pair_choice_page.dart';
+import '../features/auth/recovery_page.dart';
+import '../features/dashboard/dashboard_page.dart';
+import '../features/events/events_page.dart';
+import '../features/invite/invite_accept_page.dart';
+import '../features/members/members_page.dart';
+import '../features/notifications/notifications_page.dart';
+import '../features/objects/objects_page.dart';
+import '../features/onboarding/discovery_page.dart';
+import '../features/onboarding/setup_wizard_page.dart';
+import '../features/settings/settings_page.dart';
+import '../shared/widgets/app_shell.dart';
 
-/// Stato di autenticazione globale in memoria.
-///
-/// In produzione questo conterrà anche il JWT ricevuto da POST /api/auth/login
-/// e sarà usato come header Authorization per tutte le chiamate API.
-///
-/// Ora è un singleton semplice in memoria — nessuna persistenza su disco
-/// (SharedPreferences arriverà quando il backend sarà pronto).
-///
-/// Esempio d'uso:
-/// ```dart
-/// // Login riuscito:
-/// AuthState.instance.setLoggedIn(true);
-/// context.go('/dashboard');
-///
-/// // Sign out:
-/// AuthState.instance.setLoggedIn(false);
-/// context.go('/login');
-/// ```
-///
-/// TODO: aggiungere campo `String? jwtToken` quando il backend è pronto.
-/// TODO: persistere con flutter_secure_storage.
-class AuthState {
-  static final AuthState instance = AuthState._();
-  AuthState._();
+//Costruisce il router principale dell'app.
+//Le route di auth (login, pair, recovery, invite) stanno fuori dallo shell.
+//Lo shell ospita le pagine principali a navigazione persistente.
+//Il `redirect` regola il flusso a seconda dello stato di auth.
+class AppRouter {
+  AppRouter._();
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // TODO: per bypassare il login durante lo sviluppo, cambia a `true`.
-  // Ricorda di reimpostare `false` prima di commit/demo!
-  // ─────────────────────────────────────────────────────────────────────────
-  bool isLoggedIn = false;
+  static GoRouter build({
+    required SettingsController settings,
+    required AuthController auth,
+  }) {
+    return GoRouter(
+      initialLocation: '/splash',
+      refreshListenable: auth,
+      redirect: (context, state) {
+        final loc = state.matchedLocation;
+        final stage = auth.stage;
 
-  /// Imposta lo stato di autenticazione.
-  ///
-  /// Parametri:
-  /// - [value]: true = loggato, false = disconnesso
-  ///
-  /// Chiamare SEMPRE prima di context.go() per non triggerare il redirect.
-  void setLoggedIn(bool value) => isLoggedIn = value;
+        final isPublicRoute = loc == '/welcome' ||
+            loc == '/login' ||
+            loc == '/recover' ||
+            loc.startsWith('/onboarding') ||
+            loc.startsWith('/invite');
+
+        //La pagina verify-email è accessibile solo nello stage apposito.
+        final isVerifyEmail = loc == '/verify-email';
+
+        if (stage == AuthStage.loading) {
+          return loc == '/splash' ? null : '/splash';
+        }
+        if (stage == AuthStage.needsPairing) {
+          //Hub non ancora configurato su questo dispositivo: invito al pairing.
+          if (isPublicRoute || isVerifyEmail) return null;
+          return '/welcome';
+        }
+        if (stage == AuthStage.offline) {
+          if (isPublicRoute || isVerifyEmail) return null;
+          return '/welcome';
+        }
+        if (stage == AuthStage.needsLogin) {
+          //Se l'utente è su /verify-email e fa logout, deve andare a /login.
+          if (isVerifyEmail) return '/login';
+          if (isPublicRoute) return null;
+          return '/login';
+        }
+        if (stage == AuthStage.needsEmailVerification) {
+          if (isVerifyEmail) return null;
+          return '/verify-email';
+        }
+        //authenticated.
+        if (loc == '/splash' || isPublicRoute || isVerifyEmail) return '/dashboard';
+        return null;
+      },
+      routes: [
+        GoRoute(path: '/splash', builder: (_, __) => const _SplashPage()),
+        GoRoute(path: '/welcome', builder: (_, __) => PairChoicePage(auth: auth, settings: settings)),
+        GoRoute(path: '/login', builder: (_, __) => LoginPage(auth: auth, settings: settings)),
+        GoRoute(path: '/recover', builder: (_, __) => RecoveryPage(auth: auth, settings: settings)),
+        GoRoute(
+          path: '/verify-email',
+          builder: (_, __) => EmailVerificationPage(auth: auth, settings: settings),
+        ),
+        GoRoute(
+          path: '/onboarding/discover',
+          builder: (_, __) => DiscoveryPage(auth: auth, settings: settings),
+        ),
+        GoRoute(
+          path: '/onboarding/setup',
+          builder: (_, s) => SetupWizardPage(
+            auth: auth,
+            settings: settings,
+            //factory_code pre-popolato dopo scan QR / discovery.
+            prefilledFactoryCode: s.uri.queryParameters['factory_code'],
+          ),
+        ),
+        GoRoute(
+          path: '/invite',
+          builder: (_, __) => InviteAcceptPage(auth: auth, settings: settings),
+        ),
+        GoRoute(
+          path: '/invite/:token',
+          builder: (_, s) => InviteAcceptPage(
+            auth: auth,
+            settings: settings,
+            token: s.pathParameters['token'],
+          ),
+        ),
+
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) =>
+              AppShell(navigationShell: navigationShell, settings: settings, auth: auth),
+          branches: [
+            StatefulShellBranch(routes: [
+              GoRoute(
+                path: '/dashboard',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const DashboardPage(),
+                ),
+              ),
+            ]),
+            StatefulShellBranch(routes: [
+              GoRoute(
+                path: '/objects',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const ObjectsPage(),
+                ),
+              ),
+            ]),
+            StatefulShellBranch(routes: [
+              GoRoute(
+                path: '/events',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const EventsPage(),
+                ),
+              ),
+            ]),
+            StatefulShellBranch(routes: [
+              GoRoute(
+                path: '/members',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const MembersPage(),
+                ),
+              ),
+            ]),
+            StatefulShellBranch(routes: [
+              GoRoute(
+                path: '/notifications',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const NotificationsPage(),
+                ),
+              ),
+            ]),
+            StatefulShellBranch(routes: [
+              GoRoute(
+                path: '/settings',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: SettingsPage(settings: settings, auth: auth),
+                ),
+              ),
+            ]),
+            StatefulShellBranch(routes: [
+              GoRoute(
+                path: '/account',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: AccountPage(auth: auth),
+                ),
+              ),
+            ]),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
-/// Router centralizzato dell'app GateKeeper.
-///
-/// Struttura delle route:
-/// ```
-/// /login        → LoginScreen       (fuori ShellRoute)
-/// /setup        → SetupScreen       (fuori ShellRoute)
-/// /account      → AccountScreen     (fuori ShellRoute — slide-up)
-/// /dashboard    → DashboardScreen   ┐
-/// /users        → UsersScreen       │ dentro ShellRoute
-/// /objects      → ObjectsScreen     │ (sidebar desktop / bottom nav mobile)
-/// /events       → EventsScreen      │
-/// /settings     → SettingsScreen    ┘
-/// ```
-///
-/// Redirect globale:
-/// - Non loggato → qualsiasi route protetta → /login
-/// - Già loggato → /login o /setup → /dashboard
-///
-/// TODO: sostituire AuthState.isLoggedIn con verifica JWT reale.
-abstract final class AppRouter {
-  static final GoRouter router = GoRouter(
-    initialLocation: '/dashboard',
-
-    // ── Redirect globale di autenticazione ──────────────────────────────────
-    // Valutato ad OGNI navigazione (context.go, context.push, browser back, ecc.).
-    // Serve come guardia: anche se qualcuno bypassa la UI, non può accedere
-    // alle route protette senza aver chiamato AuthState.setLoggedIn(true).
-    redirect: (context, state) {
-      final isLoggedIn = AuthState.instance.isLoggedIn;
-      final path = state.uri.path;
-
-      final publicPaths = ['/login', '/setup'];
-      final isPublic = publicPaths.contains(path);
-
-      if (!isLoggedIn && !isPublic) return '/login';
-      if (isLoggedIn && isPublic) return '/dashboard';
-      return null; // nessun redirect: lascia passare
-    },
-
-    routes: [
-      // ── Route FUORI dallo ShellRoute (senza sidebar/bottom nav) ───────────
-
-      GoRoute(
-        path: '/login',
-        name: 'login',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          child: const LoginScreen(),
-          transitionsBuilder: (context, animation, _, child) =>
-              FadeTransition(opacity: animation, child: child),
-          transitionDuration: const Duration(milliseconds: 250),
-        ),
-      ),
-
-      GoRoute(
-        path: '/setup',
-        name: 'setup',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          child: const SetupScreen(),
-          transitionsBuilder: (context, animation, _, child) =>
-              FadeTransition(opacity: animation, child: child),
-          transitionDuration: const Duration(milliseconds: 250),
-        ),
-      ),
-
-      GoRoute(
-        path: '/account',
-        name: 'account',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          child: const AccountScreen(),
-          // SlideUp + Fade: dà l'impressione di un drawer/sheet che sale
-          transitionsBuilder: (context, animation, _, child) {
-            final tween = Tween(
-              begin: const Offset(0, 0.08),
-              end: Offset.zero,
-            ).chain(CurveTween(curve: Curves.easeOutCubic));
-            return SlideTransition(
-              position: animation.drive(tween),
-              child: FadeTransition(opacity: animation, child: child),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 300),
-        ),
-      ),
-
-      // ── ShellRoute: sidebar + bottom nav ─────────────────────────────────
-      // Tutte le route dentro questo ShellRoute sono "avvolte" da AppShell.
-      // La sidebar rimane ferma; solo il contenuto centrale (child) cambia.
-      ShellRoute(
-        builder: (context, state, child) => AppShell(child: child),
-        routes: [
-          GoRoute(
-            path: '/dashboard',
-            name: 'dashboard',
-            // NoTransitionPage: le route della shell non animano —
-            // la sidebar resta ferma e il body si sostituisce istantaneamente.
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: DashboardScreen()),
-          ),
-          GoRoute(
-            path: '/users',
-            name: 'users',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: UsersScreen()),
-          ),
-          GoRoute(
-            path: '/objects',
-            name: 'objects',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: ObjectsScreen()),
-          ),
-          GoRoute(
-            path: '/events',
-            name: 'events',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: EventsScreen()),
-          ),
-          GoRoute(
-            path: '/settings',
-            name: 'settings',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: SettingsScreen()),
-          ),
-        ],
-      ),
-    ],
+CustomTransitionPage _buildPageWithFadeTransition<T>({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+        FadeTransition(opacity: animation, child: child),
   );
+}
+
+//Splash + bootstrap. Si vede solo qualche istante.
+class _SplashPage extends StatelessWidget {
+  const _SplashPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: theme.brightness == Brightness.dark
+                ? [AppColors.inkBlack, AppColors.charcoalBlue.withValues(alpha: 0.5)]
+                : [const Color(0xFFF1F4F8), AppColors.stormyTeal.withValues(alpha: 0.08)],
+          ),
+        ),
+        alignment: Alignment.center,
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'GateKeeper',
+              style: TextStyle(
+                fontSize: 32,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.6,
+                color: AppColors.stormyTeal,
+              ),
+            ),
+            SizedBox(height: 22),
+            CircularProgressIndicator(color: AppColors.stormyTeal),
+          ],
+        ),
+      ),
+    );
+  }
 }

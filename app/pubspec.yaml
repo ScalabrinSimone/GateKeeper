@@ -1,50 +1,48 @@
 name: gatekeeper_app
-description: "GateKeeper Flutter app for smart home RFID/BLE monitoring."
-publish_to: 'none'
+description: GateKeeper Flutter application.
+publish_to: "none"
 version: 0.1.0+1
 
 environment:
-  sdk: ^3.6.0
+  sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-
   flutter_localizations:
     sdk: flutter
-
-  cupertino_icons: ^1.0.8
-
-  # Routing dichiarativo: gestisce deep link, redirect e ShellRoute
-  go_router: ^17.2.2
-
-  # SVG rendering (loghi, icone esportate da Figma)
-  flutter_svg: ^2.0.10
-
-  # Internazionalizzazione
+  go_router: ^14.2.7
+  flutter_svg: ^2.0.16
   intl: ^0.20.2
-
-  # Animazioni avanzate: FadeIn, SlideY, ScaleIn ecc.
-  # Si usa con .animate() extension sulle widget.
-  flutter_animate: ^4.5.0
-
-  provider: ^6.1.2
-
-  # Feedback aptico nativo (vibrazione).
-  # HapticFeedback di Flutter copre solo light/medium/heavy;
-  # vibration permette durata e pattern personalizzati.
-  vibration: ^3.1.8
+  shared_preferences: ^2.3.2
+  # HTTP client con interceptor, timeout e gestione errori coerente.
+  http: ^1.2.2
+  # Storage sicuro multipiattaforma per il token di sessione.
+  flutter_secure_storage: ^9.2.2
+  # Apertura URL (es. mailto) e gestione deep link semplice.
+  url_launcher: ^6.3.0
+  # Notifiche locali multipiattaforma (Android/iOS/macOS/Windows/Linux).
+  flutter_local_notifications: ^17.2.3
+  # UUID utile per id locali (es. session id, idempotency).
+  uuid: ^4.5.1
+  # Scanner QR per il flusso di pairing (camera).
+  # Si appoggia alla camera nativa di Android/iOS e a getUserMedia su web.
+  mobile_scanner: ^5.2.3
+  # Rendering QR (utile in futuro per condividere inviti come QR).
+  qr_flutter: ^4.1.0
+  google_fonts: ^8.1.0
+  # Selezione immagini/file per avatar profilo.
+  image_picker: ^1.1.2
+  # Mostra elenco icone Flutter Material per la selezione icona oggetti.
+  # (nessun pacchetto esterno necessario: usiamo icons nativa Flutter)
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
   generate: true
-
-  # TODO: aggiungere qui gli asset SVG/PNG esportati da Figma.
   assets:
     - assets/icons/
-    - assets/images/

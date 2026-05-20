@@ -217,7 +217,7 @@ def printDevice(
     device: BLEDevice,
     adv: AdvertisementData
 ) -> None:
-    """Stampa device BLE trovato."""
+    """Stampa device BLE trovato e notifica l'event engine."""
 
     address = getattr(
         device,
@@ -242,6 +242,17 @@ def printDevice(
     manufacturerData = formatManufacturerData(adv)
 
     isPhone = looksLikePhone(device, adv)
+
+    #Notifica l'event engine di ogni dispositivo rilevato.
+    try:
+        from app.services.event_engine import ble_device_seen
+        ble_device_seen(
+            address=address,
+            name=name,
+            is_phone=isPhone,
+        )
+    except Exception:
+        pass
 
     if not shouldPrint(address, isPhone):
         return
