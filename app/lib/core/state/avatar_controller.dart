@@ -51,10 +51,25 @@ class AvatarController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  //Resetta al logout.
+  //Resetta al logout: solo la cache in memoria.
   void clear() {
     _avatarPath = null;
     _userId = null;
     notifyListeners();
+  }
+
+  //Factory reset: dissocia TUTTI gli avatar salvati su questo dispositivo.
+  //I file immagine NON vengono eliminati; vengono solo rimossi i riferimenti in SharedPreferences.
+  Future<void> clearAllForFactoryReset() async {
+    _avatarPath = null;
+    _userId = null;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((k) => k.startsWith(_kPrefPrefix)).toList();
+      for (final key in keys) {
+        await prefs.remove(key);
+      }
+    } catch (_) {}
   }
 }

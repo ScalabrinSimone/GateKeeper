@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/i18n/app_l10n.dart';
+import '../../core/state/read_events_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/repositories/repositories.dart';
 import '../../data/services/realtime_service.dart';
@@ -92,6 +93,9 @@ class _AlertsPageState extends State<AlertsPage> {
     final event = _items.firstWhere((e) => e.id == id, orElse: () => _items.first);
     event.resolved = true;
     event.linkedAlertResolved = true;
+    //Propaga al controller globale così Dashboard e Notifiche si aggiornano.
+    ReadEventsController.instance.markAlertResolved(id);
+    ReadEventsController.instance.markRead(id);
 
     //L'elemento rimane visibile 0.5s per dare feedback prima di sparire.
     await Future.delayed(const Duration(milliseconds: 500));

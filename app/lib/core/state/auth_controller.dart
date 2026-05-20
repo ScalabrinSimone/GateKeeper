@@ -9,6 +9,8 @@ import '../../data/services/push_notifications_service.dart';
 import '../../data/services/realtime_service.dart';
 import '../config/api_config.dart';
 import '../storage/secure_storage.dart';
+import 'avatar_controller.dart';
+import 'read_events_controller.dart';
 
 //Stato di sessione dell'app.
 enum AuthStage {
@@ -267,6 +269,8 @@ class AuthController extends ChangeNotifier {
   //Logout: cancella token e torna a login.
   Future<void> logout() async {
     RealtimeService.instance.stop();
+    ReadEventsController.instance.clear();
+    AvatarController.instance.clear();
     //Aggiorna la posizione a "unknown" prima di fare logout.
     try {
       await _updateCurrentLocation('unknown');
@@ -293,12 +297,15 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  //Factory reset (solo admin): svuota tutto e torna a pairing.
+  //Factory reset (solo admin): svuota tutto, dissocia avatar e torna a pairing.
   Future<void> factoryReset() async {
     if (!isAdmin) throw StateError('Solo l\'admin può eseguire il factory reset.');
     await _api.hub.factoryReset();
     _api.setToken(null);
     await SecureStorage.delete(_kTokenKey);
+    //Dissocia tutti gli avatar di questo dispositivo (non elimina i file).
+    await AvatarController.instance.clearAllForFactoryReset();
+    ReadEventsController.instance.clear();
     _user = null;
     _hubInfo = const HubInfoDto(paired: false, requiresFactoryCode: true);
     _stage = AuthStage.needsPairing;

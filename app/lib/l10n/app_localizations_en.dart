@@ -821,4 +821,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inviteRole => 'Role:';
+
+  @override
+  String get share => 'Share';
+
+  @override
+  String get inviteByCode => 'Invite with code';
+
+  @override
+  String get inviteBlockedRemote =>
+      'You cannot create new accounts while connected remotely. Return home first.';
+
+  @override
+  String get notifPrefsTitle => 'Notifications';
+
+  @override
+  String get notifOnEntry => 'Entry notification';
+
+  @override
+  String get notifOnEntryHint => 'Notify me when this person/object enters.';
+
+  @override
+  String get notifOnExit => 'Exit notification';
+
+  @override
+  String get notifOnExitHint => 'Notify me when this person/object exits.';
+
+  @override
+  String get notifTimeWindow => 'Time window';
+
+  @override
+  String get notifTimeWindowHint => 'Always notify (no time restriction).';
+
+  @override
+  String get notifFrom => 'From';
+
+  @override
+  String get notifTo => 'To';
+
+  @override
+  String get objectsOutsideCount => 'objects outside';
+
+  @override
+  String get noMembers => 'No members yet.';
+
+  @override
+  String get noObjects => 'No objects yet.';
+
+  @override
+  String get live => 'LIVE';
 }

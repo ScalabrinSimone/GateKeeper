@@ -826,4 +826,55 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get inviteRole => 'Ruolo:';
+
+  @override
+  String get share => 'Condividi';
+
+  @override
+  String get inviteByCode => 'Invita con codice';
+
+  @override
+  String get inviteBlockedRemote =>
+      'Non puoi creare nuovi account mentre sei connesso da remoto. Torna a casa prima.';
+
+  @override
+  String get notifPrefsTitle => 'Notifiche';
+
+  @override
+  String get notifOnEntry => 'Notifica all\'entrata';
+
+  @override
+  String get notifOnEntryHint =>
+      'Avvisami quando questa persona/oggetto entra.';
+
+  @override
+  String get notifOnExit => 'Notifica all\'uscita';
+
+  @override
+  String get notifOnExitHint => 'Avvisami quando questa persona/oggetto esce.';
+
+  @override
+  String get notifTimeWindow => 'Finestra oraria';
+
+  @override
+  String get notifTimeWindowHint =>
+      'Notifica sempre (nessuna restrizione oraria).';
+
+  @override
+  String get notifFrom => 'Dalle';
+
+  @override
+  String get notifTo => 'Alle';
+
+  @override
+  String get objectsOutsideCount => 'oggetti fuori';
+
+  @override
+  String get noMembers => 'Nessun membro ancora.';
+
+  @override
+  String get noObjects => 'Nessun oggetto ancora.';
+
+  @override
+  String get live => 'LIVE';
 }

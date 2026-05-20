@@ -324,7 +324,8 @@ def runReader(
         if stop_event.wait(retry_delay):
             break
 
-    log("INFO", "Lettore RFID fermato")
+    #Non logga il messaggio di fermata per evitare spam in console.
+    pass
 
 
 def _readerInnerLoop(

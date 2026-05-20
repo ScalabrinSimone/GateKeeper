@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/i18n/app_l10n.dart';
+import '../../core/state/read_events_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/repositories/repositories.dart';
 import '../../data/services/realtime_service.dart';
@@ -27,15 +28,15 @@ class NotificationsPage extends StatefulWidget {
 class _NotificationsPageState extends State<NotificationsPage> {
   List<GateEvent> _items = const [];
   bool _loading = true;
-  //Set degli id già letti.
-  final Set<String> _read = {};
   //Set degli id in animazione di uscita (segnati letti di recente).
+  //Lo stato "letto" viene gestito dal ReadEventsController globale.
   final Set<String> _fadingOut = {};
 
   @override
   void initState() {
     super.initState();
     RealtimeService.instance.addListener(_onRealtimeUpdate);
+    ReadEventsController.instance.addListener(_onReadChanged);
     _syncFromRealtime();
     _load();
   }
@@ -43,7 +44,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   void dispose() {
     RealtimeService.instance.removeListener(_onRealtimeUpdate);
+    ReadEventsController.instance.removeListener(_onReadChanged);
     super.dispose();
+  }
+
+  void _onReadChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onRealtimeUpdate() {
@@ -88,8 +94,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _markAllRead() async {
     HapticFeedback.mediumImpact();
     //Segna immediatamente come "in uscita" le notifiche senza warning attivo.
+    final ctrl = ReadEventsController.instance;
     final toFade = _items
-        .where((e) => !_read.contains(e.id) && !_hasActiveWarning(e))
+        .where((e) => !ctrl.isRead(e.id) && !_hasActiveWarning(e))
         .map((e) => e.id)
         .toList();
 
@@ -99,11 +106,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
       _fadingOut.addAll(toFade);
     });
 
-    //Dopo 1.8s rimuovi definitivamente le voci in fade-out.
-    await Future.delayed(const Duration(milliseconds: 1800));
+    //Stessa velocità degli alerts: 500ms di attesa prima della scomparsa.
+    await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
+    //Propaga al controller globale (aggiorna anche Dashboard).
+    ReadEventsController.instance.markAllRead(toFade);
     setState(() {
-      _read.addAll(toFade);
       _fadingOut.clear();
     });
   }
@@ -112,29 +120,28 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _markSingleRead(String id) async {
     HapticFeedback.selectionClick();
     setState(() => _fadingOut.add(id));
-    await Future.delayed(const Duration(milliseconds: 1800));
+    await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
+    ReadEventsController.instance.markRead(id);
     setState(() {
-      _read.add(id);
       _fadingOut.remove(id);
     });
   }
 
-  //Un evento ha warning attivo se è collegato a un alert NON risolto.
-  //In questa prima implementazione, un evento ha warning se il suo id
-  //compare nella lista degli eventi critici non risolti.
   bool _hasActiveWarning(GateEvent event) => event.hasLinkedAlert;
 
   //Può essere segnata come letta solo se il warning è risolto (o non presente).
   bool _canMarkRead(GateEvent event) {
-    if (_read.contains(event.id)) return false;
+    if (ReadEventsController.instance.isRead(event.id)) return false;
     if (_hasActiveWarning(event) && !(event.linkedAlertResolved ?? false)) return false;
     return true;
   }
 
-  //Elementi visibili: escludi quelli già letti E non in fade-out.
+  //Elementi visibili: escludi quelli già letti (dal controller globale) tranne quelli in fade-out.
   List<GateEvent> get _visibleItems =>
-      _items.where((e) => !_read.contains(e.id) || _fadingOut.contains(e.id)).toList();
+      _items.where((e) =>
+        !ReadEventsController.instance.isRead(e.id) || _fadingOut.contains(e.id)
+      ).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -243,10 +250,10 @@ class _NotificationCard extends StatelessWidget {
     final warningColor = warningResolved ? AppColors.success : AppColors.orangeGold;
 
     return AnimatedOpacity(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 400),
       opacity: isFadingOut ? 0.0 : 1.0,
       child: AnimatedScale(
-        duration: const Duration(milliseconds: 600),
+        duration: const Duration(milliseconds: 400),
         scale: isFadingOut ? 0.95 : 1.0,
         child: GKCard(
           borderRadius: 28,
@@ -347,12 +354,14 @@ class _NotificationCard extends StatelessWidget {
               ),
               //Pulsante segna come letto (solo se canMarkRead).
               if (canMarkRead)
-                IconButton(
-                  onPressed: onMarkRead,
-                  icon: const Icon(Icons.check_circle_outline_rounded),
-                  tooltip: l10n.t('markAsReadSingle'),
-                  color: AppColors.stormyTeal,
-                  iconSize: 20,
+                Tooltip(
+                  message: 'Segna come letto',
+                  child: IconButton(
+                    onPressed: onMarkRead,
+                    icon: const Icon(Icons.check_circle_outline_rounded),
+                    color: AppColors.stormyTeal,
+                    iconSize: 20,
+                  ),
                 ),
             ],
           ),

@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +8,8 @@ import 'package:intl/intl.dart';
 import '../../core/config/api_config.dart';
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/avatar_controller.dart';
+import '../../core/state/read_events_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/dto.dart';
 import '../../data/services/realtime_service.dart';
@@ -16,16 +21,19 @@ import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../objects/widgets/object_form_sheet.dart';
 
-//Pagina Dashboard: ascolta RealtimeService che aggiorna i dati in background.
-//Quando RealtimeService notifica un cambiamento, la dashboard si rirenderizza
-//automaticamente tramite ListenableBuilder senza richieste esplicite.
+//Pagina Dashboard: ascolta RealtimeService e ReadEventsController.
+//Entrambi notificano quando cambiano dati: eventi live, stati letti, alert risolti.
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: RealtimeService.instance,
+      listenable: Listenable.merge([
+        RealtimeService.instance,
+        ReadEventsController.instance,
+        AvatarController.instance,
+      ]),
       builder: (context, _) => _DashboardView(
         rt: RealtimeService.instance,
       ),
@@ -90,9 +98,13 @@ class _DashboardViewState extends State<_DashboardView> {
           child: CircularProgressIndicator(color: AppColors.stormyTeal));
     }
 
-    //Solo gli alert NON ancora risolti compaiono nella dashboard.
+    //Solo gli alert NON ancora risolti e non segnati come letti dal controller.
+    final readCtrl = ReadEventsController.instance;
     final unresolved = events
-        .where((e) => e.isUnresolved && e.resolved != true)
+        .where((e) =>
+            e.isUnresolved &&
+            e.resolved != true &&
+            !readCtrl.isRead(e.id))
         .toList(growable: false);
     final isSecure = unresolved.isEmpty;
     final currentUserId = AuthController.instance.user?.id.toString();
@@ -474,6 +486,11 @@ class _MemberAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isInside = user.isInside;
     final theme = Theme.of(context);
+    //Mostra foto solo se l'utente corrisponde a chi ha fatto login su questo dispositivo.
+    final currentUserId = AuthController.instance.user?.id.toString();
+    final isCurrentUser = currentUserId != null && user.id == currentUserId;
+    final avatarPath = isCurrentUser ? AvatarController.instance.avatarPath : null;
+
     return SizedBox(
       width: 64,
       child: Column(
@@ -497,17 +514,17 @@ class _MemberAvatar extends StatelessWidget {
                     width: isInside ? 2 : 1,
                   ),
                 ),
+                clipBehavior: Clip.hardEdge,
                 alignment: Alignment.center,
-                child: Text(
-                  user.initials,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                    color: isInside
-                        ? AppColors.stormyTeal
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.3),
-                  ),
-                ),
+                child: avatarPath != null && !kIsWeb
+                    ? Image.file(
+                        File(avatarPath),
+                        fit: BoxFit.cover,
+                        width: 56,
+                        height: 56,
+                        errorBuilder: (_, __, ___) => _initialsWidget(isInside, theme),
+                      )
+                    : _initialsWidget(isInside, theme),
               ),
               //Pallino verde luminoso per utenti online, grigio per offline.
               Positioned(
@@ -533,6 +550,17 @@ class _MemberAvatar extends StatelessWidget {
       ),
     );
   }
+
+  Widget _initialsWidget(bool isInside, ThemeData theme) => Text(
+        user.initials,
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          fontSize: 18,
+          color: isInside
+              ? AppColors.stormyTeal
+              : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+        ),
+      );
 }
 
 //Pallino di stato con alone luminoso per utenti online.

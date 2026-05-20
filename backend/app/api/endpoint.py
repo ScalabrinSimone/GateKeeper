@@ -940,15 +940,35 @@ def hub_pair(req: RegisterAdminRequest):
 
 @app.post("/hub/factory-reset")
 def hub_factory_reset(req: FactoryResetRequest, _admin: dict = Depends(_require_admin)):
-    """Reset di fabbrica: svuota i database e disaccoppia l'hub.
+    """Reset di fabbrica: svuota i database, disaccoppia l'hub e riavvia il processo.
 
     Va richiamato dall'admin via app. Sul Raspberry è possibile anche tramite
     `scripts/factory_reset.py`.
+
+    Dopo il reset, il processo si riavvia automaticamente tramite os.execv
+    senza bisogno di intervento umano.
     """
+    import os
+    import sys
+    import threading
+
     if not req.confirm:
         raise HTTPException(status_code=400, detail="confirm=true required")
     gk_tokens.reset_secret()
     new_state = models.factory_reset_all()
+
+    #Riavvio automatico del processo dopo 1.5 secondi (tempo per rispondere al client).
+    def _restart_process() -> None:
+        import time as _time
+        _time.sleep(1.5)
+        try:
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception as exc:
+            print(f"[FACTORY-RESET] Errore riavvio processo: {exc}")
+
+    restart_thread = threading.Thread(target=_restart_process, daemon=True, name="restart-thread")
+    restart_thread.start()
+
     return {"reset": True, "factory_code": new_state.get("factory_code")}
 
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:io';
+
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,11 +16,12 @@ import '../../data/repositories/repositories.dart';
 import '../../data/services/realtime_service.dart';
 import '../../shared/models/app_user.dart';
 import '../../shared/models/enums.dart';
+import '../../core/state/avatar_controller.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
+import '../../shared/widgets/notif_prefs_sheet.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
-import '../../shared/widgets/notif_prefs_sheet.dart';
 import 'widgets/invite_share_dialog.dart';
 import 'widgets/permissions_sheet.dart';
 
@@ -540,19 +543,7 @@ class _MemberCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [AppColors.stormyTeal, AppColors.charcoalBlue]),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  user.initials,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-                ),
-              ),
+              _UserAvatar(user: user, size: 56),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -813,4 +804,50 @@ class _InviteCard extends StatelessWidget {
       ),
     );
   }
+}
+
+//Widget avatar utente: mostra la foto profilo se l'utente è quello correntemente
+//loggato (avatar salvato localmente), altrimenti mostra le iniziali.
+class _UserAvatar extends StatelessWidget {
+  const _UserAvatar({required this.user, required this.size});
+  final AppUser user;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUserId = AuthController.instance.user?.id.toString();
+    final isCurrentUser = currentUserId != null && user.id == currentUserId;
+    final avatarPath = isCurrentUser ? AvatarController.instance.avatarPath : null;
+    final radius = size * 0.36;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+            colors: [AppColors.stormyTeal, AppColors.charcoalBlue]),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      clipBehavior: Clip.hardEdge,
+      alignment: Alignment.center,
+      child: avatarPath != null
+          ? Image.file(
+              File(avatarPath),
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+              errorBuilder: (_, __, ___) => _initials(),
+            )
+          : _initials(),
+    );
+  }
+
+  Widget _initials() => Text(
+        user.initials,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: size * 0.32,
+        ),
+      );
 }

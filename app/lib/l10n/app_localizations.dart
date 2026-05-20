@@ -1675,6 +1675,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Role:'**
   String get inviteRole;
+
+  /// No description provided for @share.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get share;
+
+  /// No description provided for @inviteByCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite with code'**
+  String get inviteByCode;
+
+  /// No description provided for @inviteBlockedRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'You cannot create new accounts while connected remotely. Return home first.'**
+  String get inviteBlockedRemote;
+
+  /// No description provided for @notifPrefsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notifPrefsTitle;
+
+  /// No description provided for @notifOnEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry notification'**
+  String get notifOnEntry;
+
+  /// No description provided for @notifOnEntryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify me when this person/object enters.'**
+  String get notifOnEntryHint;
+
+  /// No description provided for @notifOnExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit notification'**
+  String get notifOnExit;
+
+  /// No description provided for @notifOnExitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify me when this person/object exits.'**
+  String get notifOnExitHint;
+
+  /// No description provided for @notifTimeWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Time window'**
+  String get notifTimeWindow;
+
+  /// No description provided for @notifTimeWindowHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Always notify (no time restriction).'**
+  String get notifTimeWindowHint;
+
+  /// No description provided for @notifFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get notifFrom;
+
+  /// No description provided for @notifTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get notifTo;
+
+  /// No description provided for @objectsOutsideCount.
+  ///
+  /// In en, this message translates to:
+  /// **'objects outside'**
+  String get objectsOutsideCount;
+
+  /// No description provided for @noMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'No members yet.'**
+  String get noMembers;
+
+  /// No description provided for @noObjects.
+  ///
+  /// In en, this message translates to:
+  /// **'No objects yet.'**
+  String get noObjects;
+
+  /// No description provided for @live.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get live;
 }
 
 class _AppLocalizationsDelegate
