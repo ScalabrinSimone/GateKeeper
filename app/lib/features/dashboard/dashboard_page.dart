@@ -71,7 +71,10 @@ class _DashboardViewState extends State<_DashboardView> {
   }
 
   void _resolve(GateEvent event) {
-    setState(() => event.resolved = true);
+    setState(() {
+      event.resolved = true;
+      event.linkedAlertResolved = true;
+    });
   }
 
   @override
@@ -87,7 +90,10 @@ class _DashboardViewState extends State<_DashboardView> {
           child: CircularProgressIndicator(color: AppColors.stormyTeal));
     }
 
-    final unresolved = events.where((e) => e.isUnresolved).toList(growable: false);
+    //Solo gli alert NON ancora risolti compaiono nella dashboard.
+    final unresolved = events
+        .where((e) => e.isUnresolved && e.resolved != true)
+        .toList(growable: false);
     final isSecure = unresolved.isEmpty;
     final currentUserId = AuthController.instance.user?.id.toString();
     final peopleInside = users.where((u) {
@@ -183,10 +189,7 @@ class _DashboardViewState extends State<_DashboardView> {
                         const SizedBox(height: 16),
                         _ObjectsMini(objects: objects.take(4).toList()),
                         const SizedBox(height: 16),
-                        SizedBox(
-                          height: 520,
-                          child: _LiveEventsCard(events: events, onResolve: _resolve),
-                        ),
+                        _LiveEventsCard(events: events, onResolve: _resolve),
                       ],
                     ),
             ],
@@ -801,18 +804,18 @@ class _LiveEventsCard extends StatelessWidget {
                 ],
               ),
             )
-          else
-          //ConstrainedBox invece di Expanded: evita RenderBox unbounded
-          //quando il card è dentro SingleChildScrollView (wide layout).
+          else ...[
+          //Mostra solo gli eventi NON risolti nella dashboard live.
+          //ConstrainedBox con scroll interno: evita overflow in qualsiasi layout.
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 480),
+            constraints: const BoxConstraints(maxHeight: 420),
             child: ListView.separated(
               padding: EdgeInsets.zero,
-              shrinkWrap: true,
-              itemCount: events.length,
+              shrinkWrap: false,
+              itemCount: events.where((e) => e.resolved != true).length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
-                final event = events[i];
+                final event = events.where((e) => e.resolved != true).toList()[i];
                 final critical = event.isCritical;
                 final accent = critical ? AppColors.orangeGold : AppColors.stormyTeal;
                 return AnimatedOpacity(
@@ -893,6 +896,7 @@ class _LiveEventsCard extends StatelessWidget {
               },
             ),
           ),
+          ],
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,

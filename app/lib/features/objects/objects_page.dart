@@ -12,6 +12,7 @@ import '../../data/services/realtime_service.dart';
 import '../../shared/models/smart_object.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
+import '../../shared/widgets/notif_prefs_sheet.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
 import 'widgets/object_form_sheet.dart';
@@ -350,20 +351,67 @@ class _ObjectCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (canManage) ...[
-                IconButton(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_rounded, size: 18),
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
-                  tooltip: l10n.t('edit'),
-                ),
-                IconButton(
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_rounded, size: 18),
-                  color: AppColors.danger.withValues(alpha: 0.85),
-                  tooltip: l10n.t('delete'),
-                ),
-              ],
+              //Tre puntini: modifica/elimina (solo admin) + notifiche (tutti).
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert_rounded,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                    size: 18),
+                onSelected: (v) async {
+                  if (v == 'edit') onEdit();
+                  if (v == 'delete') onDelete();
+                  if (v == 'notif') {
+                    await showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Theme.of(context).cardColor,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      builder: (_) => NotifPrefsSheet(
+                        entityId: object.id,
+                        entityName: object.name,
+                        entityIcon: object.icon,
+                      ),
+                    );
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (canManage) ...[
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_rounded, size: 18,
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7)),
+                          const SizedBox(width: 10),
+                          Text(l10n.t('edit')),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.delete_rounded, size: 18, color: AppColors.danger),
+                          const SizedBox(width: 10),
+                          Text(l10n.t('delete'),
+                              style: const TextStyle(color: AppColors.danger)),
+                        ],
+                      ),
+                    ),
+                  ],
+                  PopupMenuItem(
+                    value: 'notif',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.notifications_rounded, size: 18),
+                        const SizedBox(width: 10),
+                        Text(l10n.t('notifPrefsTitle')),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -442,7 +490,14 @@ class _ObjectCard extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     //Carica i log dell'oggetto in modo asincrono e li mostra in un dialog.
     try {
-      final logs = await GateKeeperApi.instance.logs.list(deviceId: int.parse(obj.id));
+      final deviceId = int.tryParse(obj.id);
+      if (deviceId == null) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('ID oggetto non valido: ${obj.id}')),
+        );
+        return;
+      }
+      final logs = await GateKeeperApi.instance.logs.list(deviceId: deviceId);
       if (!context.mounted) return;
       await showDialog<void>(
         context: context,
@@ -486,6 +541,11 @@ class _ObjectCard extends StatelessWidget {
       );
     } on ApiException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      //Cattura errori generici (es. errori di rete non ApiException).
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('Errore log: $e')));
+      }
     }
   }
 }

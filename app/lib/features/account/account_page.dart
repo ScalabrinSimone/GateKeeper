@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/config/api_config.dart';
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/avatar_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/dto.dart';
 import '../../data/gatekeeper_api.dart';
@@ -41,6 +41,7 @@ class AccountPage extends StatelessWidget {
       ),
     );
     if (ok != true) return;
+    AvatarController.instance.clear();
     await auth.logout();
     if (context.mounted) context.go('/welcome');
   }
@@ -129,29 +130,29 @@ class _AvatarBlock extends StatefulWidget {
 }
 
 class _AvatarBlockState extends State<_AvatarBlock> {
-  String? _avatarPath;
   bool _pickingImage = false;
-  static const _kPrefKey = 'gk.avatar.path.';
 
   @override
   void initState() {
     super.initState();
-    _loadSavedAvatar();
+    //Carica l'avatar salvato per questo utente tramite il controller globale.
+    AvatarController.instance.loadForUser(widget.userId);
+    AvatarController.instance.addListener(_onAvatarChanged);
   }
 
-  Future<void> _loadSavedAvatar() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString('$_kPrefKey${widget.userId}');
-      if (saved != null && mounted) {
-        setState(() => _avatarPath = saved);
-      }
-    } catch (_) {}
+  @override
+  void dispose() {
+    AvatarController.instance.removeListener(_onAvatarChanged);
+    super.dispose();
+  }
+
+  void _onAvatarChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _pickAvatar() async {
     if (_pickingImage) return;
-    //Web: non supportato image_picker nativo, ma gestiamo il caso.
+    //Web: non supportato image_picker nativo.
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Caricamento immagine non disponibile su web.')),
@@ -169,10 +170,8 @@ class _AvatarBlockState extends State<_AvatarBlock> {
       );
       if (picked == null) return;
       if (!mounted) return;
-      setState(() => _avatarPath = picked.path);
-      //Salva il percorso in SharedPreferences (locale al dispositivo).
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('$_kPrefKey${widget.userId}', picked.path);
+      //Aggiorna il controller globale: sidebar e tutti i listener vengono notificati.
+      await AvatarController.instance.setAvatar(widget.userId, picked.path);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -185,9 +184,7 @@ class _AvatarBlockState extends State<_AvatarBlock> {
   }
 
   Future<void> _removeAvatar() async {
-    setState(() => _avatarPath = null);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('$_kPrefKey${widget.userId}');
+    await AvatarController.instance.removeAvatar(widget.userId);
   }
 
   String get _initial {
@@ -198,11 +195,12 @@ class _AvatarBlockState extends State<_AvatarBlock> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final avatarPath = AvatarController.instance.avatarPath;
     return Column(
       children: [
         GestureDetector(
           onTap: _pickAvatar,
-          onLongPress: _avatarPath != null ? _removeAvatar : null,
+          onLongPress: avatarPath != null ? _removeAvatar : null,
           child: Tooltip(
             message: 'Tocca per cambiare foto',
             child: Stack(
@@ -224,9 +222,9 @@ class _AvatarBlockState extends State<_AvatarBlock> {
               ),
               alignment: Alignment.center,
               clipBehavior: Clip.hardEdge,
-              child: _avatarPath != null
+              child: avatarPath != null
                   ? Image.file(
-                      File(_avatarPath!),
+                      File(avatarPath),
                       fit: BoxFit.cover,
                       width: 156,
                       height: 156,
@@ -494,8 +492,6 @@ class _SessionsCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                //Pulsante che porta alla sezione "Connettività" delle impostazioni
-                //per gestire l'hub corrente (cambia / disconnetti / riconnetti).
                 GKButton(
                   onPressed: () => context.go('/settings'),
                   label: l10n.t('manage'),
@@ -554,7 +550,6 @@ class _EmailVerificationCardState extends State<_EmailVerificationCard> {
     setState(() { _verifying = true; _error = null; });
     try {
       await GateKeeperApi.instance.auth.verifyEmail(code);
-      // Ricarica l'utente per aggiornare lo stato.
       await widget.auth.refreshUser();
       if (mounted) {
         final l10n = AppL10n.of(context);
@@ -575,7 +570,6 @@ class _EmailVerificationCardState extends State<_EmailVerificationCard> {
     final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
     final user = widget.auth.user;
-    // Considera verificata se il campo non esiste (utenti pre-feature).
     final verified = user == null || (user.emailVerified ?? true);
 
     if (verified) {

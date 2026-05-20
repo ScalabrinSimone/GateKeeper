@@ -33,9 +33,9 @@ class RealtimeService extends ChangeNotifier {
   List<SmartObject> objects = const [];
   int? _lastKnownEventId;
 
-  //Intervalli di polling.
-  static const _eventInterval = Duration(seconds: 4);
-  static const _dataInterval = Duration(seconds: 8);
+  //Intervalli di polling più reattivi per un'esperienza vicina al real-time.
+  static const _eventInterval = Duration(seconds: 2);
+  static const _dataInterval = Duration(seconds: 5);
 
   bool get isRunning => _running;
 

@@ -13,15 +13,26 @@ import '../../../shared/models/smart_object.dart';
 import '../../../shared/widgets/gk_button.dart';
 import '../../auth/widgets/gk_text_field.dart';
 
+//Colori predefiniti per i tag personalizzati.
+const _kTagColors = <Color>[
+  AppColors.stormyTeal,
+  AppColors.orangeGold,
+  Color(0xFF7C4DFF),
+  Color(0xFFE91E63),
+  Color(0xFF00BCD4),
+  Color(0xFF4CAF50),
+  Color(0xFFFF5722),
+  Color(0xFF607D8B),
+];
+
 //Sheet di creazione/modifica di un oggetto smart.
 //Supporta:
-//- inserimento manuale del tag RFID (utile se non si ha il lettore connesso),
+//- inserimento manuale del tag RFID,
 //- scansione automatica tramite polling /rfid/scan/latest,
-//- selezione icona personalizzata per il tipo di oggetto.
+//- categoria "personalizzato" con nome, colore e icona custom.
 class ObjectFormSheet extends StatefulWidget {
   const ObjectFormSheet({super.key, this.editing});
 
-  //Se valorizzato, il form è in modalità modifica.
   final SmartObject? editing;
 
   @override
@@ -37,8 +48,10 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
   bool _busy = false;
   String? _error;
 
-  //Icona personalizzata (solo per categoria "other").
+  //Stato tag personalizzato (solo quando _category == ObjectCategory.other).
   IconData? _customIcon;
+  Color _customColor = AppColors.stormyTeal;
+  String _customTagLabel = '';
 
   //Stato della scansione.
   bool _scanning = false;
@@ -70,7 +83,6 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
   }
 
   Future<void> _startScan() async {
-    //Memorizzo l'ultimo tag noto del backend per riconoscere "il prossimo nuovo".
     try {
       final latest = await GateKeeperApi.instance.rfid.latest();
       _previousTagBeforeScan = latest?.tag;
@@ -106,9 +118,7 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
         _scanning = false;
       });
       HapticFeedback.selectionClick();
-    } catch (_) {
-      //In caso di errore durante polling, ignoro questo tick.
-    }
+    } catch (_) {}
   }
 
   void _stopScan() {
@@ -152,7 +162,6 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
           'is_essential': _essential,
         });
       }
-      //Consuma il tag dal buffer scan (solo se era una scansione automatica).
       if (!_manualTagInput && tag.isNotEmpty) {
         try {
           await GateKeeperApi.instance.rfid.consume(tag);
@@ -166,6 +175,33 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
       setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openCustomTagPicker() async {
+    final result = await showModalBottomSheet<_CustomTagResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _CustomTagPickerSheet(
+        initialLabel: _customTagLabel,
+        initialColor: _customColor,
+        initialIcon: _customIcon,
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _customTagLabel = result.label;
+        _customColor = result.color;
+        _customIcon = result.icon;
+        //Aggiorna il nome oggetto con il nome del tag se il nome è vuoto.
+        if (_nameCtrl.text.isEmpty && result.label.isNotEmpty) {
+          _nameCtrl.text = result.label;
+        }
+      });
     }
   }
 
@@ -213,7 +249,6 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
                 prefixIcon: Icons.label_rounded,
               ),
               const SizedBox(height: 8),
-              //Sezione tag RFID con toggle modalità.
               _RfidTagSection(
                 controller: _tagCtrl,
                 scanning: _scanning,
@@ -226,7 +261,7 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
                 }),
               ),
               const SizedBox(height: 6),
-              //Categoria con chip.
+              //Griglia categorie con chip animati.
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Wrap(
@@ -237,25 +272,30 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
                       _CategoryChip(
                         category: c,
                         selected: c == _category,
-                        onTap: () => setState(() {
-                          _category = c;
-                          //Reset icona personalizzata se non è "other".
-                          if (c != ObjectCategory.other) _customIcon = null;
-                        }),
+                        customColor: c == ObjectCategory.other ? _customColor : null,
+                        customIcon: c == ObjectCategory.other ? _customIcon : null,
+                        customLabel: c == ObjectCategory.other && _customTagLabel.isNotEmpty
+                            ? _customTagLabel
+                            : null,
+                        onTap: () async {
+                          setState(() => _category = c);
+                          if (c == ObjectCategory.other) {
+                            await _openCustomTagPicker();
+                          }
+                        },
                       ),
                   ],
                 ),
               ),
-              //Selezione icona personalizzata (solo per "altro").
+              //Mostra il riepilogo del tag personalizzato se selezionato.
               if (_category == ObjectCategory.other)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _IconPickerRow(
-                    selected: _customIcon,
-                    onPick: (icon) => setState(() => _customIcon = icon),
-                  ),
+                _CustomTagSummary(
+                  label: _customTagLabel,
+                  color: _customColor,
+                  icon: _customIcon,
+                  onEdit: _openCustomTagPicker,
                 ),
-              //Essenziale.
+              //Toggle essenziale.
               SwitchListTile.adaptive(
                 value: _essential,
                 onChanged: (v) => setState(() => _essential = v),
@@ -273,13 +313,15 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text(_error!, style: const TextStyle(color: AppColors.danger)),
+                  child: Text(_error!,
+                      style: const TextStyle(color: AppColors.danger)),
                 ),
               const SizedBox(height: 10),
               AnimatedBuilder(
                 animation: _tagCtrl,
                 builder: (_, __) => GKButton(
-                  onPressed: (_busy || _tagCtrl.text.trim().isEmpty) ? null : _submit,
+                  onPressed:
+                      (_busy || _tagCtrl.text.trim().isEmpty) ? null : _submit,
                   label: _busy
                       ? l10n.t('loadingDots')
                       : (isEdit ? l10n.t('save') : l10n.t('create')),
@@ -296,7 +338,301 @@ class _ObjectFormSheetState extends State<ObjectFormSheet> {
   }
 }
 
-//Sezione tag RFID con toggle tra modalità scan e manuale.
+//Riepilogo tag personalizzato selezionato.
+class _CustomTagSummary extends StatelessWidget {
+  const _CustomTagSummary({
+    required this.label,
+    required this.color,
+    required this.icon,
+    required this.onEdit,
+  });
+
+  final String label;
+  final Color color;
+  final IconData? icon;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppL10n.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: onEdit,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon ?? Icons.inventory_2_rounded,
+                  color: color,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label.isNotEmpty ? label : l10n.t('customTagTitle'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      l10n.t('customTagHint'),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.edit_rounded, color: color, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+//Risultato del picker tag personalizzato.
+class _CustomTagResult {
+  _CustomTagResult({required this.label, required this.color, required this.icon});
+  final String label;
+  final Color color;
+  final IconData? icon;
+}
+
+//Bottom sheet per scegliere nome, colore e icona di un tag personalizzato.
+class _CustomTagPickerSheet extends StatefulWidget {
+  const _CustomTagPickerSheet({
+    required this.initialLabel,
+    required this.initialColor,
+    required this.initialIcon,
+  });
+
+  final String initialLabel;
+  final Color initialColor;
+  final IconData? initialIcon;
+
+  @override
+  State<_CustomTagPickerSheet> createState() => _CustomTagPickerSheetState();
+}
+
+class _CustomTagPickerSheetState extends State<_CustomTagPickerSheet> {
+  late final TextEditingController _labelCtrl;
+  late Color _color;
+  IconData? _icon;
+
+  @override
+  void initState() {
+    super.initState();
+    _labelCtrl = TextEditingController(text: widget.initialLabel);
+    _color = widget.initialColor;
+    _icon = widget.initialIcon;
+  }
+
+  @override
+  void dispose() {
+    _labelCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppL10n.of(context);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 20,
+          right: 20,
+          top: 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(_icon ?? Icons.inventory_2_rounded,
+                        color: _color, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      l10n.t('customTagTitle'),
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              //Nome tag.
+              GKTextField(
+                controller: _labelCtrl,
+                label: l10n.t('customTagName'),
+                prefixIcon: Icons.badge_rounded,
+              ),
+              const SizedBox(height: 14),
+              //Selezione colore.
+              Text(
+                l10n.t('customTagColor').toUpperCase(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  letterSpacing: 1.6,
+                  fontWeight: FontWeight.w800,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _kTagColors.map((c) {
+                  final selected = c == _color;
+                  return GestureDetector(
+                    onTap: () => setState(() => _color = c),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: c,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: selected ? Colors.white : Colors.transparent,
+                          width: 3,
+                        ),
+                        boxShadow: selected
+                            ? [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 8)]
+                            : null,
+                      ),
+                      child: selected
+                          ? const Icon(Icons.check_rounded,
+                              color: Colors.white, size: 18)
+                          : null,
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 14),
+              //Selezione icona.
+              Text(
+                l10n.t('customTagIcon').toUpperCase(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  letterSpacing: 1.6,
+                  fontWeight: FontWeight.w800,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 200,
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 6,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                  ),
+                  itemCount: _kPickableIcons.length,
+                  itemBuilder: (_, i) {
+                    final (icon, label) = _kPickableIcons[i];
+                    final selected = icon == _icon;
+                    return Tooltip(
+                      message: label,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _icon = icon),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? _color.withValues(alpha: 0.2)
+                                : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: selected ? _color : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            icon,
+                            color: selected
+                                ? _color
+                                : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _color,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop(_CustomTagResult(
+                    label: _labelCtrl.text.trim(),
+                    color: _color,
+                    icon: _icon,
+                  ));
+                },
+                icon: const Icon(Icons.check_rounded),
+                label: Text(
+                  l10n.t('save'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+//Sezione tag RFID.
 class _RfidTagSection extends StatelessWidget {
   const _RfidTagSection({
     required this.controller,
@@ -320,7 +656,6 @@ class _RfidTagSection extends StatelessWidget {
     final l10n = AppL10n.of(context);
 
     if (manualInput) {
-      //Modalità manuale: campo editabile.
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -353,7 +688,6 @@ class _RfidTagSection extends StatelessWidget {
       );
     }
 
-    //Modalità scan.
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -401,7 +735,9 @@ class _RfidTagSection extends StatelessWidget {
                 )
               else
                 Text(
-                  scanning ? l10n.t('scanningTag') : l10n.t('rfidTagRequiredHint'),
+                  scanning
+                      ? l10n.t('scanningTag')
+                      : l10n.t('rfidTagRequiredHint'),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                     fontStyle: FontStyle.italic,
@@ -416,10 +752,14 @@ class _RfidTagSection extends StatelessWidget {
                       label: scanning
                           ? l10n.t('stopScan')
                           : (hasTagNow ? l10n.t('rescanTag') : l10n.t('startScan')),
-                      icon: scanning ? Icons.stop_circle_rounded : Icons.sensors_rounded,
+                      icon: scanning
+                          ? Icons.stop_circle_rounded
+                          : Icons.sensors_rounded,
                       variant: scanning
                           ? GKButtonVariant.danger
-                          : (hasTagNow ? GKButtonVariant.ghost : GKButtonVariant.secondary),
+                          : (hasTagNow
+                              ? GKButtonVariant.ghost
+                              : GKButtonVariant.secondary),
                       expanded: true,
                       dense: true,
                     ),
@@ -429,12 +769,12 @@ class _RfidTagSection extends StatelessWidget {
                     const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.stormyTeal),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.stormyTeal),
                     ),
                   ],
                 ],
               ),
-              //Link per passare all'inserimento manuale.
               const SizedBox(height: 4),
               TextButton(
                 onPressed: onToggleManual,
@@ -463,12 +803,19 @@ class _CategoryChip extends StatelessWidget {
     required this.category,
     required this.selected,
     required this.onTap,
+    this.customColor,
+    this.customIcon,
+    this.customLabel,
   });
   final ObjectCategory category;
   final bool selected;
   final VoidCallback onTap;
+  final Color? customColor;
+  final IconData? customIcon;
+  final String? customLabel;
 
   IconData get _icon {
+    if (category == ObjectCategory.other && customIcon != null) return customIcon!;
     switch (category) {
       case ObjectCategory.keys:
         return Icons.vpn_key_rounded;
@@ -481,11 +828,16 @@ class _CategoryChip extends StatelessWidget {
       case ObjectCategory.phone:
         return Icons.smartphone_rounded;
       case ObjectCategory.other:
-        return Icons.inventory_2_rounded;
+        return Icons.tune_rounded;
     }
   }
 
   String _label(AppL10n l10n) {
+    if (category == ObjectCategory.other) {
+      //Mostra il nome del tag personalizzato se impostato.
+      if (customLabel != null && customLabel!.isNotEmpty) return customLabel!;
+      return l10n.languageCode == 'it' ? 'Personalizzato' : 'Custom';
+    }
     switch (category) {
       case ObjectCategory.keys:
         return l10n.languageCode == 'it' ? 'Chiavi' : 'Keys';
@@ -498,7 +850,7 @@ class _CategoryChip extends StatelessWidget {
       case ObjectCategory.phone:
         return l10n.languageCode == 'it' ? 'Telefono' : 'Phone';
       case ObjectCategory.other:
-        return l10n.languageCode == 'it' ? 'Altro' : 'Other';
+        return '';
     }
   }
 
@@ -506,6 +858,11 @@ class _CategoryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final theme = Theme.of(context);
+    //Per tag personalizzato usa il colore scelto dall'utente se selezionato.
+    final accent = (category == ObjectCategory.other && customColor != null && selected)
+        ? customColor!
+        : AppColors.stormyTeal;
+
     return InkWell(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -516,30 +873,32 @@ class _CategoryChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: (selected ? AppColors.stormyTeal : AppColors.charcoalBlue)
-              .withValues(alpha: 0.08),
+          color: (selected ? accent : AppColors.charcoalBlue).withValues(alpha: 0.08),
           border: Border.all(
-            color: (selected ? AppColors.stormyTeal : Colors.transparent)
-                .withValues(alpha: 0.45),
+            color: (selected ? accent : Colors.transparent).withValues(alpha: 0.45),
           ),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_icon,
-                size: 16,
-                color: selected
-                    ? AppColors.stormyTeal
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.55)),
+            Icon(
+              _icon,
+              size: 16,
+              color: selected
+                  ? accent
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
             const SizedBox(width: 6),
-            Text(_label(l10n),
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: selected
-                      ? AppColors.stormyTeal
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                )),
+            Text(
+              _label(l10n),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: selected
+                    ? accent
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
           ],
         ),
       ),
@@ -547,7 +906,7 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-//Lista icone disponibili per gli oggetti personalizzati.
+//Lista icone disponibili per i tag personalizzati.
 const _kPickableIcons = <(IconData, String)>[
   (Icons.inventory_2_rounded, 'Oggetto'),
   (Icons.star_rounded, 'Stella'),
@@ -574,138 +933,12 @@ const _kPickableIcons = <(IconData, String)>[
   (Icons.build_rounded, 'Attrezzo'),
   (Icons.kitchen_rounded, 'Cucina'),
   (Icons.sports_gymnastics_rounded, 'Palestra'),
+  (Icons.tune_rounded, 'Personalizzato'),
+  (Icons.diamond_rounded, 'Prezioso'),
+  (Icons.local_florist_rounded, 'Pianta'),
+  (Icons.attach_money_rounded, 'Denaro'),
+  (Icons.electric_bolt_rounded, 'Energia'),
 ];
-
-//Riga di selezione icona + pulsante apertura picker.
-class _IconPickerRow extends StatelessWidget {
-  const _IconPickerRow({required this.selected, required this.onPick});
-  final IconData? selected;
-  final ValueChanged<IconData> onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: () async {
-        final picked = await showDialog<IconData>(
-          context: context,
-          builder: (ctx) => _IconPickerDialog(current: selected),
-        );
-        if (picked != null) onPick(picked);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.stormyTeal.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.stormyTeal.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.stormyTeal.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                selected ?? Icons.inventory_2_rounded,
-                color: AppColors.stormyTeal,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Icona personalizzata',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.stormyTeal,
-                    ),
-                  ),
-                  Text(
-                    'Tocca per scegliere',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.stormyTeal),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-//Dialogo griglia icone picker.
-class _IconPickerDialog extends StatelessWidget {
-  const _IconPickerDialog({this.current});
-  final IconData? current;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AlertDialog(
-      title: const Text('Scegli un\'icona'),
-      content: SizedBox(
-        width: 360,
-        height: 380,
-        child: GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-          ),
-          itemCount: _kPickableIcons.length,
-          itemBuilder: (_, i) {
-            final (icon, label) = _kPickableIcons[i];
-            final isSelected = icon == current;
-            return Tooltip(
-              message: label,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(icon),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.stormyTeal.withValues(alpha: 0.2)
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected
-                          ? AppColors.stormyTeal
-                          : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: isSelected
-                        ? AppColors.stormyTeal
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    size: 28,
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annulla'),
-        ),
-      ],
-    );
-  }
-}
 
 String _categoryToString(ObjectCategory c) {
   switch (c) {

@@ -14,6 +14,8 @@ class GateEvent {
     this.userIds = const [],
     this.objectIds = const [],
     this.resolved,
+    this.hasLinkedAlert = false,
+    this.linkedAlertResolved,
   });
 
   final String id;
@@ -25,7 +27,15 @@ class GateEvent {
   final GateDirection? direction;
   final List<String> userIds;
   final List<String> objectIds;
+  //Null = evento informativo senza alert; false = alert aperto; true = alert risolto.
   bool? resolved;
+
+  //True se questo evento informativo ha generato un alert critico collegato.
+  //Usato nella pagina notifiche per mostrare l'icona warning.
+  final bool hasLinkedAlert;
+
+  //True se l'alert collegato è stato risolto. Null se hasLinkedAlert è false.
+  bool? linkedAlertResolved;
 
   String descriptionFor(String languageCode) =>
       languageCode == 'en' ? descriptionEn : descriptionIt;

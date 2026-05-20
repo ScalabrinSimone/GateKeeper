@@ -5,6 +5,7 @@ import '../core/state/auth_controller.dart';
 import '../core/state/settings_controller.dart';
 import '../core/theme/app_colors.dart';
 import '../features/account/account_page.dart';
+import '../features/alerts/alerts_page.dart';
 import '../features/auth/email_verification_page.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/pair_choice_page.dart';
@@ -23,7 +24,7 @@ import '../shared/widgets/app_shell.dart';
 //Costruisce il router principale dell'app.
 //Le route di auth (login, pair, recovery, invite) stanno fuori dallo shell.
 //Lo shell ospita le pagine principali a navigazione persistente.
-//Il `redirect` regola il flusso a seconda dello stato di auth.
+///account è fuori dallo shell per evitare DuplicateGlobalKey nel NavigationShell.
 class AppRouter {
   AppRouter._();
 
@@ -44,14 +45,13 @@ class AppRouter {
             loc.startsWith('/onboarding') ||
             loc.startsWith('/invite');
 
-        //La pagina verify-email è accessibile solo nello stage apposito.
         final isVerifyEmail = loc == '/verify-email';
+        final isAccount = loc == '/account';
 
         if (stage == AuthStage.loading) {
           return loc == '/splash' ? null : '/splash';
         }
         if (stage == AuthStage.needsPairing) {
-          //Hub non ancora configurato su questo dispositivo: invito al pairing.
           if (isPublicRoute || isVerifyEmail) return null;
           return '/welcome';
         }
@@ -60,7 +60,6 @@ class AppRouter {
           return '/welcome';
         }
         if (stage == AuthStage.needsLogin) {
-          //Se l'utente è su /verify-email e fa logout, deve andare a /login.
           if (isVerifyEmail) return '/login';
           if (isPublicRoute) return null;
           return '/login';
@@ -71,6 +70,8 @@ class AppRouter {
         }
         //authenticated.
         if (loc == '/splash' || isPublicRoute || isVerifyEmail) return '/dashboard';
+        //account è una route separata accessibile solo da autenticati.
+        if (isAccount) return null;
         return null;
       },
       routes: [
@@ -91,7 +92,6 @@ class AppRouter {
           builder: (_, s) => SetupWizardPage(
             auth: auth,
             settings: settings,
-            //factory_code pre-popolato dopo scan QR / discovery.
             prefilledFactoryCode: s.uri.queryParameters['factory_code'],
           ),
         ),
@@ -107,11 +107,21 @@ class AppRouter {
             token: s.pathParameters['token'],
           ),
         ),
+        //Account è fuori dallo shell per evitare DuplicateGlobalKey.
+        GoRoute(
+          path: '/account',
+          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+            context: context,
+            state: state,
+            child: AccountPage(auth: auth),
+          ),
+        ),
 
         StatefulShellRoute.indexedStack(
           builder: (context, state, navigationShell) =>
               AppShell(navigationShell: navigationShell, settings: settings, auth: auth),
           branches: [
+            //Indice 0 – Dashboard.
             StatefulShellBranch(routes: [
               GoRoute(
                 path: '/dashboard',
@@ -122,6 +132,7 @@ class AppRouter {
                 ),
               ),
             ]),
+            //Indice 1 – Oggetti.
             StatefulShellBranch(routes: [
               GoRoute(
                 path: '/objects',
@@ -132,6 +143,7 @@ class AppRouter {
                 ),
               ),
             ]),
+            //Indice 2 – Cronologia eventi.
             StatefulShellBranch(routes: [
               GoRoute(
                 path: '/events',
@@ -142,6 +154,7 @@ class AppRouter {
                 ),
               ),
             ]),
+            //Indice 3 – Membri.
             StatefulShellBranch(routes: [
               GoRoute(
                 path: '/members',
@@ -152,6 +165,7 @@ class AppRouter {
                 ),
               ),
             ]),
+            //Indice 4 – Notifiche (eventi normali, non critici).
             StatefulShellBranch(routes: [
               GoRoute(
                 path: '/notifications',
@@ -162,6 +176,18 @@ class AppRouter {
                 ),
               ),
             ]),
+            //Indice 5 – Alerts (eventi critici, da risolvere uno per uno).
+            StatefulShellBranch(routes: [
+              GoRoute(
+                path: '/alerts',
+                pageBuilder: (context, state) => _buildPageWithFadeTransition(
+                  context: context,
+                  state: state,
+                  child: const AlertsPage(),
+                ),
+              ),
+            ]),
+            //Indice 6 – Impostazioni.
             StatefulShellBranch(routes: [
               GoRoute(
                 path: '/settings',
@@ -169,16 +195,6 @@ class AppRouter {
                   context: context,
                   state: state,
                   child: SettingsPage(settings: settings, auth: auth),
-                ),
-              ),
-            ]),
-            StatefulShellBranch(routes: [
-              GoRoute(
-                path: '/account',
-                pageBuilder: (context, state) => _buildPageWithFadeTransition(
-                  context: context,
-                  state: state,
-                  child: AccountPage(auth: auth),
                 ),
               ),
             ]),

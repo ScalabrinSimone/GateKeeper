@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../core/i18n/app_l10n.dart';
 import '../../../core/state/settings_controller.dart';
 import '../../../core/theme/app_colors.dart';
 

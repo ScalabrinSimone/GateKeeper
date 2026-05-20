@@ -1,9 +1,13 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/avatar_controller.dart';
 import '../../core/state/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import 'gk_logo.dart';
@@ -18,7 +22,15 @@ class _NavItem {
 }
 
 //Shell principale: sidebar desktop + header con quick actions + bottom nav mobile.
-class AppShell extends StatelessWidget {
+//Branches del router (indici):
+// 0 = /dashboard
+// 1 = /objects
+// 2 = /events
+// 3 = /members
+// 4 = /notifications
+// 5 = /alerts
+// 6 = /settings
+class AppShell extends StatefulWidget {
   const AppShell({
     required this.navigationShell,
     required this.settings,
@@ -30,7 +42,13 @@ class AppShell extends StatelessWidget {
   final SettingsController settings;
   final AuthController auth;
 
-  static const List<_NavItem> _items = [
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  //Elementi principali della sidebar e bottom nav.
+  static const List<_NavItem> _mainItems = [
     _NavItem(labelKey: 'dashboard', icon: Icons.home_rounded, path: '/dashboard'),
     _NavItem(labelKey: 'objects', icon: Icons.inventory_2_rounded, path: '/objects'),
     _NavItem(labelKey: 'events', icon: Icons.history_rounded, path: '/events'),
@@ -39,9 +57,53 @@ class AppShell extends StatelessWidget {
     _NavItem(labelKey: 'settings', icon: Icons.settings_rounded, path: '/settings'),
   ];
 
-  void _goBranch(BuildContext context, int index) {
+  //Indice del branch "alerts" nel router.
+  static const int _alertsBranchIndex = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    //Carica avatar per l'utente corrente.
+    final userId = widget.auth.user?.id.toString();
+    if (userId != null) {
+      AvatarController.instance.loadForUser(userId);
+    }
+    AvatarController.instance.addListener(_onAvatarChanged);
+  }
+
+  @override
+  void dispose() {
+    AvatarController.instance.removeListener(_onAvatarChanged);
+    super.dispose();
+  }
+
+  void _onAvatarChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _goBranch(int index) {
     HapticFeedback.selectionClick();
-    navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
+    widget.navigationShell.goBranch(
+      index,
+      initialLocation: index == widget.navigationShell.currentIndex,
+    );
+  }
+
+  //Converte l'indice dei _mainItems (0–5) all'indice del branch del router.
+  //dashboard(0)->0, objects(1)->1, events(2)->2, members(3)->3,
+  //notifications(4)->4, settings(5)->6.
+  int _mainItemToRouterIndex(int mainIndex) {
+    const map = [0, 1, 2, 3, 4, 6];
+    if (mainIndex >= 0 && mainIndex < map.length) return map[mainIndex];
+    return 0;
+  }
+
+  //Converte l'indice del branch del router all'indice dei _mainItems.
+  //0->0, 1->1, 2->2, 3->3, 4->4, 5->alerts(non in main), 6->5.
+  int _routerIndexToMainItem(int routerIndex) {
+    const map = [0, 1, 2, 3, 4, -1, 5];
+    if (routerIndex >= 0 && routerIndex < map.length) return map[routerIndex];
+    return 0;
   }
 
   @override
@@ -49,6 +111,8 @@ class AppShell extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final isCompact = width < 880;
     final l10n = AppL10n.of(context);
+    final currentRouterIndex = widget.navigationShell.currentIndex;
+    final currentMainIndex = _routerIndexToMainItem(currentRouterIndex);
 
     return Scaffold(
       body: SafeArea(
@@ -56,23 +120,26 @@ class AppShell extends StatelessWidget {
           children: [
             if (!isCompact)
               _Sidebar(
-                items: _items,
-                currentIndex: navigationShell.currentIndex,
-                onTap: (i) => _goBranch(context, i),
+                items: _mainItems,
+                currentMainIndex: currentMainIndex,
+                isAlerts: currentRouterIndex == _alertsBranchIndex,
+                onTapMain: (i) => _goBranch(_mainItemToRouterIndex(i)),
+                onTapAlerts: () => _goBranch(_alertsBranchIndex),
                 onAccount: () => context.go('/account'),
-                settings: settings,
-                auth: auth,
+                settings: widget.settings,
+                auth: widget.auth,
               ),
             Expanded(
               child: Column(
                 children: [
                   _TopBar(
-                    title: l10n.t(_items[navigationShell.currentIndex.clamp(0, _items.length - 1)].labelKey),
-                    settings: settings,
+                    title: _titleForIndex(l10n, currentRouterIndex),
+                    settings: widget.settings,
                     onAccount: () => context.go('/account'),
-                    onNotifications: () => _goBranch(context, 4),
+                    onNotifications: () => _goBranch(4),
+                    onAlerts: () => _goBranch(_alertsBranchIndex),
                   ),
-                  Expanded(child: navigationShell),
+                  Expanded(child: widget.navigationShell),
                 ],
               ),
             ),
@@ -81,28 +148,47 @@ class AppShell extends StatelessWidget {
       ),
       bottomNavigationBar: isCompact
           ? _BottomBar(
-              items: _items.take(5).toList(growable: false),
-              currentIndex: navigationShell.currentIndex.clamp(0, 4),
-              onTap: (i) => _goBranch(context, i),
+              items: _mainItems.take(5).toList(growable: false),
+              currentIndex: currentMainIndex.clamp(0, 4),
+              alertsSelected: currentRouterIndex == _alertsBranchIndex,
+              onTap: (i) => _goBranch(_mainItemToRouterIndex(i)),
+              onTapAlerts: () => _goBranch(_alertsBranchIndex),
             )
           : null,
     );
+  }
+
+  String _titleForIndex(AppL10n l10n, int routerIndex) {
+    switch (routerIndex) {
+      case 0: return l10n.t('dashboard');
+      case 1: return l10n.t('objects');
+      case 2: return l10n.t('events');
+      case 3: return l10n.t('members');
+      case 4: return l10n.t('notifications');
+      case 5: return l10n.t('alerts');
+      case 6: return l10n.t('settings');
+      default: return 'GateKeeper';
+    }
   }
 }
 
 class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.items,
-    required this.currentIndex,
-    required this.onTap,
+    required this.currentMainIndex,
+    required this.isAlerts,
+    required this.onTapMain,
+    required this.onTapAlerts,
     required this.onAccount,
     required this.settings,
     required this.auth,
   });
 
   final List<_NavItem> items;
-  final int currentIndex;
-  final ValueChanged<int> onTap;
+  final int currentMainIndex;
+  final bool isAlerts;
+  final ValueChanged<int> onTapMain;
+  final VoidCallback onTapAlerts;
   final VoidCallback onAccount;
   final SettingsController settings;
   final AuthController auth;
@@ -145,19 +231,19 @@ class _Sidebar extends StatelessWidget {
                 return _SidebarItem(
                   icon: item.icon,
                   label: l10n.t(item.labelKey),
-                  selected: index == currentIndex,
-                  onTap: () => onTap(index),
+                  selected: index == currentMainIndex && !isAlerts,
+                  onTap: () => onTapMain(index),
                 );
               },
             ),
           ),
           const SizedBox(height: 12),
-          //Area bottom-left: alert + account.
+          //Area bottom-left: alerts (highlight arancione) + account.
           _SidebarItem(
             icon: Icons.notifications_active_rounded,
             label: l10n.t('alerts'),
-            selected: currentIndex == 4,
-            onTap: () => onTap(4),
+            selected: isAlerts,
+            onTap: onTapAlerts,
             highlight: true,
           ),
           const SizedBox(height: 6),
@@ -187,7 +273,8 @@ class _SidebarItem extends StatefulWidget {
   State<_SidebarItem> createState() => _SidebarItemState();
 }
 
-class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderStateMixin {
+class _SidebarItemState extends State<_SidebarItem>
+    with SingleTickerProviderStateMixin {
   bool _hover = false;
   bool _pressed = false;
   late AnimationController _animationController;
@@ -200,15 +287,11 @@ class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderSta
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-
     _glowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
     );
-
     if (widget.selected) {
       _animationController.forward();
-    } else {
-      _animationController.reverse();
     }
   }
 
@@ -233,13 +316,13 @@ class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderSta
     final scheme = Theme.of(context).colorScheme;
     final accent = widget.highlight ? AppColors.orangeGold : AppColors.stormyTeal;
 
-    //Il background si illumina al click (pressed/selected), non all'hover.
-    //L'hover mostra solo una lieve tonalità come feedback desktop.
     final bg = (widget.selected || _pressed)
-        ? accent.withOpacity(0.18)
-        : (_hover ? scheme.onSurface.withOpacity(0.05) : Colors.transparent);
+        ? accent.withValues(alpha: 0.18)
+        : (_hover ? scheme.onSurface.withValues(alpha: 0.05) : Colors.transparent);
 
-    final fg = (widget.selected || _pressed) ? accent : scheme.onSurface.withOpacity(0.85);
+    final fg = (widget.selected || _pressed)
+        ? accent
+        : scheme.onSurface.withValues(alpha: 0.85);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -264,7 +347,7 @@ class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderSta
               boxShadow: [
                 if (widget.selected)
                   BoxShadow(
-                    color: accent.withOpacity(_glowAnimation.value * 0.28),
+                        color: accent.withValues(alpha: _glowAnimation.value * 0.28),
                     blurRadius: 14,
                     spreadRadius: 1,
                   ),
@@ -274,7 +357,6 @@ class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderSta
           ),
           child: Row(
             children: [
-              //Indicatore animato (barretta laterale) dell'item selezionato.
               AnimatedContainer(
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
@@ -283,7 +365,7 @@ class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderSta
                 margin: EdgeInsets.only(right: widget.selected ? 10 : 0),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [accent, accent.withOpacity(0.6)],
+                      colors: [accent, accent.withValues(alpha: 0.6)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -298,7 +380,8 @@ class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderSta
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: fg,
-                    fontWeight: widget.selected ? FontWeight.w800 : FontWeight.w600,
+                    fontWeight:
+                        widget.selected ? FontWeight.w800 : FontWeight.w600,
                     letterSpacing: 0.2,
                   ),
                 ),
@@ -312,7 +395,11 @@ class _SidebarItemState extends State<_SidebarItem> with SingleTickerProviderSta
 }
 
 class _AccountTile extends StatelessWidget {
-  const _AccountTile({required this.onTap, required this.settings, required this.auth});
+  const _AccountTile({
+    required this.onTap,
+    required this.settings,
+    required this.auth,
+  });
 
   final VoidCallback onTap;
   final SettingsController settings;
@@ -329,6 +416,7 @@ class _AccountTile extends StatelessWidget {
     final user = auth.user;
     final name = user?.username ?? 'Guest';
     final subtitle = user?.role.toUpperCase() ?? AppL10n.of(context).t('account');
+    final avatarPath = AvatarController.instance.avatarPath;
 
     return Material(
       color: Colors.transparent,
@@ -347,6 +435,7 @@ class _AccountTile extends StatelessWidget {
           ),
           child: Row(
             children: [
+              //Avatar (immagine o iniziali).
               Container(
                 width: 36,
                 height: 36,
@@ -356,11 +445,8 @@ class _AccountTile extends StatelessWidget {
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  _initial(name),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic),
-                ),
+                clipBehavior: Clip.hardEdge,
+                child: _buildAvatarContent(avatarPath, name),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -371,7 +457,8 @@ class _AccountTile extends StatelessWidget {
                     Text(
                       name,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     Text(
                       subtitle,
@@ -391,6 +478,32 @@ class _AccountTile extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildAvatarContent(String? avatarPath, String name) {
+    if (avatarPath != null && !kIsWeb) {
+      return Image.file(
+        File(avatarPath),
+        fit: BoxFit.cover,
+        width: 36,
+        height: 36,
+        errorBuilder: (_, __, ___) => _initialsWidget(name),
+      );
+    }
+    return _initialsWidget(name);
+  }
+
+  Widget _initialsWidget(String name) {
+    return Center(
+      child: Text(
+        _initial(name),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontStyle: FontStyle.italic,
+        ),
+      ),
+    );
+  }
 }
 
 class _TopBar extends StatelessWidget {
@@ -399,12 +512,14 @@ class _TopBar extends StatelessWidget {
     required this.settings,
     required this.onAccount,
     required this.onNotifications,
+    required this.onAlerts,
   });
 
   final String title;
   final SettingsController settings;
   final VoidCallback onAccount;
   final VoidCallback onNotifications;
+  final VoidCallback onAlerts;
 
   @override
   Widget build(BuildContext context) {
@@ -432,9 +547,16 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           _IconButtonGK(
+            icon: Icons.notifications_active_rounded,
+            tooltip: l10n.t('alerts'),
+            badge: true,
+            badgeColor: AppColors.orangeGold,
+            onTap: onAlerts,
+          ),
+          const SizedBox(width: 8),
+          _IconButtonGK(
             icon: Icons.notifications_rounded,
             tooltip: l10n.t('notifications'),
-            badge: true,
             onTap: onNotifications,
           ),
           const SizedBox(width: 8),
@@ -459,12 +581,14 @@ class _IconButtonGK extends StatelessWidget {
     required this.onTap,
     this.tooltip,
     this.badge = false,
+    this.badgeColor = AppColors.orangeGold,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final String? tooltip;
   final bool badge;
+  final Color badgeColor;
 
   @override
   Widget build(BuildContext context) {
@@ -485,10 +609,10 @@ class _IconButtonGK extends StatelessWidget {
             children: [
               Icon(icon, size: 20),
               if (badge)
-                const Positioned(
+                Positioned(
                   top: -2,
                   right: -2,
-                  child: _Dot(color: AppColors.orangeGold),
+                  child: _Dot(color: badgeColor),
                 ),
             ],
           ),
@@ -528,14 +652,17 @@ class _LanguageSwitcher extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _langChip(context, 'IT', settings.locale.languageCode == 'it', () => settings.setLocale(const Locale('it'))),
-          _langChip(context, 'EN', settings.locale.languageCode == 'en', () => settings.setLocale(const Locale('en'))),
+          _langChip(context, 'IT', settings.locale.languageCode == 'it',
+              () => settings.setLocale(const Locale('it'))),
+          _langChip(context, 'EN', settings.locale.languageCode == 'en',
+              () => settings.setLocale(const Locale('en'))),
         ],
       ),
     );
   }
 
-  Widget _langChip(BuildContext context, String label, bool selected, VoidCallback onTap) {
+  Widget _langChip(
+      BuildContext context, String label, bool selected, VoidCallback onTap) {
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -552,7 +679,9 @@ class _LanguageSwitcher extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+            color: selected
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
             fontWeight: FontWeight.w900,
             fontSize: 11,
             letterSpacing: 0.5,
@@ -589,7 +718,9 @@ class _ThemeButton extends StatelessWidget {
           child: Padding(
             key: ValueKey(isDark),
             padding: const EdgeInsets.all(10),
-            child: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded, size: 20),
+            child: Icon(
+                isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                size: 20),
           ),
         ),
       ),
@@ -597,21 +728,29 @@ class _ThemeButton extends StatelessWidget {
   }
 }
 
-//Bottom bar con feedback immediato al tap (pressed state + haptic).
+//Bottom bar mobile con feedback immediato al tap.
 class _BottomBar extends StatefulWidget {
-  const _BottomBar({required this.items, required this.currentIndex, required this.onTap});
+  const _BottomBar({
+    required this.items,
+    required this.currentIndex,
+    required this.alertsSelected,
+    required this.onTap,
+    required this.onTapAlerts,
+  });
 
   final List<_NavItem> items;
   final int currentIndex;
+  final bool alertsSelected;
   final ValueChanged<int> onTap;
+  final VoidCallback onTapAlerts;
 
   @override
   State<_BottomBar> createState() => _BottomBarState();
 }
 
 class _BottomBarState extends State<_BottomBar> {
-  //Indice dell'item attualmente premuto (-1 = nessuno).
   int _pressedIndex = -1;
+  bool _alertsPressed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -625,7 +764,8 @@ class _BottomBarState extends State<_BottomBar> {
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.stormyTeal.withValues(alpha: 0.15)),
+            border:
+                Border.all(color: AppColors.stormyTeal.withValues(alpha: 0.15)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.18),
@@ -636,66 +776,121 @@ class _BottomBarState extends State<_BottomBar> {
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(widget.items.length, (i) {
-              final selected = i == widget.currentIndex;
-              final pressed = i == _pressedIndex;
-              //Il colore si illumina immediatamente al touchDown.
-              final active = selected || pressed;
-              return Expanded(
+            children: [
+              //Item principali (prime 5).
+              ...List.generate(widget.items.length, (i) {
+                final selected = i == widget.currentIndex && !widget.alertsSelected;
+                final pressed = i == _pressedIndex;
+                final active = selected || pressed;
+                return Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (_) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _pressedIndex = i);
+                    },
+                    onTapUp: (_) => setState(() => _pressedIndex = -1),
+                    onTapCancel: () => setState(() => _pressedIndex = -1),
+                    onTap: () => widget.onTap(i),
+                    child: _BottomBarItem(
+                      icon: widget.items[i].icon,
+                      label: l10n.t(widget.items[i].labelKey),
+                      active: active,
+                      pressed: pressed,
+                      accentColor: AppColors.stormyTeal,
+                    ),
+                  ),
+                );
+              }),
+              //Item alerts (highlight arancione).
+              Expanded(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapDown: (_) {
                     HapticFeedback.selectionClick();
-                    setState(() => _pressedIndex = i);
+                    setState(() => _alertsPressed = true);
                   },
-                  onTapUp: (_) => setState(() => _pressedIndex = -1),
-                  onTapCancel: () => setState(() => _pressedIndex = -1),
-                  onTap: () => widget.onTap(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: active
-                          ? AppColors.stormyTeal.withValues(alpha: pressed ? 0.28 : 0.18)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedScale(
-                          duration: const Duration(milliseconds: 120),
-                          scale: pressed ? 0.88 : 1.0,
-                          child: Icon(
-                            widget.items[i].icon,
-                            size: 20,
-                            color: active
-                                ? AppColors.stormyTeal
-                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          l10n.t(widget.items[i].labelKey),
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.6,
-                            color: active
-                                ? AppColors.stormyTeal
-                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
-                          ),
-                        ),
-                      ],
-                    ),
+                  onTapUp: (_) => setState(() => _alertsPressed = false),
+                  onTapCancel: () => setState(() => _alertsPressed = false),
+                  onTap: widget.onTapAlerts,
+                  child: _BottomBarItem(
+                    icon: Icons.notifications_active_rounded,
+                    label: l10n.t('alerts'),
+                    active: widget.alertsSelected || _alertsPressed,
+                    pressed: _alertsPressed,
+                    accentColor: AppColors.orangeGold,
                   ),
                 ),
-              );
-            }),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _BottomBarItem extends StatelessWidget {
+  const _BottomBarItem({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.pressed,
+    required this.accentColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+  final bool pressed;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOutCubic,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: active
+            ? accentColor.withValues(alpha: pressed ? 0.28 : 0.18)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedScale(
+            duration: const Duration(milliseconds: 120),
+            scale: pressed ? 0.88 : 1.0,
+            child: Icon(
+              icon,
+              size: 20,
+              color: active
+                  ? accentColor
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.55),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.6,
+              color: active
+                  ? accentColor
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.55),
+            ),
+          ),
+        ],
       ),
     );
   }

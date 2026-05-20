@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/i18n/app_l10n.dart';
+import '../../core/platform/platform_info.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/state/settings_controller.dart';
 import '../../core/theme/app_colors.dart';
@@ -51,11 +52,15 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
   bool _busy = false;
   String? _error;
 
-  //Step 2: tag essenziali da creare. Coppie (nome, categoria).
+  //Step 2: tag essenziali da creare.
   final List<_TagSelection> _selectedTags = [];
   bool _creatingTags = false;
 
-  //Step 3: inviti generati.
+  //Step 3 (solo mobile): configurazione BLE.
+  //Su desktop questo step viene saltato automaticamente.
+  bool get _showBleStep => PlatformInfo.isMobile;
+
+  //Step 4 (o 3 su desktop): inviti generati.
   final List<InviteDto> _invites = [];
   bool _creatingInvite = false;
 
@@ -115,7 +120,7 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
 
   Future<void> _createSelectedTags() async {
     if (_selectedTags.isEmpty) {
-      setState(() => _step = 3);
+      setState(() => _step = _step + 1);
       return;
     }
     setState(() => _creatingTags = true);
@@ -127,7 +132,7 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
           isEssential: sel.essential,
         );
       }
-      if (mounted) setState(() => _step = 3);
+      if (mounted) setState(() => _step = _step + 1);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -154,8 +159,12 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
+    //Costruisce la lista di step in base alla piattaforma.
+    //Su mobile include lo step BLE (indice 3), su desktop lo salta.
     final steps = <Widget>[
+      //Step 0 — Welcome.
       _WelcomeStep(onNext: () => setState(() => _step = 1)),
+      //Step 1 — Admin.
       _AdminStep(
         houseCtrl: _houseCtrl,
         usernameCtrl: _usernameCtrl,
@@ -168,17 +177,26 @@ class _SetupWizardPageState extends State<SetupWizardPage> {
         onSubmit: () => _submitAdmin(l10n),
         onBack: () => setState(() => _step = 0),
       ),
+      //Step 2 — Tags essenziali.
       _TagsStep(
         selected: _selectedTags,
         busy: _creatingTags,
         onSubmit: _createSelectedTags,
       ),
+      //Step 3 — BLE setup (solo mobile).
+      if (_showBleStep)
+        _BleSetupStep(
+          onContinue: () => setState(() => _step = _step + 1),
+          onSkip: () => setState(() => _step = _step + 1),
+        ),
+      //Step 4 (o 3 su desktop) — Inviti.
       _InviteStep(
         invites: _invites,
         busy: _creatingInvite,
         onGenerate: _generateInvite,
-        onContinue: () => setState(() => _step = 4),
+        onContinue: () => setState(() => _step = _step + 1),
       ),
+      //Step finale — Done.
       _DoneStep(onFinish: () => _finish(context)),
     ];
 
@@ -701,7 +719,211 @@ class _InviteStep extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// STEP 4 — DONE
+// STEP 3 (MOBILE ONLY) — BLE SETUP
+// ---------------------------------------------------------------------------
+class _BleSetupStep extends StatefulWidget {
+  const _BleSetupStep({required this.onContinue, required this.onSkip});
+  final VoidCallback onContinue;
+  final VoidCallback onSkip;
+
+  @override
+  State<_BleSetupStep> createState() => _BleSetupStepState();
+}
+
+class _BleSetupStepState extends State<_BleSetupStep> {
+  String? _bleAddress;
+  bool _loadingBle = false;
+  bool _savingBle = false;
+  List<Map<String, dynamic>> _nearbyBle = const [];
+  bool _showingNearby = false;
+
+  Future<void> _loadNearby() async {
+    setState(() {
+      _loadingBle = true;
+      _showingNearby = true;
+    });
+    try {
+      final list = await GateKeeperApi.instance.users.bleNearby();
+      if (mounted) setState(() => _nearbyBle = list);
+    } catch (_) {
+      if (mounted) setState(() => _nearbyBle = const []);
+    } finally {
+      if (mounted) setState(() => _loadingBle = false);
+    }
+  }
+
+  Future<void> _registerBle(String address) async {
+    setState(() => _savingBle = true);
+    try {
+      await GateKeeperApi.instance.users.registerBle(address);
+      if (mounted) {
+        setState(() {
+          _bleAddress = address;
+          _showingNearby = false;
+        });
+      }
+    } catch (_) {} finally {
+      if (mounted) setState(() => _savingBle = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.stormyTeal.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.stormyTeal.withValues(alpha: 0.18)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.stormyTeal.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.bluetooth_rounded,
+                    color: AppColors.stormyTeal),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.t('bleSetupTitle'),
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.t('bleSetupSubtitle'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (_bleAddress != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.bluetooth_connected_rounded,
+                    color: AppColors.success),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _bleAddress!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        GKButton(
+          onPressed: _loadingBle ? null : _loadNearby,
+          label: _loadingBle
+              ? l10n.t('loadingDots')
+              : l10n.t('bleScan'),
+          icon: Icons.bluetooth_searching_rounded,
+          variant: GKButtonVariant.secondary,
+          expanded: true,
+        ),
+        if (_showingNearby && !_loadingBle) ...[
+          const SizedBox(height: 10),
+          if (_nearbyBle.isEmpty)
+            Text(
+              l10n.t('bleNoDevices'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            )
+          else
+            for (final dev in _nearbyBle)
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.stormyTeal.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: AppColors.stormyTeal.withValues(alpha: 0.2)),
+                ),
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(
+                    dev['is_phone'] == true
+                        ? Icons.smartphone_rounded
+                        : Icons.bluetooth_rounded,
+                    color: AppColors.stormyTeal,
+                  ),
+                  title: Text(
+                    dev['name']?.toString() ?? 'Sconosciuto',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    dev['address']?.toString() ?? '',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontFamily: 'monospace',
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  trailing: _savingBle
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : TextButton(
+                          onPressed: () =>
+                              _registerBle(dev['address'].toString()),
+                          child: Text(l10n.t('bleSelect')),
+                        ),
+                ),
+              ),
+        ],
+        const SizedBox(height: 16),
+        GKButton(
+          onPressed: _bleAddress != null ? widget.onContinue : null,
+          label: l10n.t('bleSetupContinue'),
+          icon: Icons.arrow_forward_rounded,
+          expanded: true,
+        ),
+        TextButton(
+          onPressed: widget.onSkip,
+          child: Text(l10n.t('bleSetupSkip')),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// STEP DONE
 // ---------------------------------------------------------------------------
 class _DoneStep extends StatelessWidget {
   const _DoneStep({required this.onFinish});

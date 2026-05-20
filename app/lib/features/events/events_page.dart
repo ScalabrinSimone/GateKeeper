@@ -347,6 +347,7 @@ class _EventRow extends StatelessWidget {
     final l10n = AppL10n.of(context);
     final critical = event.severity == EventSeverity.critical;
     final color = critical ? AppColors.orangeGold : AppColors.stormyTeal;
+    //Usa sempre l'orario locale del dispositivo.
     final df = DateFormat.Hm();
 
     return Padding(
@@ -388,7 +389,7 @@ class _EventRow extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      df.format(event.timestamp),
+                      df.format(event.timestamp.toLocal()),
                       style: theme.textTheme.labelSmall?.copyWith(
                         letterSpacing: 1.4,
                         fontWeight: FontWeight.w800,

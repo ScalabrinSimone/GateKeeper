@@ -209,7 +209,7 @@ abstract class AppLocalizations {
   /// No description provided for @markResolved.
   ///
   /// In en, this message translates to:
-  /// **'Resolve'**
+  /// **'Resolved'**
   String get markResolved;
 
   /// No description provided for @theme.
@@ -428,11 +428,23 @@ abstract class AppLocalizations {
   /// **'Mark all as read'**
   String get markAsRead;
 
+  /// No description provided for @markAsReadSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as read'**
+  String get markAsReadSingle;
+
   /// No description provided for @noNotifications.
   ///
   /// In en, this message translates to:
   /// **'No new notifications'**
   String get noNotifications;
+
+  /// No description provided for @noNotificationsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'All caught up! Events will appear here.'**
+  String get noNotificationsHint;
 
   /// No description provided for @appPreferences.
   ///
@@ -503,7 +515,7 @@ abstract class AppLocalizations {
   /// No description provided for @stayUpdated.
   ///
   /// In en, this message translates to:
-  /// **'Stay updated on critical events.'**
+  /// **'Stay updated on events.'**
   String get stayUpdated;
 
   /// No description provided for @noEvents.
@@ -521,7 +533,7 @@ abstract class AppLocalizations {
   /// No description provided for @tagShort.
   ///
   /// In en, this message translates to:
-  /// **'Tag'**
+  /// **'Log'**
   String get tagShort;
 
   /// No description provided for @logShort.
@@ -605,8 +617,38 @@ abstract class AppLocalizations {
   /// No description provided for @alertsHint.
   ///
   /// In en, this message translates to:
-  /// **'Important alerts from the system.'**
+  /// **'Critical alerts requiring your attention.'**
   String get alertsHint;
+
+  /// No description provided for @noAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'No active alerts'**
+  String get noAlerts;
+
+  /// No description provided for @noAlertsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The system is secure. Alerts will appear here.'**
+  String get noAlertsHint;
+
+  /// No description provided for @alertResolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get alertResolved;
+
+  /// No description provided for @alertActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active alert'**
+  String get alertActive;
+
+  /// No description provided for @alertResolvedFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Alert resolved!'**
+  String get alertResolvedFeedback;
 
   /// No description provided for @welcomeTitle.
   ///
@@ -673,6 +715,966 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Join the home'**
   String get joinHome;
+
+  /// No description provided for @entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry'**
+  String get entry;
+
+  /// No description provided for @exit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get exit;
+
+  /// No description provided for @risk.
+  ///
+  /// In en, this message translates to:
+  /// **'Risk'**
+  String get risk;
+
+  /// No description provided for @noLogsForObject.
+  ///
+  /// In en, this message translates to:
+  /// **'No logs for this object.'**
+  String get noLogsForObject;
+
+  /// No description provided for @manage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage'**
+  String get manage;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get edit;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get create;
+
+  /// No description provided for @tryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get tryAgain;
+
+  /// No description provided for @objectCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Object created.'**
+  String get objectCreated;
+
+  /// No description provided for @objectUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Object updated.'**
+  String get objectUpdated;
+
+  /// No description provided for @objectDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Object deleted.'**
+  String get objectDeleted;
+
+  /// No description provided for @addObject.
+  ///
+  /// In en, this message translates to:
+  /// **'Add object'**
+  String get addObject;
+
+  /// No description provided for @objectsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No objects yet.'**
+  String get objectsEmpty;
+
+  /// No description provided for @objectName.
+  ///
+  /// In en, this message translates to:
+  /// **'Object name'**
+  String get objectName;
+
+  /// No description provided for @objectNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the object name.'**
+  String get objectNameRequired;
+
+  /// No description provided for @rfidTagRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please scan or enter the RFID tag.'**
+  String get rfidTagRequired;
+
+  /// No description provided for @rfidTagLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'RFID TAG'**
+  String get rfidTagLabel;
+
+  /// No description provided for @rfidTagRequiredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the tag by passing it in front of the reader.'**
+  String get rfidTagRequiredHint;
+
+  /// No description provided for @scanningTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning... pass the tag in front of the reader.'**
+  String get scanningTag;
+
+  /// No description provided for @startScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Start scan'**
+  String get startScan;
+
+  /// No description provided for @stopScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stopScan;
+
+  /// No description provided for @rescanTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Rescan'**
+  String get rescanTag;
+
+  /// No description provided for @tagScanned.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag scanned'**
+  String get tagScanned;
+
+  /// No description provided for @enterTagManually.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter tag manually'**
+  String get enterTagManually;
+
+  /// No description provided for @essential.
+  ///
+  /// In en, this message translates to:
+  /// **'Essential'**
+  String get essential;
+
+  /// No description provided for @essentialHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Generates a special alert if left without the owner.'**
+  String get essentialHint;
+
+  /// No description provided for @loadingDots.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading...'**
+  String get loadingDots;
+
+  /// No description provided for @editObject.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit object'**
+  String get editObject;
+
+  /// No description provided for @deleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete object'**
+  String get deleteConfirmTitle;
+
+  /// No description provided for @deleteConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete'**
+  String get deleteConfirmBody;
+
+  /// No description provided for @customTagName.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag name'**
+  String get customTagName;
+
+  /// No description provided for @customTagColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get customTagColor;
+
+  /// No description provided for @customTagIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon'**
+  String get customTagIcon;
+
+  /// No description provided for @customTagTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom tag'**
+  String get customTagTitle;
+
+  /// No description provided for @customTagHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a name, color and icon for this tag.'**
+  String get customTagHint;
+
+  /// No description provided for @bleSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth (BLE)'**
+  String get bleSectionTitle;
+
+  /// No description provided for @bleSectionExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'Associate your phone\'s Bluetooth address so the Raspberry Pi can identify who is entering or leaving.'**
+  String get bleSectionExplain;
+
+  /// No description provided for @bleRegisteredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Registered device'**
+  String get bleRegisteredTitle;
+
+  /// No description provided for @bleNotRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'No Bluetooth device registered.'**
+  String get bleNotRegistered;
+
+  /// No description provided for @bleScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan nearby devices'**
+  String get bleScan;
+
+  /// No description provided for @bleSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get bleSelect;
+
+  /// No description provided for @bleRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get bleRemove;
+
+  /// No description provided for @bleRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth device registered.'**
+  String get bleRegistered;
+
+  /// No description provided for @bleRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth device removed.'**
+  String get bleRemoved;
+
+  /// No description provided for @bleNoDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'No devices found nearby.'**
+  String get bleNoDevices;
+
+  /// No description provided for @bleSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth Setup'**
+  String get bleSetupTitle;
+
+  /// No description provided for @bleSetupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Associate your phone so the system can identify you when you enter/exit.'**
+  String get bleSetupSubtitle;
+
+  /// No description provided for @bleSetupSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip for now'**
+  String get bleSetupSkip;
+
+  /// No description provided for @bleSetupContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get bleSetupContinue;
+
+  /// No description provided for @remoteAccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote Access'**
+  String get remoteAccessTitle;
+
+  /// No description provided for @remoteAccessExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'Save the URL of your Cloudflare Tunnel to access the hub from anywhere.'**
+  String get remoteAccessExplain;
+
+  /// No description provided for @remoteUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote URL (https://...)'**
+  String get remoteUrlLabel;
+
+  /// No description provided for @remoteApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply & reconnect'**
+  String get remoteApply;
+
+  /// No description provided for @remoteSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save URL'**
+  String get remoteSave;
+
+  /// No description provided for @remoteClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get remoteClear;
+
+  /// No description provided for @remoteApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote URL applied.'**
+  String get remoteApplied;
+
+  /// No description provided for @reconnectHubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect hub'**
+  String get reconnectHubTitle;
+
+  /// No description provided for @reconnectHubSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Force reconnection to the current hub.'**
+  String get reconnectHubSubtitle;
+
+  /// No description provided for @reconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get reconnect;
+
+  /// No description provided for @reconnectingHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting...'**
+  String get reconnectingHub;
+
+  /// No description provided for @leaveHomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave home'**
+  String get leaveHomeTitle;
+
+  /// No description provided for @leaveHomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this device from the home.'**
+  String get leaveHomeSubtitle;
+
+  /// No description provided for @leaveHomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account will be deleted from the server. This action cannot be undone.'**
+  String get leaveHomeBody;
+
+  /// No description provided for @leaveHomeBodyAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'You are the admin. Leaving will perform a factory reset of the entire home.'**
+  String get leaveHomeBodyAdmin;
+
+  /// No description provided for @leaveHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get leaveHome;
+
+  /// No description provided for @houseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'House'**
+  String get houseLabel;
+
+  /// No description provided for @pushTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Push notifications'**
+  String get pushTitle;
+
+  /// No description provided for @pushSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive alerts even when the app is closed.'**
+  String get pushSubtitle;
+
+  /// No description provided for @pushUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Push notifications not available on this device.'**
+  String get pushUnsupported;
+
+  /// No description provided for @pushRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'Push notifications enabled.'**
+  String get pushRegistered;
+
+  /// No description provided for @profileSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profileSectionTitle;
+
+  /// No description provided for @changeUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Change username'**
+  String get changeUsername;
+
+  /// No description provided for @newUsernameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New username'**
+  String get newUsernameLabel;
+
+  /// No description provided for @changeEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Change email'**
+  String get changeEmail;
+
+  /// No description provided for @newEmailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New email'**
+  String get newEmailLabel;
+
+  /// No description provided for @changePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get changePassword;
+
+  /// No description provided for @currentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password'**
+  String get currentPassword;
+
+  /// No description provided for @newPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get newPasswordLabel;
+
+  /// No description provided for @newPasswordMin.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 6 characters'**
+  String get newPasswordMin;
+
+  /// No description provided for @changePasswordSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update your account password.'**
+  String get changePasswordSubtitle;
+
+  /// No description provided for @saveChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get saveChanges;
+
+  /// No description provided for @profileUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile updated.'**
+  String get profileUpdated;
+
+  /// No description provided for @emailChangedVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Email changed. Please verify the new address.'**
+  String get emailChangedVerify;
+
+  /// No description provided for @profileUpdateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error updating profile.'**
+  String get profileUpdateError;
+
+  /// No description provided for @wrongCurrentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password is incorrect.'**
+  String get wrongCurrentPassword;
+
+  /// No description provided for @logoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get logoutTitle;
+
+  /// No description provided for @logoutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'End your current session.'**
+  String get logoutSubtitle;
+
+  /// No description provided for @logoutConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to log out?'**
+  String get logoutConfirm;
+
+  /// No description provided for @factoryResetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset the entire home. Irreversible.'**
+  String get factoryResetSubtitle;
+
+  /// No description provided for @factoryResetAdminOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only admins can perform a factory reset.'**
+  String get factoryResetAdminOnly;
+
+  /// No description provided for @factoryResetDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Factory reset completed.'**
+  String get factoryResetDone;
+
+  /// No description provided for @pendingInvites.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Invites'**
+  String get pendingInvites;
+
+  /// No description provided for @showInviteQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Show QR code'**
+  String get showInviteQr;
+
+  /// No description provided for @copyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get copyCode;
+
+  /// No description provided for @revoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get revoke;
+
+  /// No description provided for @revokedInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite revoked.'**
+  String get revokedInvite;
+
+  /// No description provided for @generateInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate invite'**
+  String get generateInvite;
+
+  /// No description provided for @inviteAdult.
+  ///
+  /// In en, this message translates to:
+  /// **'Adult'**
+  String get inviteAdult;
+
+  /// No description provided for @inviteChild.
+  ///
+  /// In en, this message translates to:
+  /// **'Child'**
+  String get inviteChild;
+
+  /// No description provided for @noInvitesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No invites generated yet.'**
+  String get noInvitesYet;
+
+  /// No description provided for @inviteCopiedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied to clipboard.'**
+  String get inviteCopiedBody;
+
+  /// No description provided for @copiedToClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied!'**
+  String get copiedToClipboard;
+
+  /// No description provided for @removeMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeMember;
+
+  /// No description provided for @removeMemberConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this member from the home?'**
+  String get removeMemberConfirm;
+
+  /// No description provided for @memberRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Member removed.'**
+  String get memberRemoved;
+
+  /// No description provided for @permissionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions'**
+  String get permissionsTitle;
+
+  /// No description provided for @admin.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get admin;
+
+  /// No description provided for @adult.
+  ///
+  /// In en, this message translates to:
+  /// **'Adult'**
+  String get adult;
+
+  /// No description provided for @child.
+  ///
+  /// In en, this message translates to:
+  /// **'Child'**
+  String get child;
+
+  /// No description provided for @role.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get role;
+
+  /// No description provided for @setupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup'**
+  String get setupTitle;
+
+  /// No description provided for @step.
+  ///
+  /// In en, this message translates to:
+  /// **'Step'**
+  String get step;
+
+  /// No description provided for @back.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get back;
+
+  /// No description provided for @welcomeHubReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Your hub is ready.'**
+  String get welcomeHubReady;
+
+  /// No description provided for @setupTip1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart Protection'**
+  String get setupTip1Title;
+
+  /// No description provided for @setupTip1Body.
+  ///
+  /// In en, this message translates to:
+  /// **'GateKeeper tracks objects and people via RFID and Bluetooth.'**
+  String get setupTip1Body;
+
+  /// No description provided for @setupTip2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Event Detection'**
+  String get setupTip2Title;
+
+  /// No description provided for @setupTip2Body.
+  ///
+  /// In en, this message translates to:
+  /// **'The system detects every entry and exit at the door.'**
+  String get setupTip2Body;
+
+  /// No description provided for @setupTip3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Instant Alerts'**
+  String get setupTip3Title;
+
+  /// No description provided for @setupTip3Body.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive notifications even when the app is closed.'**
+  String get setupTip3Body;
+
+  /// No description provided for @startSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get startSetup;
+
+  /// No description provided for @houseName.
+  ///
+  /// In en, this message translates to:
+  /// **'House name'**
+  String get houseName;
+
+  /// No description provided for @adminUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin username'**
+  String get adminUsername;
+
+  /// No description provided for @password.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get password;
+
+  /// No description provided for @factoryCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Factory code'**
+  String get factoryCode;
+
+  /// No description provided for @fillAllFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Please fill in all fields.'**
+  String get fillAllFields;
+
+  /// No description provided for @invalidEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid email address.'**
+  String get invalidEmail;
+
+  /// No description provided for @createAndPair.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and pair'**
+  String get createAndPair;
+
+  /// No description provided for @tagsStepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the objects you want to track from the beginning. You can add more later.'**
+  String get tagsStepHint;
+
+  /// No description provided for @skipForNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip for now'**
+  String get skipForNow;
+
+  /// No description provided for @createTagsAndContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and continue'**
+  String get createTagsAndContinue;
+
+  /// No description provided for @inviteStepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite family members. You can also do this later from the Members section.'**
+  String get inviteStepHint;
+
+  /// No description provided for @finishSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get finishSetup;
+
+  /// No description provided for @setupCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup complete!'**
+  String get setupCompleteTitle;
+
+  /// No description provided for @setupCompleteSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'GateKeeper is ready to protect your home.'**
+  String get setupCompleteSubtitle;
+
+  /// No description provided for @exitSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit setup?'**
+  String get exitSetupTitle;
+
+  /// No description provided for @exitSetupBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The admin account has been created. You can continue the setup later from the Settings.'**
+  String get exitSetupBody;
+
+  /// No description provided for @exitAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to app'**
+  String get exitAction;
+
+  /// No description provided for @verifyEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify email'**
+  String get verifyEmail;
+
+  /// No description provided for @verifyEmailSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your email to complete registration.'**
+  String get verifyEmailSubtitle;
+
+  /// No description provided for @verifyEmailSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send code'**
+  String get verifyEmailSend;
+
+  /// No description provided for @verifyEmailSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending...'**
+  String get verifyEmailSending;
+
+  /// No description provided for @verifyEmailCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'6-digit code'**
+  String get verifyEmailCodeHint;
+
+  /// No description provided for @verifyEmailConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get verifyEmailConfirm;
+
+  /// No description provided for @verifyEmailSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Email verified!'**
+  String get verifyEmailSuccess;
+
+  /// No description provided for @verifyEmailError.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid or expired code.'**
+  String get verifyEmailError;
+
+  /// No description provided for @emailVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Email verified'**
+  String get emailVerified;
+
+  /// No description provided for @profileEmailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get profileEmailLabel;
+
+  /// No description provided for @profileRoleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get profileRoleLabel;
+
+  /// No description provided for @profileMemberSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Member since'**
+  String get profileMemberSince;
+
+  /// No description provided for @profileLastSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Last seen'**
+  String get profileLastSeen;
+
+  /// No description provided for @invalidUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid URL. It must start with http:// or https://'**
+  String get invalidUrl;
+
+  /// No description provided for @remoteCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote URL cleared.'**
+  String get remoteCleared;
+
+  /// No description provided for @inviteShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Invite'**
+  String get inviteShareTitle;
+
+  /// No description provided for @inviteShareSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share this QR code or token with the new member.'**
+  String get inviteShareSubtitle;
+
+  /// No description provided for @inviteExpires.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires:'**
+  String get inviteExpires;
+
+  /// No description provided for @inviteRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Role:'**
+  String get inviteRole;
 }
 
 class _AppLocalizationsDelegate

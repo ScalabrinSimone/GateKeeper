@@ -197,6 +197,8 @@ class AuthController extends ChangeNotifier {
       _stage = AuthStage.authenticated;
       unawaited(PushNotificationsService.instance.initialize());
       unawaited(RealtimeService.instance.start());
+      //Nuovo admin: segna subito "inside" al termine del pairing.
+      unawaited(_updateCurrentLocation('inside'));
     }
     notifyListeners();
   }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/config/api_config.dart';
 import '../../core/i18n/app_l10n.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/theme/app_colors.dart';
@@ -9,12 +11,14 @@ import '../../data/api/api_exception.dart';
 import '../../data/api/dto.dart';
 import '../../data/gatekeeper_api.dart';
 import '../../data/repositories/repositories.dart';
+import '../../data/services/realtime_service.dart';
 import '../../shared/models/app_user.dart';
 import '../../shared/models/enums.dart';
 import '../../shared/widgets/gk_button.dart';
 import '../../shared/widgets/gk_card.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_pill.dart';
+import '../../shared/widgets/notif_prefs_sheet.dart';
 import 'widgets/invite_share_dialog.dart';
 import 'widgets/permissions_sheet.dart';
 
@@ -37,7 +41,31 @@ class _MembersPageState extends State<MembersPage> {
   @override
   void initState() {
     super.initState();
+    //Ascolta RealtimeService per aggiornamenti in tempo reale.
+    RealtimeService.instance.addListener(_onRealtimeUpdate);
     _refresh();
+    _syncFromRealtime();
+  }
+
+  @override
+  void dispose() {
+    RealtimeService.instance.removeListener(_onRealtimeUpdate);
+    super.dispose();
+  }
+
+  void _onRealtimeUpdate() {
+    if (!mounted) return;
+    _syncFromRealtime();
+  }
+
+  void _syncFromRealtime() {
+    final rt = RealtimeService.instance;
+    if (rt.users.isNotEmpty) {
+      setState(() {
+        _users = rt.users;
+        _loading = false;
+      });
+    }
   }
 
   bool get _canManageUsers {
@@ -139,12 +167,41 @@ class _MembersPageState extends State<MembersPage> {
     }
   }
 
+  //Ritorna true se l'accesso è remoto (tunnel) — in quel caso la creazione
+  //di nuovi account/inviti è bloccata per sicurezza.
+  //Legge da SharedPreferences la URL del tunnel salvata e la confronta con
+  //il base URL corrente.
+  Future<bool> _isRemoteAccess() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final tunnelUrl = prefs.getString('gk.remote.tunnel_url') ?? '';
+      if (tunnelUrl.isEmpty) return false;
+      final base = ApiConfig.baseUrl ?? '';
+      return base.isNotEmpty && base == tunnelUrl;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _generateInvite() async {
     if (!_canManageInvites) return;
     final l10n = AppL10n.of(context);
+    //Blocca la creazione di inviti se si è connessi da remoto.
+    if (await _isRemoteAccess()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.t('inviteBlockedRemote')),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+    //Salva il context prima dell'await per evitare l'uso asincrono.
+    final ctx = context;
     final role = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Theme.of(context).cardColor,
+      context: ctx,
+      backgroundColor: Theme.of(ctx).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -308,13 +365,8 @@ class _MembersPageState extends State<MembersPage> {
                     context: context,
                     builder: (_) => InviteShareDialog(invite: inv),
                   ),
-                  onCopy: (inv) async {
-                    await Clipboard.setData(ClipboardData(text: inv.token));
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.t('inviteCopiedBody'))),
-                    );
-                  },
+                  //La copia è silenziosa: nessuna snackbar.
+                  onCopy: (inv) => Clipboard.setData(ClipboardData(text: inv.token)),
                 ),
               ],
             ],
@@ -325,7 +377,8 @@ class _MembersPageState extends State<MembersPage> {
   }
 }
 
-class _PendingInvites extends StatelessWidget {
+//StatefulWidget per gestire il feedback visivo "copia → tick" per ogni invito.
+class _PendingInvites extends StatefulWidget {
   const _PendingInvites({
     required this.invites,
     required this.onRevoke,
@@ -337,6 +390,23 @@ class _PendingInvites extends StatelessWidget {
   final Future<void> Function(InviteDto) onRevoke;
   final Future<void> Function(InviteDto) onCopy;
   final void Function(InviteDto) onShowQr;
+
+  @override
+  State<_PendingInvites> createState() => _PendingInvitesState();
+}
+
+class _PendingInvitesState extends State<_PendingInvites> {
+  //Token dell'invito attualmente in stato "copiato" (mostra tick).
+  final Set<String> _copied = {};
+
+  Future<void> _handleCopy(InviteDto inv) async {
+    await widget.onCopy(inv);
+    if (!mounted) return;
+    setState(() => _copied.add(inv.token));
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    setState(() => _copied.remove(inv.token));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -357,7 +427,7 @@ class _PendingInvites extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          for (final inv in invites)
+          for (final inv in widget.invites)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
@@ -394,18 +464,30 @@ class _PendingInvites extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => onShowQr(inv),
+                    onPressed: () => widget.onShowQr(inv),
                     icon: const Icon(Icons.qr_code_2_rounded),
                     tooltip: l10n.t('showInviteQr'),
                     color: AppColors.stormyTeal,
                   ),
-                  IconButton(
-                    onPressed: () => onCopy(inv),
-                    icon: const Icon(Icons.copy_rounded),
-                    tooltip: l10n.t('copyCode'),
+                  //Icona copia con feedback tick per 2s (silenzioso).
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: IconButton(
+                      key: ValueKey(_copied.contains(inv.token)),
+                      onPressed: () => _handleCopy(inv),
+                      icon: Icon(
+                        _copied.contains(inv.token)
+                            ? Icons.check_circle_rounded
+                            : Icons.copy_rounded,
+                        color: _copied.contains(inv.token)
+                            ? AppColors.success
+                            : null,
+                      ),
+                      tooltip: l10n.t('copyCode'),
+                    ),
                   ),
                   IconButton(
-                    onPressed: () => onRevoke(inv),
+                    onPressed: () => widget.onRevoke(inv),
                     icon: const Icon(Icons.delete_outline_rounded),
                     tooltip: l10n.t('revoke'),
                     color: AppColors.danger.withValues(alpha: 0.85),
@@ -479,16 +561,17 @@ class _MemberCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        if (user.isActive)
-                          Container(
-                            width: 8,
-                            height: 8,
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: const BoxDecoration(
-                              color: AppColors.success,
-                              shape: BoxShape.circle,
-                            ),
+                        //Il bollino verde indica che l'utente è fisicamente in casa,
+                        //non che l'account è attivo (isActive = account abilitato).
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: user.isInside ? AppColors.success : AppColors.charcoalBlue.withValues(alpha: 0.4),
+                            shape: BoxShape.circle,
                           ),
+                        ),
                         Expanded(
                           child: Text(
                             user.name,
@@ -517,15 +600,31 @@ class _MemberCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (canManage)
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert_rounded,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.55)),
-                  onSelected: (v) {
-                    if (v == 'perm') onPermissions();
-                    if (v == 'remove') onRemove();
-                  },
-                  itemBuilder: (_) => [
+              //Tre puntini sempre visibili: permessi (solo admin), notifiche (tutti).
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert_rounded,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.55)),
+                onSelected: (v) async {
+                  if (v == 'perm') onPermissions();
+                  if (v == 'remove') onRemove();
+                  if (v == 'notif') {
+                    await showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Theme.of(context).cardColor,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      builder: (_) => NotifPrefsSheet(
+                        entityId: user.id,
+                        entityName: user.name,
+                        entityIcon: Icons.person_rounded,
+                      ),
+                    );
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (canManage)
                     PopupMenuItem(
                       value: 'perm',
                       child: Row(
@@ -548,8 +647,19 @@ class _MemberCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  //Preferenze notifiche: visibile a tutti (non solo admin).
+                  PopupMenuItem(
+                    value: 'notif',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.notifications_rounded, size: 18),
+                        const SizedBox(width: 10),
+                        Text(l10n.t('notifPrefsTitle')),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           const Spacer(),
@@ -564,7 +674,8 @@ class _MemberCard extends StatelessWidget {
           _row(
             theme,
             label: l10n.t('lastSeen'),
-            value: user.lastSeenAt != null ? df.format(user.lastSeenAt!) : '—',
+            //Usa sempre l'orario locale del dispositivo.
+            value: user.lastSeenAt != null ? df.format(user.lastSeenAt!.toLocal()) : '—',
           ),
           const SizedBox(height: 16),
           if (canManage)
